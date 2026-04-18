@@ -1,0 +1,345 @@
+'use client';
+
+import { useRouter, usePathname } from "next/navigation";
+import { Zap, BarChart3, User, LogOut, ChevronDown, Plus, Settings, Users, Route, GraduationCap, Globe, MessageCircle, HelpCircle, Sparkles, ArrowRight } from "lucide-react";
+import logoMark from "@/assets/logo.png";
+import { supabase } from "@/integrations/supabase/client";
+import { useWorkspaceStore } from "@/store/workspaceStore";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { PLANS } from "@/lib/pricing";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useEffect, useState, useRef } from "react";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+
+const tabs = [
+  { label: "Funnels", path: "/dashboard", icon: Zap },
+  { label: "Analytics", path: "/analytics", icon: BarChart3 },
+  { label: "Academy", path: "https://www.skool.com/leadcommerce-4121", icon: GraduationCap, external: true },
+  { label: "Route", path: "/routing", icon: Route, soon: true },
+];
+
+export function TopNav() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { workspaces, currentWorkspaceId, setCurrentWorkspace, getCurrentWorkspace, createWorkspace, updateWorkspace } = useWorkspaceStore();
+  const { planName } = usePlanLimits();
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const u = data.user;
+      setUserEmail(u?.email || "");
+      const meta = (u?.user_metadata || {}) as Record<string, any>;
+      const name = meta.full_name || meta.name || (u?.email ? u.email.split("@")[0] : "");
+      setUserName(name);
+    });
+  }, []);
+
+  const currentWorkspace = getCurrentWorkspace();
+  const initials = (userName || userEmail || "QF")
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() || "")
+    .join("") || "QF";
+  const planLabel = PLANS.find((p) => p.name === planName)?.label || "Starter";
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim()) return;
+    const ws = await createWorkspace(newWorkspaceName.trim());
+    if (ws) {
+      setCurrentWorkspace(ws.id);
+    }
+    setNewWorkspaceName("");
+    setCreateDialogOpen(false);
+  };
+
+  const handleSaveName = () => {
+    if (tempName.trim() && currentWorkspace && tempName.trim() !== currentWorkspace.name) {
+      updateWorkspace(currentWorkspace.id, { name: tempName.trim() });
+      toast.success("Nombre actualizado");
+    }
+    setEditingName(false);
+  };
+
+  const handleWorkspaceClick = () => {
+    if (editingName) return;
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      setTempName(currentWorkspace?.name || "");
+      setEditingName(true);
+      setDropdownOpen(false);
+    } else {
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        setDropdownOpen((prev) => !prev);
+      }, 250);
+    }
+  };
+
+  return (
+    <header className="h-14 border-b bg-background flex items-center px-4 gap-6 shrink-0">
+      {/* Workspace Switcher */}
+      <div className="flex items-center gap-2">
+        {editingName ? (
+          <div className="flex items-center gap-2 px-2">
+            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
+              {currentWorkspace?.logo_url ? (
+                <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-primary-foreground">
+                  {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
+                </span>
+              )}
+            </div>
+            <Input
+              className="h-7 w-40 text-sm font-semibold"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              onBlur={handleSaveName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              autoFocus
+            />
+          </div>
+        ) : (
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="gap-2 font-semibold text-base px-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleWorkspaceClick();
+                }}
+              >
+                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
+                  {currentWorkspace?.logo_url ? (
+                    <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-primary-foreground">
+                      {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
+                    </span>
+                  )}
+                </div>
+                <span className="max-w-[160px] truncate">
+                  {currentWorkspace?.name || "Workspace"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Switch Workspace</DropdownMenuLabel>
+              {workspaces.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => setCurrentWorkspace(ws.id)}
+                  className={cn(
+                    "gap-2",
+                    ws.id === currentWorkspaceId && "bg-accent"
+                  )}
+                >
+                  <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-semibold text-primary">
+                      {ws.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="truncate">{ws.name}</span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setDropdownOpen(false); router.push("/workspace-settings"); }}>
+                <Settings className="h-4 w-4 mr-2" /> Configuración
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setDropdownOpen(false); setCreateDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" /> Nuevo Workspace
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      {/* Center tabs */}
+      <nav className="flex items-center gap-1 flex-1 justify-center">
+        {tabs.map((tab) => {
+          const isExternal = !!(tab as any).external;
+          const active = !isExternal && pathname === tab.path;
+          const disabled = !!(tab as any).soon;
+          return (
+            <Button
+              key={tab.label}
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (disabled) return;
+                if (isExternal) {
+                  window.open(tab.path, "_blank", "noopener,noreferrer");
+                } else {
+                  router.push(tab.path);
+                }
+              }}
+              disabled={disabled}
+              className={cn(
+                "gap-2 rounded-lg px-4",
+                disabled
+                  ? "text-muted-foreground/50 cursor-not-allowed"
+                  : active
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {disabled && (
+                <span className="text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-1 font-medium">soon</span>
+              )}
+            </Button>
+          );
+        })}
+      </nav>
+
+      {/* Right section */}
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden">
+            <div className="px-4 pt-4 pb-3">
+              <p className="text-base font-semibold text-foreground truncate">
+                {userName || "Usuario"}
+              </p>
+              <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
+              <p className="mt-3 text-sm font-semibold text-foreground">
+                Plan {planLabel}
+              </p>
+            </div>
+
+            <DropdownMenuSeparator className="my-0" />
+
+            <div className="py-1">
+              <DropdownMenuItem
+                onClick={() => router.push("/profile")}
+                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
+              >
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push("/workspace-settings")}
+                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
+              >
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <span>Workspace</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("mailto:soporte@leadflow.es", "_blank")}
+                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
+              >
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                <span>Contact Support</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
+                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
+              >
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                <span>Help &amp; Tips</span>
+              </DropdownMenuItem>
+            </div>
+
+            <DropdownMenuSeparator className="my-0" />
+
+            <div className="py-1">
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="px-4 py-2.5 text-sm gap-3 cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="font-medium">Logout</span>
+              </DropdownMenuItem>
+            </div>
+
+            {planName === "starter" && (
+              <button
+                onClick={() => router.push("/profile")}
+                className="w-full text-left bg-muted/50 hover:bg-muted transition-colors px-4 py-3 flex items-center gap-3 border-t"
+              >
+                <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground leading-tight">
+                    Ahorra y desbloquea<br />nuevas funciones
+                  </p>
+                  <p className="text-sm text-primary font-medium mt-0.5 flex items-center gap-1">
+                    Mejorar plan <ArrowRight className="h-3.5 w-3.5" />
+                  </p>
+                </div>
+              </button>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Create Workspace Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo Workspace</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Nombre del workspace"
+            value={newWorkspaceName}
+            onChange={(e) => setNewWorkspaceName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>Crear</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </header>
+  );
+}

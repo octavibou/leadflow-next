@@ -1,0 +1,1 @@
+UPDATE public.subscriptions SET leads_used_current_period = 350, updated_at = now() WHERE id = '656cb9f7-2f2d-41e6-b2cd-4131567b234b';

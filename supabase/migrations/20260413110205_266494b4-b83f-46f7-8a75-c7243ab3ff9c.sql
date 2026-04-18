@@ -1,0 +1,1 @@
+ALTER TABLE public.route_invitations ADD CONSTRAINT route_invitations_workspace_client_unique UNIQUE (workspace_id, client_id);

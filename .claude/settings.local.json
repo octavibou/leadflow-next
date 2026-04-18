@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx next *)",
+      "Bash(find /Users/octavi/Downloads/embeddable-quiz-main/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec sed -i '' 's|\"@/pages/|\"@/views/|g' {} \\\\;)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(node -e \"const p = require\\('/Users/octavi/Downloads/embeddable-quiz-main/package.json'\\); const all = {...p.dependencies,...p.devDependencies}; const old = ['react-router-dom','vite','@vitejs/plugin-react-swc','lovable-tagger']; old.forEach\\(k => all[k] && console.log\\('STILL IN package.json:', k\\)\\)\")"
+    ]
+  }
+}
