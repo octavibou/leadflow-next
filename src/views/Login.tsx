@@ -20,12 +20,19 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      router.push("/dashboard");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.log("[v0] Supabase auth error:", error);
+        toast.error(error.message);
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      console.log("[v0] Network/fetch error:", err);
+      toast.error("Error de conexión. Verifica tu conexión a internet.");
+    } finally {
+      setLoading(false);
     }
   };
 
