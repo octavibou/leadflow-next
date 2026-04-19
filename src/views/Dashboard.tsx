@@ -193,11 +193,11 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
     { date: "Sab", leads: 0 },
     { date: "Dom", leads: 0 },
   ]);
+  const [leadsTotal, setLeadsTotal] = useState(0);
 
   useEffect(() => {
     const fetchLeadsData = async () => {
       try {
-        // Get leads data for last 7 days
         const last7Days = Array.from({ length: 7 }, (_, i) => {
           const date = new Date();
           date.setDate(date.getDate() - (6 - i));
@@ -216,6 +216,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
             leads: data.filter((l) => l.created_at.startsWith(date)).length,
           }));
           setChartData(leadsPerDay);
+          setLeadsTotal(data.length);
         }
       } catch (err) {
         console.error("Error fetching leads data:", err);
@@ -226,9 +227,9 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   }, [funnel.id]);
 
   return (
-    <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
-      <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
-      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 overflow-hidden p-2">
+    <div className="relative max-w-sm rounded-xl bg-gradient-to-br from-muted to-accent/40 shadow-lg overflow-hidden">
+      {/* Chart Section */}
+      <div className="h-48 flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 p-2">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 10, right: 5, left: -30, bottom: 20 }}>
             <XAxis 
@@ -250,31 +251,50 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <CardHeader className="p-3">
-        <CardAction>
-          <Badge variant="secondary" className="gap-1 text-xs">
-            <Sparkle className="h-2.5 w-2.5" weight="fill" />
-            {typeLabel}
-          </Badge>
-        </CardAction>
-        <CardTitle className="text-sm">{funnel.name}</CardTitle>
-        <CardDescription className="text-xs">
-          Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
-            month: "short",
-            day: "numeric",
-          })}
-        </CardDescription>
-      </CardHeader>
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <FunnelDropdown
-          onEdit={onEdit}
-          onCampaigns={onCampaigns}
-          onDuplicate={onDuplicate}
-          onExport={onExport}
-          onDelete={onDelete}
-        />
-      </div>
-    </Card>
+
+      {/* Card Content */}
+      <Card className="border-none rounded-none">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <Badge variant="secondary" className="gap-1 text-xs mb-2">
+                <Sparkle className="h-2.5 w-2.5" weight="fill" />
+                {typeLabel}
+              </Badge>
+              <CardTitle className="text-base">{funnel.name}</CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-3">
+          <p className="text-xs text-muted-foreground">
+            Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+          <p className="text-sm font-semibold mt-2">{leadsTotal} leads en 7 días</p>
+        </CardContent>
+        <CardFooter className="gap-2">
+          <Button
+            size="sm"
+            className="flex-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
+            Abrir
+          </Button>
+          <FunnelDropdown
+            onEdit={onEdit}
+            onCampaigns={onCampaigns}
+            onDuplicate={onDuplicate}
+            onExport={onExport}
+            onDelete={onDelete}
+          />
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
 
