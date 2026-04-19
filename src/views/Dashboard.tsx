@@ -216,18 +216,23 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           .from('leads')
           .select('created_at')
           .eq('funnel_id', funnel.id)
-          .gte('created_at', last7Days[0]);
+          .gte('created_at', last7Days[0] + 'T00:00:00');
 
-        if (!error && data) {
+        if (error) {
+          console.error("[v0] Error fetching leads:", error);
+          return;
+        }
+
+        if (data) {
           const leadsPerDay = last7Days.map((date, i) => ({
             date: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sab", "Dom"][i],
-            leads: data.filter((l) => l.created_at.startsWith(date)).length,
+            leads: data.filter((l) => l.created_at && l.created_at.startsWith(date)).length,
           }));
           setChartData(leadsPerDay);
           setLeadsTotal(data.length);
         }
       } catch (err) {
-        console.error("Error fetching leads data:", err);
+        console.error("[v0] Error fetching leads data:", err);
       }
     };
 
