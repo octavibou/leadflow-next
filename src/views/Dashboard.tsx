@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -229,26 +228,25 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   return (
     <div className="rounded-2xl overflow-hidden bg-background shadow-md hover:shadow-lg transition-shadow cursor-pointer" onClick={onEdit}>
       {/* Chart Section - Image Area */}
-      <div className="h-64 bg-gradient-to-br from-slate-600 via-purple-500 to-pink-400 flex items-center justify-center p-4 relative">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 15, right: 10, left: -20, bottom: 25 }}>
-            <XAxis 
-              dataKey="date" 
-              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.7)" }}
-              angle={0}
-              textAnchor="middle"
-            />
-            <YAxis 
-              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.7)" }}
-              width={35}
-            />
-            <Bar 
-              dataKey="leads" 
-              fill="rgba(255,255,255,0.9)"
-              radius={[6, 6, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="h-64 bg-gradient-to-br from-slate-600 via-purple-500 to-pink-400 flex items-center justify-center p-6 relative">
+        <div className="w-full h-full flex items-end justify-center gap-2">
+          {chartData.map((item, index) => {
+            const maxLeads = Math.max(...chartData.map(d => d.leads), 1);
+            const heightPercent = (item.leads / maxLeads) * 100;
+            
+            return (
+              <div key={index} className="flex-1 flex flex-col items-center gap-1.5">
+                <div className="w-full bg-white/30 backdrop-blur-sm rounded-md overflow-hidden relative h-32 flex items-end justify-center">
+                  <div
+                    className="w-full bg-white rounded-md transition-all duration-300"
+                    style={{ height: `${Math.max(heightPercent, 10)}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-white">{item.date}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Content Section - White Area */}
