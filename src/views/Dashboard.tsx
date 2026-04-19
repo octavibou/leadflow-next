@@ -183,17 +183,16 @@ interface FunnelActionProps {
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   return (
-    <Card className="relative mx-auto w-full pt-0 cursor-pointer group">
+    <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
       <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
       <div
         className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 brightness-60 grayscale"
-        onClick={onEdit}
       >
         <div className="text-5xl font-bold text-foreground/10">
           {funnel.name.charAt(0).toUpperCase()}
         </div>
       </div>
-      <CardHeader onClick={onEdit} className="p-3">
+      <CardHeader className="p-3">
         <CardAction>
           <Badge variant="secondary" className="gap-1 text-xs">
             <Sparkle className="h-2.5 w-2.5" weight="fill" />
@@ -208,27 +207,15 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           })}
         </CardDescription>
       </CardHeader>
-      <CardFooter className="p-3">
-        <Button
-          size="sm"
-          className="w-full text-xs"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          Abrir funnel
-        </Button>
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <FunnelDropdown
-            onEdit={onEdit}
-            onCampaigns={onCampaigns}
-            onDuplicate={onDuplicate}
-            onExport={onExport}
-            onDelete={onDelete}
-          />
-        </div>
-      </CardFooter>
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <FunnelDropdown
+          onEdit={onEdit}
+          onCampaigns={onCampaigns}
+          onDuplicate={onDuplicate}
+          onExport={onExport}
+          onDelete={onDelete}
+        />
+      </div>
     </Card>
   );
 }
