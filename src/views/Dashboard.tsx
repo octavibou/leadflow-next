@@ -243,7 +243,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
     >
       {/* Three dots top-right */}
       <div
-        className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-3 right-3 z-10"
         onClick={(e) => e.stopPropagation()}
       >
         <FunnelDropdown
