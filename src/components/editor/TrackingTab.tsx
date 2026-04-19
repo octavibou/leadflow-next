@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, CheckCircle, PaperPlaneTilt, SpinnerGap, Warning, ArrowSquareOut } from "@phosphor-icons/react";
+import { Pulse, CheckCircle, PaperPlaneTilt, SpinnerGap, Warning, ArrowSquareOut } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
 import type { Funnel, FunnelSettings } from "@/types/funnel";
 
@@ -113,7 +113,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
       <div className="border rounded-xl p-6 bg-card space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <Activity className="h-5 w-5 text-blue-500" weight="bold" />
+            <Pulse className="h-5 w-5 text-blue-500" weight="bold" />
           </div>
           <div>
             <h3 className="text-sm font-semibold">Meta (Facebook)</h3>
