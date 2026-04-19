@@ -209,17 +209,18 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
     <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
       <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
       <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 overflow-hidden">
-        <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid meet">
+        <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
           <polyline
-            points="10,120 40,100 70,110 100,70 130,90 160,40 190,60"
+            points="20,150 50,120 80,130 110,80 140,100 170,50 190,70"
             fill="none"
             stroke="hsl(var(--primary))"
-            strokeWidth="2"
-            vectorEffect="non-scaling-stroke"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-          <p className="text-3xl font-bold text-white drop-shadow-lg">{leadsTotal}</p>
+          <p className="text-4xl font-bold text-white drop-shadow-lg">{leadsTotal}</p>
           <p className="text-xs text-white/80 drop-shadow-lg">últimos 7 días</p>
         </div>
       </div>
