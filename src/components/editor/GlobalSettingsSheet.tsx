@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFunnelStore } from "@/store/funnelStore";
 import { LANGUAGE_LABELS } from "@/lib/i18n";
-import { Copy, Check, ChevronDown, Globe, Activity } from "lucide-react";
+import { Copy, Check, CaretDown, Globe, Activity } from "@phosphor-icons/react";
 import type { Language } from "@/lib/i18n";
 import type { Funnel, FunnelSettings } from "@/types/funnel";
 
@@ -214,7 +214,7 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
                       onClick={() => setExpandedQuestion(expandedQuestion === "__qualified" ? null : "__qualified")}
                       className="shrink-0 p-1 rounded hover:bg-muted transition-colors"
                     >
-                      <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedQuestion === "__qualified" ? "rotate-180" : ""}`} />
+                      <CaretDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedQuestion === "__qualified" ? "rotate-180" : ""}`} />
                     </button>
                     <span className="font-mono bg-background border rounded px-2 py-1 flex-1 truncate">qualified</span>
                     <button onClick={() => copyToClipboard("qualified")} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
@@ -255,7 +255,7 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
                           onClick={() => setExpandedQuestion(isExpanded ? null : step.id)}
                           className="shrink-0 p-1 rounded hover:bg-muted transition-colors"
                         >
-                          <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          <CaretDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                         </button>
                         <span className="font-mono bg-background border rounded px-2 py-1 flex-1 truncate" title={label}>{label}</span>
                         <button onClick={() => copyToClipboard(label)} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
