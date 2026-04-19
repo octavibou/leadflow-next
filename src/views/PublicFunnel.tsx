@@ -76,6 +76,11 @@ const PublicFunnel = () => {
       .single()
       .then(({ data, error }) => {
         if (data && !error) {
+          // Check if funnel is published
+          if (data.status !== "published") {
+            setLoading(false);
+            return;
+          }
           setFunnel({
             id: data.id,
             user_id: data.user_id,
@@ -84,6 +89,9 @@ const PublicFunnel = () => {
             type: data.type as FunnelType,
             settings: data.settings as any,
             steps: (data.steps as any) || [],
+            status: data.status,
+            published_at: data.published_at,
+            archived_at: data.archived_at,
             created_at: data.created_at,
             updated_at: data.updated_at,
             saved_at: data.saved_at || data.updated_at,
@@ -359,6 +367,22 @@ const PublicFunnel = () => {
 
   return (
     <div className="h-[100dvh] bg-white flex flex-col overflow-hidden" style={{ fontFamily: font }}>
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4">
+            <div className="h-12 w-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto" />
+            <p className="text-gray-500">Cargando...</p>
+          </div>
+        </div>
+      ) : !funnel ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4 px-6">
+            <h1 className="text-2xl font-bold">Formulario no disponible</h1>
+            <p className="text-gray-500 max-w-sm">Este formulario no ha sido publicado o no existe. Por favor, verifica el enlace e intenta de nuevo.</p>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Logo */}
       {funnel.settings.logoUrl && (
         <div className="flex justify-center pt-4 pb-0 shrink-0">
@@ -571,6 +595,8 @@ const PublicFunnel = () => {
             <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

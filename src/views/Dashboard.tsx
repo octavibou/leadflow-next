@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Archive, Undo } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useFunnelStore } from "@/store/funnelStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { FUNNEL_TYPE_LABELS } from "@/types/funnel";
+import type { FunnelStatus } from "@/types/funnel";
 import { TemplatePicker } from "@/components/TemplatePicker";
 import { PendingInvitations } from "@/components/workspace/PendingInvitations";
 import { exportFunnelToHtml } from "@/lib/exportHtml";
@@ -26,6 +27,7 @@ const Dashboard = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [statusFilter, setStatusFilter] = useState<FunnelStatus | "all">("all");
   const router = useRouter();
 
   const handleNewFunnel = () => {
@@ -40,9 +42,11 @@ const Dashboard = () => {
     fetchFunnels(currentWorkspaceId || undefined);
   }, [fetchFunnels, currentWorkspaceId]);
 
-  const filteredFunnels = funnels.filter((f) =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFunnels = funnels.filter((f) => {
+    const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || f.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleExport = (id: string) => {
     const funnel = useFunnelStore.getState().getFunnel(id);
@@ -72,6 +76,40 @@ const Dashboard = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 w-56"
             />
+          </div>
+          <div className="flex items-center gap-2 border rounded-lg">
+            <Button
+              variant={statusFilter === "all" ? "ghost" : "outline"}
+              size="sm"
+              className={statusFilter === "all" ? "bg-accent" : ""}
+              onClick={() => setStatusFilter("all")}
+            >
+              Todos
+            </Button>
+            <Button
+              variant={statusFilter === "published" ? "ghost" : "outline"}
+              size="sm"
+              className={statusFilter === "published" ? "bg-accent" : ""}
+              onClick={() => setStatusFilter("published")}
+            >
+              Publicados
+            </Button>
+            <Button
+              variant={statusFilter === "draft" ? "ghost" : "outline"}
+              size="sm"
+              className={statusFilter === "draft" ? "bg-accent" : ""}
+              onClick={() => setStatusFilter("draft")}
+            >
+              Borradores
+            </Button>
+            <Button
+              variant={statusFilter === "archived" ? "ghost" : "outline"}
+              size="sm"
+              className={statusFilter === "archived" ? "bg-accent" : ""}
+              onClick={() => setStatusFilter("archived")}
+            >
+              Archivados
+            </Button>
           </div>
           <div className="flex items-center border rounded-lg">
             <Button
@@ -237,6 +275,24 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           <Badge variant="secondary" className="text-xs">
             {leadsTotal} leads
           </Badge>
+          {funnel.status === "published" && (
+            <Badge className="gap-1 text-xs bg-green-500/10 text-green-700 border-green-200">
+              <div className="h-1.5 w-1.5 bg-green-500 rounded-full" />
+              Publicado
+            </Badge>
+          )}
+          {funnel.status === "draft" && (
+            <Badge className="gap-1 text-xs bg-yellow-500/10 text-yellow-700 border-yellow-200">
+              <div className="h-1.5 w-1.5 bg-yellow-500 rounded-full" />
+              Borrador
+            </Badge>
+          )}
+          {funnel.status === "archived" && (
+            <Badge className="gap-1 text-xs bg-gray-500/10 text-gray-700 border-gray-200">
+              <div className="h-1.5 w-1.5 bg-gray-500 rounded-full" />
+              Archivado
+            </Badge>
+          )}
         </CardDescription>
       </CardHeader>
 

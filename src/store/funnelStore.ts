@@ -15,6 +15,9 @@ interface FunnelStore {
   saveFunnel: (id: string) => Promise<void>;
   deleteFunnel: (id: string) => Promise<void>;
   duplicateFunnel: (id: string) => Promise<Funnel | null>;
+  publishFunnel: (id: string) => Promise<void>;
+  archiveFunnel: (id: string) => Promise<void>;
+  unarchiveFunnel: (id: string) => Promise<void>;
   getFunnel: (id: string) => Funnel | undefined;
 }
 
@@ -29,6 +32,9 @@ function dbToFunnel(row: any): Funnel {
     type: row.type,
     settings: row.settings as Funnel["settings"],
     steps: (row.steps as FunnelStep[]) || [],
+    status: row.status || "draft",
+    published_at: row.published_at,
+    archived_at: row.archived_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
     saved_at: row.saved_at || row.updated_at,
@@ -167,4 +173,44 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
   },
 
   getFunnel: (id) => get().funnels.find((f) => f.id === id),
-}));
+
+  publishFunnel: async (id) => {
+    const now = new Date().toISOString();
+    await supabase
+      .from("funnels")
+      .update({ status: "published", published_at: now })
+      .eq("id", id);
+    set((s) => ({
+      funnels: s.funnels.map((f) =>
+        f.id === id ? { ...f, status: "published", published_at: now } : f
+      ),
+    }));
+  },
+
+  archiveFunnel: async (id) => {
+    const now = new Date().toISOString();
+    await supabase
+      .from("funnels")
+      .update({ status: "archived", archived_at: now })
+      .eq("id", id);
+    set((s) => ({
+      funnels: s.funnels.map((f) =>
+        f.id === id ? { ...f, status: "archived", archived_at: now } : f
+      ),
+    }));
+  },
+
+  unarchiveFunnel: async (id) => {
+    const funnel = get().funnels.find((f) => f.id === id);
+    const newStatus = funnel?.published_at ? "published" : "draft";
+    await supabase
+      .from("funnels")
+      .update({ status: newStatus, archived_at: null })
+      .eq("id", id);
+    set((s) => ({
+      funnels: s.funnels.map((f) =>
+        f.id === id ? { ...f, status: newStatus as any, archived_at: null } : f
+      ),
+    }));
+  },
+}
