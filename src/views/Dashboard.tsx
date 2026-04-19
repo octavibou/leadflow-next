@@ -266,7 +266,6 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           className="flex-1"
           onClick={(e) => {
             e.stopPropagation();
-            console.log("[v0] Clicking open funnel button for:", funnel.id);
             onEdit();
           }}
         >

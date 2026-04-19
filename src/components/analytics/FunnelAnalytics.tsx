@@ -54,6 +54,10 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
 
+  if (!funnelId || !steps || steps.length === 0) {
+    return <div className="p-6 text-center text-muted-foreground">Cargando datos...</div>;
+  }
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
