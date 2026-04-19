@@ -105,14 +105,14 @@ const Dashboard = () => {
       </div>
 
       {loading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <Skeleton className="aspect-[16/10] w-full rounded-t-lg" />
-              <CardContent className="space-y-2">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-                <Skeleton className="h-5 w-20 rounded-full" />
+              <CardContent className="pt-6 space-y-4">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full rounded-md" />
               </CardContent>
             </Card>
           ))}
@@ -137,7 +137,7 @@ const Dashboard = () => {
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {filteredFunnels.map((f) => (
             <FunnelCard
               key={f.id}
@@ -184,14 +184,14 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   return (
     <Card
-      className="group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all duration-200"
+      className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-200"
       onClick={onEdit}
     >
-      <div className="relative aspect-[16/10] bg-gradient-to-br from-muted to-accent/40 flex items-center justify-center overflow-hidden rounded-t-lg">
-        <div className="text-5xl font-bold text-foreground/10">
+      <div className="relative aspect-video bg-gradient-to-br from-muted to-accent/40 flex items-center justify-center">
+        <div className="text-6xl font-bold text-foreground/10">
           {funnel.name.charAt(0).toUpperCase()}
         </div>
-        <div className="absolute top-3 left-3 flex items-center gap-2">
+        <div className="absolute top-4 left-4 flex items-center gap-2">
           <Badge variant="secondary" className="gap-1 shadow-sm backdrop-blur-sm bg-background/80">
             <Sparkle className="h-3 w-3" weight="fill" />
             {typeLabel}
@@ -207,10 +207,10 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           />
         </div>
       </div>
-      <CardContent className="flex flex-col gap-4">
-        <div className="space-y-1">
-          <h3 className="font-semibold text-sm truncate">{funnel.name}</h3>
-          <p className="text-xs text-muted-foreground">
+      <CardContent className="pt-6 pb-6 flex flex-col gap-6">
+        <div className="space-y-2">
+          <h3 className="font-semibold text-base">{funnel.name}</h3>
+          <p className="text-sm text-muted-foreground">
             Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
               month: "short",
               day: "numeric",
@@ -219,6 +219,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           </p>
         </div>
         <Button
+          size="lg"
           className="w-full group/btn"
           onClick={(e) => {
             e.stopPropagation();
@@ -226,7 +227,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           }}
         >
           Abrir funnel
-          <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" weight="bold" />
+          <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover/btn:translate-x-1" weight="bold" />
         </Button>
       </CardContent>
     </Card>
