@@ -244,80 +244,44 @@ export function TopNav() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden">
-            <div className="px-4 pt-4 pb-3">
-              <p className="text-base font-semibold text-foreground truncate">
-                {userName || "Usuario"}
-              </p>
-              <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
-              <p className="mt-3 text-sm font-semibold text-foreground">
-                Plan {planLabel}
-              </p>
-            </div>
-
-            <DropdownMenuSeparator className="my-0" />
-
-            <div className="py-1">
-              <DropdownMenuItem
-                onClick={() => router.push("/profile")}
-                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
-              >
-                <User className="h-4 w-4 text-muted-foreground" weight="bold" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => router.push("/workspace-settings")}
-                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
-              >
-                <Globe className="h-4 w-4 text-muted-foreground" weight="bold" />
-                <span>Workspace</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open("mailto:soporte@leadflow.es", "_blank")}
-                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
-              >
-                <ChatCircle className="h-4 w-4 text-muted-foreground" weight="bold" />
-                <span>Contact Support</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
-                className="px-4 py-2.5 text-sm gap-3 cursor-pointer"
-              >
-                <Question className="h-4 w-4 text-muted-foreground" weight="bold" />
-                <span>Help &amp; Tips</span>
-              </DropdownMenuItem>
-            </div>
-
-            <DropdownMenuSeparator className="my-0" />
-
-            <div className="py-1">
-              <DropdownMenuItem
-                onClick={handleSignOut}
-                className="px-4 py-2.5 text-sm gap-3 cursor-pointer text-destructive focus:text-destructive"
-              >
-                <SignOut className="h-4 w-4" weight="bold" />
-                <span className="font-medium">Logout</span>
-              </DropdownMenuItem>
-            </div>
-
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col">
+                <span className="font-semibold truncate">{userName || "Usuario"}</span>
+                <span className="text-xs text-muted-foreground font-normal truncate">{userEmail}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <User className="h-4 w-4 mr-2" weight="bold" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/workspace-settings")}>
+              <Globe className="h-4 w-4 mr-2" weight="bold" />
+              Workspace
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.open("mailto:soporte@leadflow.es", "_blank")}>
+              <ChatCircle className="h-4 w-4 mr-2" weight="bold" />
+              Contact Support
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}>
+              <Question className="h-4 w-4 mr-2" weight="bold" />
+              Help &amp; Tips
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {planName === "starter" && (
-              <button
-                onClick={() => router.push("/profile")}
-                className="w-full text-left bg-muted/50 hover:bg-muted transition-colors px-4 py-3 flex items-center gap-3 border-t"
-              >
-                <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                  <Sparkle className="h-5 w-5 text-primary" weight="fill" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground leading-tight">
-                    Ahorra y desbloquea<br />nuevas funciones
-                  </p>
-                  <p className="text-sm text-primary font-medium mt-0.5 flex items-center gap-1">
-                    Mejorar plan <ArrowRight className="h-3.5 w-3.5" weight="bold" />
-                  </p>
-                </div>
-              </button>
+              <>
+                <DropdownMenuItem onClick={() => router.push("/profile")}>
+                  <Sparkle className="h-4 w-4 mr-2" weight="fill" />
+                  Mejorar plan
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
             )}
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+              <SignOut className="h-4 w-4 mr-2" weight="bold" />
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

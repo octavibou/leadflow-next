@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useFunnelStore } from "@/store/funnelStore";
-import { Copy, Check, Eye, Code, Rocket, CheckCircle2, Link } from "lucide-react";
+import { Copy, Check, Eye, Code, Rocket, CheckCircle, Link } from "@phosphor-icons/react";
 import type { Funnel } from "@/types/funnel";
 
 export function PublishTab({ funnel }: { funnel: Funnel }) {
@@ -56,7 +56,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
       {/* URL display */}
       <div className="border rounded-xl p-4 bg-card">
         <div className="flex items-center gap-2">
-          <Link className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Link className="h-4 w-4 text-muted-foreground shrink-0" weight="bold" />
           <Input
             readOnly
             value={url}
@@ -68,7 +68,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
             onClick={() => copy(url, "URL")}
             className="shrink-0 gap-1.5"
           >
-            {copied === "URL" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied === "URL" ? <Check className="h-3.5 w-3.5" weight="bold" /> : <Copy className="h-3.5 w-3.5" weight="bold" />}
             Copiar
           </Button>
         </div>
@@ -81,7 +81,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
           className="flex-1 gap-2 h-12"
           onClick={() => window.open(url, "_blank")}
         >
-          <Eye className="h-4 w-4" />
+          <Eye className="h-4 w-4" weight="bold" />
           Preview
         </Button>
         <Button
@@ -91,12 +91,12 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
         >
           {hasUnsavedChanges ? (
             <>
-              <Rocket className="h-4 w-4" />
+              <Rocket className="h-4 w-4" weight="bold" />
               {publishing ? "Publicando..." : "Publicar ahora"}
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4" />
+              <CheckCircle className="h-4 w-4" weight="bold" />
               Funnel publicado
             </>
           )}
@@ -106,7 +106,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
       {/* Embed code */}
       <div className="border rounded-xl p-6 bg-card space-y-3">
         <div className="flex items-center gap-2">
-          <Code className="h-4 w-4 text-muted-foreground" />
+          <Code className="h-4 w-4 text-muted-foreground" weight="bold" />
           <h3 className="text-sm font-semibold">Embed en tu web</h3>
         </div>
         <div className="bg-muted rounded-lg p-3">
@@ -118,7 +118,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
           onClick={() => copy(embedCode, "Embed")}
           className="gap-1.5"
         >
-          {copied === "Embed" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied === "Embed" ? <Check className="h-3.5 w-3.5" weight="bold" /> : <Copy className="h-3.5 w-3.5" weight="bold" />}
           Copiar código embed
         </Button>
       </div>

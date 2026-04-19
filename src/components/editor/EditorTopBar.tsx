@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Home, Settings, Save, Monitor, Smartphone, Eye, Zap, BarChart3, Webhook, Activity, Rocket, FlaskConical } from "lucide-react";
+import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, ChartBar, Webhooks, Activity, Rocket, Flask } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,13 +11,13 @@ import type { EditorTab } from "@/views/FunnelEditor";
 import { useFunnelStore } from "@/store/funnelStore";
 import { cn } from "@/lib/utils";
 
-const editorTabs: { id: EditorTab; label: string; icon: typeof Zap }[] = [
-  { id: "funnel", label: "Funnel", icon: Zap },
-  { id: "webhook", label: "Webhook", icon: Webhook },
+const editorTabs: { id: EditorTab; label: string; icon: typeof Lightning }[] = [
+  { id: "funnel", label: "Funnel", icon: Lightning },
+  { id: "webhook", label: "Webhook", icon: Webhooks },
   { id: "tracking", label: "Tracking", icon: Activity },
   { id: "publish", label: "Publish", icon: Rocket },
-  { id: "ab_test", label: "A/B Test", icon: FlaskConical },
-  { id: "metrics", label: "Metrics", icon: BarChart3 },
+  { id: "ab_test", label: "A/B Test", icon: Flask },
+  { id: "metrics", label: "Metrics", icon: ChartBar },
 ];
 
 interface EditorTopBarProps {
@@ -63,7 +63,7 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
       {/* Left: Home + Name */}
       <div className="flex items-center gap-3 min-w-0">
         <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push("/dashboard")}>
-          <Home className="h-4 w-4" />
+          <House className="h-4 w-4" weight="bold" />
         </Button>
         {editing ? (
           <Input
@@ -86,23 +86,27 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
 
       {/* Center: Tabs */}
       <nav className="flex-1 flex items-center justify-center gap-1">
-        {editorTabs.map((tab) => (
-          <Button
-            key={tab.id}
-            variant="ghost"
-            size="sm"
-            onClick={() => handleTabClick(tab.id)}
-            className={cn(
-              "gap-2 rounded-lg px-4",
-              activeTab === tab.id
-                ? "bg-accent text-accent-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </Button>
-        ))}
+        {editorTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <Button
+              key={tab.id}
+              variant="ghost"
+              size="sm"
+              onClick={() => handleTabClick(tab.id)}
+              className={cn(
+                "gap-2 rounded-lg px-4",
+                isActive
+                  ? "bg-accent text-accent-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" weight={isActive ? "fill" : "bold"} />
+              {tab.label}
+            </Button>
+          );
+        })}
       </nav>
 
       {/* Right: Actions */}
@@ -115,7 +119,7 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
             className="h-7 w-7"
             onClick={viewMode === "desktop" ? onToggleView : undefined}
           >
-            <Smartphone className="h-3.5 w-3.5" />
+            <DeviceMobile className="h-3.5 w-3.5" weight={viewMode === "mobile" ? "fill" : "bold"} />
           </Button>
           <Button
             variant={viewMode === "desktop" ? "default" : "ghost"}
@@ -123,23 +127,23 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
             className="h-7 w-7"
             onClick={viewMode === "mobile" ? onToggleView : undefined}
           >
-            <Monitor className="h-3.5 w-3.5" />
+            <Monitor className="h-3.5 w-3.5" weight={viewMode === "desktop" ? "fill" : "bold"} />
           </Button>
         </div>
 
         {/* Preview */}
         <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview">
-          <Eye className="h-4 w-4" />
+          <Eye className="h-4 w-4" weight="bold" />
         </Button>
 
         {/* Settings */}
         <Button variant="ghost" size="icon" onClick={onOpenSettings}>
-          <Settings className="h-4 w-4" />
+          <Gear className="h-4 w-4" weight="bold" />
         </Button>
 
         {/* Save */}
         <Button onClick={handleSave} className="relative">
-          <Save className="h-4 w-4 mr-2" /> Guardar
+          <FloppyDisk className="h-4 w-4 mr-2" weight="bold" /> Guardar
           {hasUnsavedChanges && (
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-background" />
           )}

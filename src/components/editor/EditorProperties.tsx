@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Plus, GripVertical, Monitor, Smartphone } from "lucide-react";
+import { Trash, Plus, DotsSixVertical, Monitor, DeviceMobile } from "@phosphor-icons/react";
 import type { Funnel, FunnelStep, QuestionOption, ContactField, ThankYouNextStep } from "@/types/funnel";
 import { ResultsPropertiesAdvanced } from "./ResultsPropertiesAdvanced";
 
@@ -101,13 +101,13 @@ function IntroProps({ step, update }: { step: FunnelStep; update: (u: Partial<Fu
             onClick={() => setDevice("desktop")}
             className={`p-1.5 rounded-md transition-colors ${device === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <Monitor className="h-3.5 w-3.5" />
+            <Monitor className="h-3.5 w-3.5" weight="bold" />
           </button>
           <button
             onClick={() => setDevice("mobile")}
             className={`p-1.5 rounded-md transition-colors ${device === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <Smartphone className="h-3.5 w-3.5" />
+            <DeviceMobile className="h-3.5 w-3.5" weight="bold" />
           </button>
         </div>
       </div>
@@ -191,10 +191,10 @@ function QuestionProps({ step, update }: { step: FunnelStep; update: (u: Partial
         {q.options.map((opt) => (
           <div key={opt.id} className="border rounded-lg p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <GripVertical className="h-3 w-3 text-muted-foreground" />
+              <DotsSixVertical className="h-3 w-3 text-muted-foreground" weight="bold" />
               <Input className="h-7 text-sm w-12 text-center" value={opt.emoji} onChange={(e) => setOpt(opt.id, { emoji: e.target.value })} />
               <Input className="h-7 text-sm flex-1" value={opt.label} onChange={(e) => setOpt(opt.id, { label: e.target.value, value: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-") })} />
-              <button onClick={() => delOpt(opt.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+              <button onClick={() => delOpt(opt.id)} className="text-muted-foreground hover:text-destructive"><Trash className="h-3.5 w-3.5" weight="bold" /></button>
             </div>
             <div className="flex items-center gap-2 pl-5">
               <Badge
@@ -230,7 +230,7 @@ function QuestionProps({ step, update }: { step: FunnelStep; update: (u: Partial
         ))}
       </div>
       <Button size="sm" variant="outline" onClick={addOpt} className="w-full">
-        <Plus className="h-4 w-4 mr-1" /> Añadir opción
+        <Plus className="h-4 w-4 mr-1" weight="bold" /> Añadir opción
       </Button>
     </>
   );
@@ -404,14 +404,14 @@ function ThankYouProps({ step, update }: { step: FunnelStep; update: (u: Partial
             <div key={i} className="border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <Badge variant="outline" className="text-xs">Paso {ns.number}</Badge>
-                <button onClick={() => removeNs(i)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                <button onClick={() => removeNs(i)} className="text-muted-foreground hover:text-destructive"><Trash className="h-3.5 w-3.5" weight="bold" /></button>
               </div>
               <Field label="Título" value={ns.title} onChange={(v) => updateNs(i, { title: v })} />
               <Field label="Descripción" value={ns.description} onChange={(v) => updateNs(i, { description: v })} />
             </div>
           ))}
           <Button size="sm" variant="outline" onClick={addNextStep} className="w-full">
-            <Plus className="h-4 w-4 mr-1" /> Añadir paso
+            <Plus className="h-4 w-4 mr-1" weight="bold" /> Añadir paso
           </Button>
         </>
       )}

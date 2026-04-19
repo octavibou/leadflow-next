@@ -2,7 +2,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { User, Mail, CreditCard, Loader2, BarChart3, TrendingUp } from "lucide-react";
+import { User, Envelope, CreditCard, CircleNotch, ChartBar, TrendUp } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -157,7 +157,7 @@ const Profile = () => {
               {userName || "Usuario"}
             </p>
             <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
-              <Mail className="h-3.5 w-3.5" />
+              <Envelope className="h-3.5 w-3.5" weight="bold" />
               {email}
             </p>
             <p className="mt-2 text-sm font-semibold text-foreground">
@@ -174,7 +174,7 @@ const Profile = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
+            <CreditCard className="h-4 w-4" weight="bold" />
             Suscripción
           </CardTitle>
         </CardHeader>
@@ -204,7 +204,7 @@ const Profile = () => {
                 Cambiar plan
               </Button>
               <Button onClick={handleManageSubscription} disabled={portalLoading} variant="outline">
-                {portalLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
+                {portalLoading ? <CircleNotch className="h-4 w-4 animate-spin mr-2" weight="bold" /> : <CreditCard className="h-4 w-4 mr-2" weight="bold" />}
                 Gestionar pagos
               </Button>
             </div>
@@ -232,7 +232,7 @@ const Profile = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
+            <TrendUp className="h-4 w-4" weight="bold" />
             Uso de este ciclo
           </CardTitle>
         </CardHeader>
@@ -274,7 +274,7 @@ const Profile = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+            <ChartBar className="h-4 w-4" weight="bold" />
             Límites del plan
           </CardTitle>
         </CardHeader>
