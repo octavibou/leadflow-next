@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Rocket } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +20,7 @@ import { exportFunnelToHtml } from "@/lib/exportHtml";
 import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
-  const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel } = useFunnelStore();
+  const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel, saveFunnel, unpublishFunnel } = useFunnelStore();
   const { currentWorkspaceId } = useWorkspaceStore();
   const { canCreateFunnel, usage, limits, loading: limitsLoading } = usePlanLimits();
   const [showPicker, setShowPicker] = useState(false);
@@ -148,6 +148,10 @@ const Dashboard = () => {
               onDuplicate={() => duplicateFunnel(f.id)}
               onExport={() => handleExport(f.id)}
               onDelete={() => deleteFunnel(f.id)}
+              onTogglePublish={() => {
+                const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
+                isLive ? unpublishFunnel(f.id) : saveFunnel(f.id);
+              }}
             />
           ))}
         </div>
@@ -162,6 +166,10 @@ const Dashboard = () => {
               onDuplicate={() => duplicateFunnel(f.id)}
               onExport={() => handleExport(f.id)}
               onDelete={() => deleteFunnel(f.id)}
+              onTogglePublish={() => {
+                const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
+                isLive ? unpublishFunnel(f.id) : saveFunnel(f.id);
+              }}
             />
           ))}
         </div>
@@ -179,9 +187,10 @@ interface FunnelActionProps {
   onDuplicate: () => void;
   onExport: () => void;
   onDelete: () => void;
+  onTogglePublish: () => void;
 }
 
-function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
+function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([
     { date: "Lun", leads: 0 },
@@ -291,11 +300,13 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
         </Button>
         <div onClick={(e) => e.stopPropagation()}>
           <FunnelDropdown
+            funnel={funnel}
             onEdit={onEdit}
             onCampaigns={onCampaigns}
             onDuplicate={onDuplicate}
             onExport={onExport}
             onDelete={onDelete}
+            onTogglePublish={onTogglePublish}
           />
         </div>
       </CardFooter>
@@ -303,7 +314,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   );
 }
 
-function FunnelListItem({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
+function FunnelListItem({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
   return (
     <div
       className="flex items-center gap-4 p-3 rounded-lg border hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer group"
@@ -323,18 +334,22 @@ function FunnelListItem({ funnel, onEdit, onCampaigns, onDuplicate, onExport, on
       </Badge>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
         <FunnelDropdown
+          funnel={funnel}
           onEdit={onEdit}
           onCampaigns={onCampaigns}
           onDuplicate={onDuplicate}
           onExport={onExport}
           onDelete={onDelete}
+          onTogglePublish={onTogglePublish}
         />
       </div>
     </div>
   );
 }
 
-function FunnelDropdown({ onEdit, onCampaigns, onDuplicate, onExport, onDelete }: Omit<FunnelActionProps, "funnel">) {
+function FunnelDropdown({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
+  const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -345,6 +360,17 @@ function FunnelDropdown({ onEdit, onCampaigns, onDuplicate, onExport, onDelete }
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="h-4 w-4 mr-2" weight="bold" /> Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onTogglePublish}>
+          {isLive ? (
+            <>
+              <ArrowRight className="h-4 w-4 mr-2 rotate-180" weight="bold" /> Despublicar
+            </>
+          ) : (
+            <>
+              <Rocket className="h-4 w-4 mr-2" weight="bold" /> Publicar
+            </>
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onCampaigns}>
           <Megaphone className="h-4 w-4 mr-2" weight="bold" /> Campanas
