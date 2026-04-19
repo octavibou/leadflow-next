@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Eye, Calculator, BarChart3 } from "lucide-react";
+import { Trash, Plus, Eye, Calculator, BarChart } from "@phosphor-icons/react";
 import type { Funnel, FunnelStep, ResultFormula, MetricCard, ResultCtaConfig, CtaAction } from "@/types/funnel";
 import { evaluateFormulas, generateSampleContext, interpolate, formatNumber, collectVariables } from "@/lib/resultsEngine";
 
@@ -96,7 +96,7 @@ export function ResultsPropertiesAdvanced({ step, funnel, onUpdateStep }: Props)
             onClick={() => set("resultType", "score")}
             className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 text-xs transition-colors ${resultType === "score" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
           >
-            <BarChart3 className="h-4 w-4" />
+            <BarChart className="h-4 w-4" />
             <span className="font-medium">Score</span>
           </button>
         </div>
@@ -140,7 +140,7 @@ export function ResultsPropertiesAdvanced({ step, funnel, onUpdateStep }: Props)
                   />
                   <span className="text-muted-foreground text-xs">=</span>
                   <button onClick={() => deleteFormula(f.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash className="h-3.5 w-3.5" />
                   </button>
                 </div>
 
@@ -245,7 +245,7 @@ export function ResultsPropertiesAdvanced({ step, funnel, onUpdateStep }: Props)
           <div key={card.id} className="border rounded-lg p-3 space-y-2 mb-2">
             <div className="flex items-center justify-between">
               <Input className="h-7 text-sm flex-1" value={card.label} onChange={(e) => updateMetricCard(card.id, { label: e.target.value })} placeholder="Label" />
-              <button onClick={() => deleteMetricCard(card.id)} className="ml-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+              <button onClick={() => deleteMetricCard(card.id)} className="ml-2 text-muted-foreground hover:text-destructive"><Trash className="h-3.5 w-3.5" /></button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

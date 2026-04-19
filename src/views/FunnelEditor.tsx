@@ -156,8 +156,12 @@ const FunnelEditor = () => {
             onAddStep={handleAddStep}
             onDeleteStep={handleDeleteStep}
           />
-          <EditorCanvas step={selectedStep} steps={funnel.steps} settings={funnel.settings} viewMode={viewMode} />
-          <EditorProperties step={selectedStep} funnel={funnel} onUpdateStep={handleUpdateStep} />
+          {selectedStep && (
+            <>
+              <EditorCanvas step={selectedStep} steps={funnel.steps} settings={funnel.settings} viewMode={viewMode} />
+              <EditorProperties step={selectedStep} funnel={funnel} onUpdateStep={handleUpdateStep} />
+            </>
+          )}
         </div>
       )}
 
