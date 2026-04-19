@@ -226,7 +226,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   }, [funnel.id]);
 
   return (
-    <Card className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={onEdit}>
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <CardHeader>
         <CardTitle>{funnel.name}</CardTitle>
         <CardDescription className="flex gap-2 mt-2">
@@ -266,6 +266,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           className="flex-1"
           onClick={(e) => {
             e.stopPropagation();
+            console.log("[v0] Clicking open funnel button for:", funnel.id);
             onEdit();
           }}
         >
