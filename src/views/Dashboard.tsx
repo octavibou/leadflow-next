@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Copy, Download, Trash2, Pencil, Megaphone, Search, LayoutGrid, List, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -29,7 +29,7 @@ const Dashboard = () => {
 
   const handleNewFunnel = () => {
     if (!canCreateFunnel) {
-      toast.error(`Has alcanzado el límite de ${limits.funnels} funnels de tu plan. Actualiza tu plan para crear más.`);
+      toast.error(`Has alcanzado el limite de ${limits.funnels} funnels de tu plan. Actualiza tu plan para crear mas.`);
       return;
     }
     setShowPicker(true);
@@ -64,7 +64,7 @@ const Dashboard = () => {
         <h1 className="text-2xl font-bold">Funnels</h1>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" weight="bold" />
             <Input
               placeholder="Buscar funnels..."
               value={searchQuery}
@@ -79,7 +79,7 @@ const Dashboard = () => {
               className={viewMode === "grid" ? "bg-accent" : ""}
               onClick={() => setViewMode("grid")}
             >
-              <LayoutGrid className="h-4 w-4" />
+              <SquaresFour className="h-4 w-4" weight="bold" />
             </Button>
             <Button
               variant="ghost"
@@ -87,14 +87,14 @@ const Dashboard = () => {
               className={viewMode === "list" ? "bg-accent" : ""}
               onClick={() => setViewMode("list")}
             >
-              <List className="h-4 w-4" />
+              <List className="h-4 w-4" weight="bold" />
             </Button>
           </div>
           <Button onClick={handleNewFunnel} variant={canCreateFunnel ? "default" : "outline"}>
             {canCreateFunnel ? (
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" weight="bold" />
             ) : (
-              <Lock className="h-4 w-4 mr-2" />
+              <Lock className="h-4 w-4 mr-2" weight="bold" />
             )}
             New Funnel
             {!limitsLoading && (
@@ -107,9 +107,9 @@ const Dashboard = () => {
       {loading ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="overflow-hidden">
-              <Skeleton className="aspect-[16/10] w-full" />
-              <CardContent className="p-4 space-y-2">
+            <Card key={i}>
+              <Skeleton className="aspect-[16/10] w-full rounded-t-lg" />
+              <CardContent className="space-y-2">
                 <Skeleton className="h-5 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
                 <Skeleton className="h-5 w-20 rounded-full" />
@@ -120,7 +120,7 @@ const Dashboard = () => {
       ) : filteredFunnels.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
           <div className="rounded-2xl bg-accent/50 p-6 mb-6">
-            <Plus className="h-12 w-12 text-primary" />
+            <Plus className="h-12 w-12 text-primary" weight="bold" />
           </div>
           <h2 className="text-2xl font-bold mb-2">
             {searchQuery ? "Sin resultados" : "Crea tu primer funnel"}
@@ -128,11 +128,11 @@ const Dashboard = () => {
           <p className="text-muted-foreground mb-6 text-center max-w-md">
             {searchQuery
               ? "No se encontraron funnels con ese nombre."
-              : "Construye funnels de quiz de alta conversión y compártelos con un link único."}
+              : "Construye funnels de quiz de alta conversion y compartelos con un link unico."}
           </p>
           {!searchQuery && (
             <Button size="lg" onClick={() => setShowPicker(true)}>
-              <Plus className="h-4 w-4 mr-2" /> New Funnel
+              <Plus className="h-4 w-4 mr-2" weight="bold" /> New Funnel
             </Button>
           )}
         </div>
@@ -184,16 +184,16 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   return (
     <Card
-      className="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col"
+      className="group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all duration-200"
       onClick={onEdit}
     >
-      <div className="relative aspect-[16/10] bg-gradient-to-br from-muted to-accent/40 flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-[16/10] bg-gradient-to-br from-muted to-accent/40 flex items-center justify-center overflow-hidden rounded-t-lg">
         <div className="text-5xl font-bold text-foreground/10">
           {funnel.name.charAt(0).toUpperCase()}
         </div>
         <div className="absolute top-3 left-3 flex items-center gap-2">
           <Badge variant="secondary" className="gap-1 shadow-sm backdrop-blur-sm bg-background/80">
-            <Sparkles className="h-3 w-3" />
+            <Sparkle className="h-3 w-3" weight="fill" />
             {typeLabel}
           </Badge>
         </div>
@@ -207,10 +207,10 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           />
         </div>
       </div>
-      <CardContent className="p-5 flex flex-col gap-4 flex-1">
+      <CardContent className="flex flex-col gap-4">
         <div className="space-y-1">
-          <h3 className="font-semibold text-base truncate">{funnel.name}</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="font-semibold text-sm truncate">{funnel.name}</h3>
+          <p className="text-xs text-muted-foreground">
             Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
               month: "short",
               day: "numeric",
@@ -219,14 +219,14 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           </p>
         </div>
         <Button
-          className="w-full mt-auto group/btn"
+          className="w-full group/btn"
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
           }}
         >
           Abrir funnel
-          <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
+          <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" weight="bold" />
         </Button>
       </CardContent>
     </Card>
@@ -236,7 +236,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
 function FunnelListItem({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   return (
     <div
-      className="flex items-center gap-4 p-3 rounded-lg border hover:shadow-sm transition-shadow cursor-pointer group"
+      className="flex items-center gap-4 p-3 rounded-lg border hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer group"
       onClick={onEdit}
     >
       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -269,24 +269,24 @@ function FunnelDropdown({ onEdit, onCampaigns, onDuplicate, onExport, onDelete }
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreHorizontal className="h-4 w-4" />
+          <DotsThree className="h-4 w-4" weight="bold" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={onEdit}>
-          <Pencil className="h-4 w-4 mr-2" /> Editar
+          <Pencil className="h-4 w-4 mr-2" weight="bold" /> Editar
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onCampaigns}>
-          <Megaphone className="h-4 w-4 mr-2" /> Campañas
+          <Megaphone className="h-4 w-4 mr-2" weight="bold" /> Campanas
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onDuplicate}>
-          <Copy className="h-4 w-4 mr-2" /> Duplicar
+          <Copy className="h-4 w-4 mr-2" weight="bold" /> Duplicar
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onExport}>
-          <Download className="h-4 w-4 mr-2" /> Exportar HTML
+          <DownloadSimple className="h-4 w-4 mr-2" weight="bold" /> Exportar HTML
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-          <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+          <Trash className="h-4 w-4 mr-2" weight="bold" /> Eliminar
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
