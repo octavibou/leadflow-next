@@ -11,14 +11,26 @@ import type { EditorTab } from "@/views/FunnelEditor";
 import { useFunnelStore } from "@/store/funnelStore";
 import { cn } from "@/lib/utils";
 
-const editorTabs: { id: EditorTab; label: string; icon: typeof Lightning }[] = [
-  { id: "funnel", label: "Funnel", icon: Lightning },
-  { id: "webhook", label: "Webhook", icon: Webhooks },
-  { id: "tracking", label: "Tracking", icon: Activity },
-  { id: "publish", label: "Publish", icon: Rocket },
-  { id: "ab_test", label: "A/B Test", icon: Flask },
-  { id: "metrics", label: "Metrics", icon: BarChart },
+const editorTabs = [
+  { id: "funnel" as const, label: "Funnel" },
+  { id: "webhook" as const, label: "Webhook" },
+  { id: "tracking" as const, label: "Tracking" },
+  { id: "publish" as const, label: "Publish" },
+  { id: "ab_test" as const, label: "A/B Test" },
+  { id: "metrics" as const, label: "Metrics" },
 ];
+
+const getTabIcon = (tabId: string) => {
+  switch (tabId) {
+    case "funnel": return Lightning;
+    case "webhook": return Webhooks;
+    case "tracking": return Activity;
+    case "publish": return Rocket;
+    case "ab_test": return Flask;
+    case "metrics": return BarChart;
+    default: return null;
+  }
+};
 
 interface EditorTopBarProps {
   funnel: Funnel;
@@ -87,11 +99,7 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
       {/* Center: Tabs */}
       <nav className="flex-1 flex items-center justify-center gap-1">
         {editorTabs.map((tab) => {
-          const Icon = tab.icon;
-          if (!Icon) {
-            console.log("[v0] Missing icon for tab:", tab.id);
-            return null;
-          }
+          const Icon = getTabIcon(tab.id);
           const isActive = activeTab === tab.id;
           return (
             <Button
@@ -106,7 +114,7 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="h-4 w-4" weight={isActive ? "fill" : "bold"} />
+              {Icon && <Icon className="h-4 w-4" weight={isActive ? "fill" : "bold"} />}
               {tab.label}
             </Button>
           );
