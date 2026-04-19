@@ -22,7 +22,12 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
 
   // Test event state
   const [testEvent, setTestEvent] = useState("PageView");
-  const [testSourceUrl, setTestSourceUrl] = useState(window.location.origin);
+  const [testSourceUrl, setTestSourceUrl] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+    return "";
+  });
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
