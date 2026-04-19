@@ -7,7 +7,7 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter, CardAction } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -183,20 +183,42 @@ interface FunnelActionProps {
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   return (
-    <Card
-      className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-200"
-      onClick={onEdit}
-    >
-      <div className="relative aspect-video bg-gradient-to-br from-muted to-accent/40 flex items-center justify-center">
+    <Card className="relative mx-auto w-full pt-0 cursor-pointer group">
+      <div className="absolute inset-0 z-30 aspect-video bg-black/35" />
+      <div
+        className="relative z-20 aspect-video w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 brightness-60 grayscale"
+        onClick={onEdit}
+      >
         <div className="text-6xl font-bold text-foreground/10">
           {funnel.name.charAt(0).toUpperCase()}
         </div>
-        <div className="absolute top-4 left-4 flex items-center gap-2">
-          <Badge variant="secondary" className="gap-1 shadow-sm backdrop-blur-sm bg-background/80">
+      </div>
+      <CardHeader onClick={onEdit}>
+        <CardAction>
+          <Badge variant="secondary" className="gap-1">
             <Sparkle className="h-3 w-3" weight="fill" />
             {typeLabel}
           </Badge>
-        </div>
+        </CardAction>
+        <CardTitle>{funnel.name}</CardTitle>
+        <CardDescription>
+          Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Button
+          className="w-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          Abrir funnel
+        </Button>
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <FunnelDropdown
             onEdit={onEdit}
@@ -206,30 +228,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
             onDelete={onDelete}
           />
         </div>
-      </div>
-      <CardContent className="pt-6 pb-6 flex flex-col gap-6">
-        <div className="space-y-2">
-          <h3 className="font-semibold text-base">{funnel.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
-        </div>
-        <Button
-          size="lg"
-          className="w-full group/btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          Abrir funnel
-          <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover/btn:translate-x-1" weight="bold" />
-        </Button>
-      </CardContent>
+      </CardFooter>
     </Card>
   );
 }
