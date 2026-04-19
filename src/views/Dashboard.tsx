@@ -225,10 +225,23 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
     fetchLeadsData();
   }, [funnel.id]);
 
+  const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <CardHeader>
-        <CardTitle>{funnel.name}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          {funnel.name}
+          {isLive && (
+            <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              Live
+            </span>
+          )}
+        </CardTitle>
         <CardDescription className="flex gap-2 mt-2">
           <Badge variant="secondary" className="gap-1 text-xs">
             <Sparkle className="h-2.5 w-2.5" weight="fill" />
@@ -237,6 +250,11 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           <Badge variant="secondary" className="text-xs">
             {leadsTotal} leads
           </Badge>
+          {!isLive && (
+            <Badge variant="outline" className="gap-1 text-xs text-yellow-600 border-yellow-300 bg-yellow-500/10">
+              Borrador
+            </Badge>
+          )}
         </CardDescription>
       </CardHeader>
 
