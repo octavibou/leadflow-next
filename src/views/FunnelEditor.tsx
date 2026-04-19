@@ -44,6 +44,13 @@ const FunnelEditor = () => {
   }, [fetchFunnels]);
 
   useEffect(() => {
+    // Ensure the funnel is loaded
+    if (!funnel && funnelId) {
+      fetchFunnels();
+    }
+  }, [funnelId, funnel, fetchFunnels]);
+
+  useEffect(() => {
     if (funnelId) {
       fetchCampaigns(funnelId);
     }
@@ -179,11 +186,17 @@ const FunnelEditor = () => {
       {activeTab === "metrics" && (
         <ScrollArea className="flex-1">
           <div className="p-6 max-w-5xl mx-auto">
-            <FunnelAnalytics
-              funnelId={funnel.id}
-              campaigns={campaigns}
-              steps={funnel.steps}
-            />
+            {funnel.steps && funnel.steps.length > 0 ? (
+              <FunnelAnalytics
+                funnelId={funnel.id}
+                campaigns={campaigns}
+                steps={funnel.steps}
+              />
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                No hay datos de análisis disponibles aún. Crea pasos en el funnel primero.
+              </div>
+            )}
           </div>
         </ScrollArea>
       )}
