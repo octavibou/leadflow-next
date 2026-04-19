@@ -88,6 +88,10 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
       <nav className="flex-1 flex items-center justify-center gap-1">
         {editorTabs.map((tab) => {
           const Icon = tab.icon;
+          if (!Icon) {
+            console.log("[v0] Missing icon for tab:", tab.id);
+            return null;
+          }
           const isActive = activeTab === tab.id;
           return (
             <Button
