@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell } from "recharts";
-import { Eye, Users, Target, TrendingDown, ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell } from "recharts";
+import { Eye, Users, Target, TrendDown, ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +82,32 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
     const resultAssigned = events.filter((e) => e.event_type === "result_assigned").length;
     const totalLeads = leads.length;
     const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
+    const ctr = formSubmits > 0 ? (resultAssigned / formSubmits) * 100 : 0;
+
+    // Time-series data for line chart (last 7 days)
+    const today = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - (6 - i));
+      return date.toISOString().split('T')[0];
+    });
+
+    const timeSeriesData = last7Days.map((date) => {
+      const dayEvents = events.filter((e) => e.created_at.startsWith(date));
+      const dayLeads = leads.filter((l) => l.created_at.startsWith(date));
+      const dayPageViews = dayEvents.filter((e) => e.event_type === "page_view").length;
+      const dayFormSubmits = dayEvents.filter((e) => e.event_type === "form_submit").length;
+      const dayDayAverageCvr = dayPageViews > 0 ? (dayLeads.length / dayPageViews) * 100 : 0;
+      const dayCtr = dayFormSubmits > 0 ? (dayEvents.filter((e) => e.event_type === "result_assigned").length / dayFormSubmits) * 100 : 0;
+
+      return {
+        date: new Date(date).toLocaleDateString("es-ES", { month: "short", day: "numeric" }),
+        impressions: dayPageViews,
+        leads: dayLeads.length,
+        cvr: dayDayAverageCvr,
+        ctr: dayCtr,
+      };
+    });
 
     // Step-by-step funnel data
     const stepFunnel = steps.map((step, i) => {
@@ -155,7 +181,7 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
       });
     }
 
-    return { pageViews, totalLeads, formSubmits, resultAssigned, cvr, stepFunnel: stepFunnelWithDropoff, campaignStats };
+    return { pageViews, totalLeads, formSubmits, resultAssigned, cvr, ctr, timeSeriesData, stepFunnel: stepFunnelWithDropoff, campaignStats };
   }, [events, leads, steps, campaigns]);
 
   if (loading) {
@@ -172,11 +198,46 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard icon={Eye} label="Visitas" value={stats.pageViews} />
+        <KpiCard icon={Eye} label="Impresiones" value={stats.pageViews} />
         <KpiCard icon={Users} label="Leads" value={stats.totalLeads} />
         <KpiCard icon={Target} label="CVR" value={`${stats.cvr.toFixed(1)}%`} />
-        <KpiCard icon={TrendingDown} label="Formularios" value={stats.formSubmits} />
+        <KpiCard icon={TrendDown} label="CTR" value={`${stats.ctr.toFixed(1)}%`} />
       </div>
+
+      {/* Time-series metrics chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Métricas en el tiempo (últimos 7 días)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats.timeSeriesData.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Sin datos aún</p>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={stats.timeSeriesData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                  <YAxis yAxisId="left" tick={{ fontSize: 12 }} className="fill-muted-foreground" label={{ value: "Impresiones / Leads", angle: -90, position: "insideLeft" }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} className="fill-muted-foreground" label={{ value: "Porcentaje (%)", angle: 90, position: "insideRight" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Line yAxisId="left" type="monotone" dataKey="impressions" stroke="hsl(var(--primary))" name="Impresiones" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line yAxisId="left" type="monotone" dataKey="leads" stroke="hsl(var(--primary) / 0.6)" name="Leads" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="cvr" stroke="hsl(var(--destructive))" name="CVR (%)" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="ctr" stroke="hsl(var(--primary) / 0.4)" name="CTR (%)" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Step-by-step funnel */}
       <Card>
@@ -233,7 +294,7 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className={step.dropoff > 50 ? "text-destructive" : step.dropoff > 25 ? "text-orange-500" : "text-green-600"}>
-                              <ArrowDownRight className="h-3 w-3 inline mr-0.5" />
+                              <ArrowDown className="h-3 w-3 inline mr-0.5" weight="bold" />
                               {step.dropoff.toFixed(1)}%
                             </span>
                           )}
@@ -308,7 +369,7 @@ export default function FunnelAnalytics({ funnelId, campaigns, steps }: FunnelAn
                           {c.name}
                           {c.cvr === bestCvr && bestCvr > 0 && (
                             <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                              <ArrowUpRight className="h-3 w-3 mr-0.5" /> Mejor
+                              <ArrowUp className="h-3 w-3 mr-0.5" weight="bold" /> Mejor
                             </Badge>
                           )}
                         </div>
@@ -334,7 +395,7 @@ function KpiCard({ icon: Icon, label, value }: { icon: any; label: string; value
     <Card>
       <CardContent className="p-4 flex items-center gap-3">
         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="h-5 w-5 text-primary" />
+          <Icon className="h-5 w-5 text-primary" weight="bold" />
         </div>
         <div>
           <p className="text-2xl font-bold leading-none">{value}</p>
