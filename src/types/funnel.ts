@@ -171,7 +171,7 @@ export interface FunnelStep {
   bookingConfig?: BookingConfig;
 }
 
-export type FunnelStatus = "draft" | "published" | "archived";
+export type FunnelStatus = "draft" | "published";
 
 export interface Funnel {
   id: string;
@@ -181,9 +181,6 @@ export interface Funnel {
   type: FunnelType;
   settings: FunnelSettings;
   steps: FunnelStep[];
-  status: FunnelStatus;
-  published_at?: string;
-  archived_at?: string;
   created_at: string;
   updated_at: string;
   saved_at: string;
