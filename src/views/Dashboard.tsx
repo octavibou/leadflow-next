@@ -137,7 +137,7 @@ const Dashboard = () => {
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filteredFunnels.map((f) => (
             <FunnelCard
               key={f.id}
@@ -184,34 +184,34 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   return (
     <Card className="relative mx-auto w-full pt-0 cursor-pointer group">
-      <div className="absolute inset-0 z-30 aspect-video bg-black/35" />
+      <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
       <div
-        className="relative z-20 aspect-video w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 brightness-60 grayscale"
+        className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 brightness-60 grayscale"
         onClick={onEdit}
       >
-        <div className="text-6xl font-bold text-foreground/10">
+        <div className="text-5xl font-bold text-foreground/10">
           {funnel.name.charAt(0).toUpperCase()}
         </div>
       </div>
-      <CardHeader onClick={onEdit}>
+      <CardHeader onClick={onEdit} className="p-3">
         <CardAction>
-          <Badge variant="secondary" className="gap-1">
-            <Sparkle className="h-3 w-3" weight="fill" />
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <Sparkle className="h-2.5 w-2.5" weight="fill" />
             {typeLabel}
           </Badge>
         </CardAction>
-        <CardTitle>{funnel.name}</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-sm">{funnel.name}</CardTitle>
+        <CardDescription className="text-xs">
           Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
             month: "short",
             day: "numeric",
-            year: "numeric",
           })}
         </CardDescription>
       </CardHeader>
-      <CardFooter>
+      <CardFooter className="p-3">
         <Button
-          className="w-full"
+          size="sm"
+          className="w-full text-xs"
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
