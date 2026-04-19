@@ -226,76 +226,62 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   }, [funnel.id]);
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-background shadow-md hover:shadow-lg transition-shadow cursor-pointer" onClick={onEdit}>
-      {/* Chart Section - Image Area */}
-      <div className="h-64 bg-gradient-to-br from-slate-600 via-purple-500 to-pink-400 flex items-center justify-center p-6 relative">
-        <div className="w-full h-full flex items-end justify-center gap-2">
+    <Card className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={onEdit}>
+      <CardHeader>
+        <CardTitle>{funnel.name}</CardTitle>
+        <CardDescription className="flex gap-2 mt-2">
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <Sparkle className="h-2.5 w-2.5" weight="fill" />
+            {typeLabel}
+          </Badge>
+          <Badge variant="secondary" className="text-xs">
+            {leadsTotal} leads
+          </Badge>
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent>
+        <div className="relative flex justify-center gap-1.5 items-end w-full overflow-hidden rounded-lg bg-muted p-4 h-40 max-w-full">
           {chartData.map((item, index) => {
             const maxLeads = Math.max(...chartData.map(d => d.leads), 1);
             const heightPercent = (item.leads / maxLeads) * 100;
             
             return (
-              <div key={index} className="flex-1 flex flex-col items-center gap-1.5">
-                <div className="w-full bg-white/30 backdrop-blur-sm rounded-md overflow-hidden relative h-32 flex items-end justify-center">
+              <div key={index} className="flex flex-col items-center gap-1 flex-1">
+                <div className="w-full bg-muted-foreground/20 rounded-full overflow-hidden relative flex-1 flex items-end justify-center min-w-0">
                   <div
-                    className="w-full bg-white rounded-md transition-all duration-300"
-                    style={{ height: `${Math.max(heightPercent, 10)}%` }}
+                    className="w-full bg-chart-3 rounded-full transition-all duration-150"
+                    style={{ height: `${Math.max(heightPercent, 5)}%` }}
                   />
                 </div>
-                <span className="text-xs font-medium text-white">{item.date}</span>
+                <span className="text-xs font-medium text-muted-foreground">{item.date}</span>
               </div>
             );
           })}
         </div>
-      </div>
+      </CardContent>
 
-      {/* Content Section - White Area */}
-      <div className="p-6 space-y-4">
-        {/* Title and Metadata */}
-        <div>
-          <h3 className="text-2xl font-bold">{funnel.name}</h3>
-          <div className="flex gap-2 mt-3 flex-wrap">
-            <Badge variant="outline" className="text-xs">
-              <Sparkle className="h-2.5 w-2.5 mr-1" weight="fill" />
-              {typeLabel}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {leadsTotal} leads
-            </Badge>
-          </div>
+      <CardFooter className="gap-2">
+        <Button
+          className="flex-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          Abrir funnel
+        </Button>
+        <div onClick={(e) => e.stopPropagation()}>
+          <FunnelDropdown
+            onEdit={onEdit}
+            onCampaigns={onCampaigns}
+            onDuplicate={onDuplicate}
+            onExport={onExport}
+            onDelete={onDelete}
+          />
         </div>
-
-        {/* Description */}
-        <p className="text-sm text-muted-foreground">
-          Editado {new Date(funnel.updated_at).toLocaleDateString("es-ES", {
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-
-        {/* Action Button */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            className="flex-1 rounded-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            Abrir
-          </Button>
-          <div onClick={(e) => e.stopPropagation()}>
-            <FunnelDropdown
-              onEdit={onEdit}
-              onCampaigns={onCampaigns}
-              onDuplicate={onDuplicate}
-              onExport={onExport}
-              onDelete={onDelete}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
 
