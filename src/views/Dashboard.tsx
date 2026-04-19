@@ -237,9 +237,28 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
   const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer relative group"
+      onClick={onEdit}
+    >
+      {/* Three dots top-right */}
+      <div
+        className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <FunnelDropdown
+          funnel={funnel}
+          onEdit={onEdit}
+          onCampaigns={onCampaigns}
+          onDuplicate={onDuplicate}
+          onExport={onExport}
+          onDelete={onDelete}
+          onTogglePublish={onTogglePublish}
+        />
+      </div>
+
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 pr-8">
           {funnel.name}
           {isLive && (
             <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
@@ -272,7 +291,6 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           {chartData.map((item, index) => {
             const maxLeads = Math.max(...chartData.map(d => d.leads), 1);
             const heightPercent = (item.leads / maxLeads) * 100;
-            
             return (
               <div key={index} className="flex flex-col items-center gap-1 flex-1">
                 <div className="w-full bg-muted-foreground/20 rounded-full overflow-hidden relative flex-1 flex items-end justify-center min-w-0">
@@ -287,29 +305,6 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
           })}
         </div>
       </CardContent>
-
-      <CardFooter className="gap-2">
-        <Button
-          className="flex-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          Abrir funnel
-        </Button>
-        <div onClick={(e) => e.stopPropagation()}>
-          <FunnelDropdown
-            funnel={funnel}
-            onEdit={onEdit}
-            onCampaigns={onCampaigns}
-            onDuplicate={onDuplicate}
-            onExport={onExport}
-            onDelete={onDelete}
-            onTogglePublish={onTogglePublish}
-          />
-        </div>
-      </CardFooter>
     </Card>
   );
 }
