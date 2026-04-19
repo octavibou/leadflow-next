@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,7 @@ import { FUNNEL_TYPE_LABELS } from "@/types/funnel";
 import { TemplatePicker } from "@/components/TemplatePicker";
 import { PendingInvitations } from "@/components/workspace/PendingInvitations";
 import { exportFunnelToHtml } from "@/lib/exportHtml";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel } = useFunnelStore();
@@ -182,15 +184,57 @@ interface FunnelActionProps {
 
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
+  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([]);
+
+  useEffect(() => {
+    const fetchLeadsData = async () => {
+      // Get leads data for last 7 days
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return date.toISOString().split('T')[0];
+      });
+
+      const { data } = await supabase
+        .from('leads')
+        .select('created_at')
+        .eq('funnel_id', funnel.id)
+        .gte('created_at', last7Days[0]);
+
+      if (data) {
+        const leadsPerDay = last7Days.map((date) => ({
+          date: new Date(date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+          leads: data.filter((l) => l.created_at.startsWith(date)).length,
+        }));
+        setChartData(leadsPerDay);
+      }
+    };
+
+    fetchLeadsData();
+  }, [funnel.id]);
+
   return (
     <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
       <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
-      <div
-        className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 brightness-60 grayscale"
-      >
-        <div className="text-5xl font-bold text-foreground/10">
-          {funnel.name.charAt(0).toUpperCase()}
-        </div>
+      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40">
+        {chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+              <Line
+                type="monotone"
+                dataKey="leads"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="text-5xl font-bold text-foreground/10">
+            {funnel.name.charAt(0).toUpperCase()}
+          </div>
+        )}
       </div>
       <CardHeader className="p-3">
         <CardAction>
