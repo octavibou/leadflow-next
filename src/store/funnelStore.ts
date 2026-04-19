@@ -213,4 +213,4 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
       ),
     }));
   },
-}
+}));
