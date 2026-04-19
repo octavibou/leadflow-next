@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
 import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Rocket } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -190,50 +191,38 @@ interface FunnelActionProps {
   onTogglePublish: () => void;
 }
 
+const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
+
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
-  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([
-    { date: "Lun", leads: 0 },
-    { date: "Mar", leads: 0 },
-    { date: "Mié", leads: 0 },
-    { date: "Jue", leads: 0 },
-    { date: "Vie", leads: 0 },
-    { date: "Sab", leads: 0 },
-    { date: "Dom", leads: 0 },
-  ]);
+  const [chartData, setChartData] = useState<Array<{ day: string; leads: number }>>([]);
   const [leadsTotal, setLeadsTotal] = useState(0);
 
   useEffect(() => {
     const fetchLeadsData = async () => {
-      try {
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - (6 - i));
-          return date.toISOString().split('T')[0];
-        });
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return d;
+      });
 
-        const { data, error } = await supabase
-          .from('leads')
-          .select('created_at')
-          .eq('funnel_id', funnel.id)
-          .gte('created_at', last7Days[0] + 'T00:00:00');
+      const fromDate = last7Days[0].toISOString().split('T')[0] + 'T00:00:00';
 
-        if (error) {
-          console.error("[v0] Error fetching leads:", error);
-          return;
-        }
+      const { data, error } = await supabase
+        .from('leads')
+        .select('created_at')
+        .eq('funnel_id', funnel.id)
+        .gte('created_at', fromDate);
 
-        if (data) {
-          const leadsPerDay = last7Days.map((date, i) => ({
-            date: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sab", "Dom"][i],
-            leads: data.filter((l) => l.created_at && l.created_at.startsWith(date)).length,
-          }));
-          setChartData(leadsPerDay);
-          setLeadsTotal(data.length);
-        }
-      } catch (err) {
-        console.error("[v0] Error fetching leads data:", err);
-      }
+      if (error || !data) return;
+
+      const leadsPerDay = last7Days.map((d) => ({
+        day: DAY_LABELS[d.getDay()],
+        leads: data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
+      }));
+
+      setChartData(leadsPerDay);
+      setLeadsTotal(data.length);
     };
 
     fetchLeadsData();
@@ -291,23 +280,42 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
-        <div className="relative flex justify-center gap-1.5 items-end w-full overflow-hidden rounded-lg bg-muted p-4 h-40 max-w-full">
-          {chartData.map((item, index) => {
-            const maxLeads = Math.max(...chartData.map(d => d.leads), 1);
-            const heightPercent = (item.leads / maxLeads) * 100;
-            return (
-              <div key={index} className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-full bg-muted-foreground/20 rounded-full overflow-hidden relative flex-1 flex items-end justify-center min-w-0">
-                  <div
-                    className="w-full bg-chart-3 rounded-full transition-all duration-150"
-                    style={{ height: `${Math.max(heightPercent, 5)}%` }}
-                  />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground">{item.date}</span>
-              </div>
-            );
-          })}
+      <CardContent className="px-0 pb-0">
+        <div className="h-28 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${funnel.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Tooltip
+                content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
+                      <span className="font-semibold">{label}</span>
+                      <span className="ml-2 text-muted-foreground">{payload[0].value} leads</span>
+                    </div>
+                  ) : null
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="leads"
+                stroke="hsl(var(--chart-3))"
+                strokeWidth={2}
+                fill={`url(#grad-${funnel.id})`}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-between px-4 pb-3 pt-1">
+          {chartData.map((item) => (
+            <span key={item.day} className="text-[10px] text-muted-foreground">{item.day}</span>
+          ))}
         </div>
       </CardContent>
     </Card>
