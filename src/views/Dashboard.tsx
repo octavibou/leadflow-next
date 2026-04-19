@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,57 +183,45 @@ interface FunnelActionProps {
 
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
-  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([]);
+  const [leadsTotal, setLeadsTotal] = useState<number>(0);
 
   useEffect(() => {
-    const fetchLeadsData = async () => {
-      // Get leads data for last 7 days
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i));
-        return date.toISOString().split('T')[0];
-      });
+    const fetchLeadsCount = async () => {
+      // Get leads count for last 7 days
+      const last7Days = new Date();
+      last7Days.setDate(last7Days.getDate() - 7);
 
-      const { data } = await supabase
+      const { count } = await supabase
         .from('leads')
-        .select('created_at')
+        .select('*', { count: 'exact', head: true })
         .eq('funnel_id', funnel.id)
-        .gte('created_at', last7Days[0]);
+        .gte('created_at', last7Days.toISOString());
 
-      if (data) {
-        const leadsPerDay = last7Days.map((date) => ({
-          date: new Date(date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-          leads: data.filter((l) => l.created_at.startsWith(date)).length,
-        }));
-        setChartData(leadsPerDay);
+      if (count !== null) {
+        setLeadsTotal(count);
       }
     };
 
-    fetchLeadsData();
+    fetchLeadsCount();
   }, [funnel.id]);
 
   return (
     <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
       <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
-      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40">
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-              <Line
-                type="monotone"
-                dataKey="leads"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="text-5xl font-bold text-foreground/10">
-            {funnel.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 overflow-hidden">
+        <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid meet">
+          <polyline
+            points="10,120 40,100 70,110 100,70 130,90 160,40 190,60"
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+          <p className="text-3xl font-bold text-white drop-shadow-lg">{leadsTotal}</p>
+          <p className="text-xs text-white/80 drop-shadow-lg">últimos 7 días</p>
+        </div>
       </div>
       <CardHeader className="p-3">
         <CardAction>
