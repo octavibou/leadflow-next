@@ -183,46 +183,59 @@ interface FunnelActionProps {
 
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
-  const [leadsTotal, setLeadsTotal] = useState<number>(0);
+  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([]);
 
   useEffect(() => {
-    const fetchLeadsCount = async () => {
-      // Get leads count for last 7 days
-      const last7Days = new Date();
-      last7Days.setDate(last7Days.getDate() - 7);
+    const fetchLeadsData = async () => {
+      // Get leads data for last 7 days
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return date.toISOString().split('T')[0];
+      });
 
-      const { count } = await supabase
+      const { data } = await supabase
         .from('leads')
-        .select('*', { count: 'exact', head: true })
+        .select('created_at')
         .eq('funnel_id', funnel.id)
-        .gte('created_at', last7Days.toISOString());
+        .gte('created_at', last7Days[0]);
 
-      if (count !== null) {
-        setLeadsTotal(count);
+      if (data) {
+        const leadsPerDay = last7Days.map((date) => ({
+          date: new Date(date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+          leads: data.filter((l) => l.created_at.startsWith(date)).length,
+        }));
+        setChartData(leadsPerDay);
       }
     };
 
-    fetchLeadsCount();
+    fetchLeadsData();
   }, [funnel.id]);
 
   return (
     <Card className="relative mx-auto w-full pt-0 cursor-pointer group" onClick={onEdit}>
       <div className="absolute inset-0 z-30 aspect-square bg-black/35" />
-      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 overflow-hidden">
-        <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
-          <polyline
-            points="20,150 50,120 80,130 110,80 140,100 170,50 190,70"
-            fill="none"
-            stroke="hsl(var(--primary))"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-          <p className="text-4xl font-bold text-white drop-shadow-lg">{leadsTotal}</p>
-          <p className="text-xs text-white/80 drop-shadow-lg">últimos 7 días</p>
-        </div>
+      <div className="relative z-20 aspect-square w-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/40 overflow-hidden p-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 10, right: 5, left: -30, bottom: 20 }}>
+            <XAxis 
+              dataKey="date" 
+              tick={{ fontSize: 10 }}
+              angle={-45}
+              textAnchor="end"
+              height={50}
+            />
+            <YAxis 
+              tick={{ fontSize: 10 }}
+              width={30}
+            />
+            <Bar 
+              dataKey="leads" 
+              fill="hsl(var(--primary))"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
       <CardHeader className="p-3">
         <CardAction>
