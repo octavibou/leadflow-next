@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, BarChart, Webhooks, Pulse, Rocket, Flask } from "@phosphor-icons/react";
+import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, ChartBar, ArrowsClockwise, Pulse, Rocket, Flask } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +23,11 @@ const editorTabs = [
 const getTabIcon = (tabId: string) => {
   switch (tabId) {
     case "funnel": return Lightning;
-    case "webhook": return Webhooks;
+    case "webhook": return ArrowsClockwise;
     case "tracking": return Pulse;
     case "publish": return Rocket;
     case "ab_test": return Flask;
-    case "metrics": return BarChart;
+    case "metrics": return ChartBar;
     default: return null;
   }
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash, Webhooks, Users, CaretDown, CaretUp, DotsSixVertical, Link } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowsClockwise, Users, CaretDown, CaretUp, DotsSixVertical, Link } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -330,7 +330,7 @@ const LeadRouting = () => {
                           <div className="flex items-center gap-2 mt-1">
                             {client.webhookUrl ? (
                               <Badge variant="secondary" className="text-xs">
-                                <Webhooks className="h-3 w-3 mr-1" weight="bold" /> Webhook configurado
+                                <ArrowsClockwise className="h-3 w-3 mr-1" weight="bold" /> Webhook configurado
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs text-muted-foreground">Sin webhook</Badge>

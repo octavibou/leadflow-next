@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash, Webhooks, Users, CaretDown, CaretUp, Rows } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowsClockwise, Users, CaretDown, CaretUp, Rows } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,7 +152,7 @@ export function LeadRouter({ funnel, onUpdateSettings }: LeadRouterProps) {
                             <div className="flex items-center gap-2 mt-1">
                               {client.webhookUrl ? (
                                 <Badge variant="secondary" className="text-xs">
-                                  <Webhooks className="h-3 w-3 mr-1" />
+                                  <ArrowsClockwise className="h-3 w-3 mr-1" />
                                   Webhook configurado
                                 </Badge>
                               ) : (
