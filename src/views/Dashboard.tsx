@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,29 +184,41 @@ interface FunnelActionProps {
 
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete }: FunnelActionProps) {
   const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
-  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([]);
+  const [chartData, setChartData] = useState<Array<{ date: string; leads: number }>>([
+    { date: "Lun", leads: 0 },
+    { date: "Mar", leads: 0 },
+    { date: "Mié", leads: 0 },
+    { date: "Jue", leads: 0 },
+    { date: "Vie", leads: 0 },
+    { date: "Sab", leads: 0 },
+    { date: "Dom", leads: 0 },
+  ]);
 
   useEffect(() => {
     const fetchLeadsData = async () => {
-      // Get leads data for last 7 days
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i));
-        return date.toISOString().split('T')[0];
-      });
+      try {
+        // Get leads data for last 7 days
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (6 - i));
+          return date.toISOString().split('T')[0];
+        });
 
-      const { data } = await supabase
-        .from('leads')
-        .select('created_at')
-        .eq('funnel_id', funnel.id)
-        .gte('created_at', last7Days[0]);
+        const { data, error } = await supabase
+          .from('leads')
+          .select('created_at')
+          .eq('funnel_id', funnel.id)
+          .gte('created_at', last7Days[0]);
 
-      if (data) {
-        const leadsPerDay = last7Days.map((date) => ({
-          date: new Date(date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-          leads: data.filter((l) => l.created_at.startsWith(date)).length,
-        }));
-        setChartData(leadsPerDay);
+        if (!error && data) {
+          const leadsPerDay = last7Days.map((date, i) => ({
+            date: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sab", "Dom"][i],
+            leads: data.filter((l) => l.created_at.startsWith(date)).length,
+          }));
+          setChartData(leadsPerDay);
+        }
+      } catch (err) {
+        console.error("Error fetching leads data:", err);
       }
     };
 
