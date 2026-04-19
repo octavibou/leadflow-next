@@ -1,4 +1,4 @@
-import { Plus, GripVertical, Trash2, AlignLeft, HelpCircle, UserCircle, BarChart3, Calendar, Video, Gift, ThumbsUp } from "lucide-react";
+import { Plus, DotsSixVertical, Trash, TextAlignLeft, Question, UserCircle, ChartBar, CalendarBlank, VideoCamera, Gift, ThumbsUp } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -9,14 +9,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
 const STEP_ICONS: Record<StepType, React.ReactNode> = {
-  intro: <AlignLeft className="h-4 w-4" />,
-  question: <HelpCircle className="h-4 w-4" />,
-  contact: <UserCircle className="h-4 w-4" />,
-  results: <BarChart3 className="h-4 w-4" />,
-  booking: <Calendar className="h-4 w-4" />,
-  vsl: <Video className="h-4 w-4" />,
-  delivery: <Gift className="h-4 w-4" />,
-  thankyou: <ThumbsUp className="h-4 w-4" />,
+  intro: <TextAlignLeft className="h-4 w-4" weight="bold" />,
+  question: <Question className="h-4 w-4" weight="bold" />,
+  contact: <UserCircle className="h-4 w-4" weight="bold" />,
+  results: <ChartBar className="h-4 w-4" weight="bold" />,
+  booking: <CalendarBlank className="h-4 w-4" weight="bold" />,
+  vsl: <VideoCamera className="h-4 w-4" weight="bold" />,
+  delivery: <Gift className="h-4 w-4" weight="bold" />,
+  thankyou: <ThumbsUp className="h-4 w-4" weight="bold" />,
 };
 
 const STEP_LABELS: Record<StepType, string> = {
@@ -62,7 +62,7 @@ function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelSt
       onClick={onSelect}
     >
       <span {...attributes} {...listeners} className="shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
-        <GripVertical className="h-3.5 w-3.5" />
+        <DotsSixVertical className="h-3.5 w-3.5" weight="bold" />
       </span>
       <span className="shrink-0 text-muted-foreground">{STEP_ICONS[step.type]}</span>
       <span className="min-w-0 flex-1 truncate pr-1" title={fullLabel}>{label}</span>
@@ -73,7 +73,7 @@ function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelSt
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         aria-label={`Eliminar paso ${fullLabel}`}
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash className="h-3.5 w-3.5" weight="bold" />
       </Button>
     </div>
   );
@@ -125,7 +125,7 @@ export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAdd
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="w-full">
-              <Plus className="h-4 w-4 mr-2" /> Añadir paso
+              <Plus className="h-4 w-4 mr-2" weight="bold" /> Añadir paso
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>

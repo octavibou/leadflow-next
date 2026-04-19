@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { ChartBar } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
 import FunnelAnalytics from "@/components/analytics/FunnelAnalytics";
@@ -35,7 +35,7 @@ const AnalyticsPage = () => {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-primary" />
+          <ChartBar className="h-6 w-6 text-primary" weight="fill" />
           Analytics
         </h1>
         <Select value={selectedFunnelId} onValueChange={setSelectedFunnelId}>
@@ -59,8 +59,8 @@ const AnalyticsPage = () => {
       ) : !selectedFunnel ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p>Selecciona un funnel para ver sus analíticas</p>
+            <ChartBar className="h-10 w-10 mx-auto mb-3 opacity-50" weight="bold" />
+            <p>Selecciona un funnel para ver sus analiticas</p>
           </CardContent>
         </Card>
       ) : (

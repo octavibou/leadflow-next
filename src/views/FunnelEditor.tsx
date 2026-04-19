@@ -16,7 +16,7 @@ import FunnelAnalytics from "@/components/analytics/FunnelAnalytics";
 import { CampaignsTab } from "@/components/editor/CampaignsTab";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Smartphone } from "lucide-react";
+import { DeviceMobile } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FunnelStep, StepType } from "@/types/funnel";
@@ -117,7 +117,7 @@ const FunnelEditor = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <DeviceMobile className="h-12 w-12 text-muted-foreground mx-auto mb-4" weight="bold" />
           <h2 className="text-xl font-semibold mb-2">Abre en escritorio para editar</h2>
           <p className="text-muted-foreground mb-4">El editor de funnels requiere una pantalla más grande.</p>
           <Button variant="link" onClick={() => router.push("/dashboard")}>Volver al dashboard</Button>

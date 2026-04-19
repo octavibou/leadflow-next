@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Plus, Copy, Trash2, Link, MoreHorizontal, Megaphone, Pencil, X, Monitor, Smartphone, Settings2 } from "lucide-react";
+import { Plus, Copy, Trash, Link, DotsThree, Megaphone, Pencil, X, Monitor, DeviceMobile, Gear } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,14 +41,14 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
   const handleCreateVariation = async () => {
     setCreating(true);
     const count = campaigns.length + 1;
-    const name = `Variación ${count}`;
+    const name = `Variacion ${count}`;
     const steps = funnel.steps.map((s) => ({
       ...JSON.parse(JSON.stringify(s)),
       id: crypto.randomUUID(),
     }));
     const c = await createCampaign(funnel.id, name, steps);
     if (c) {
-      toast.success("Variación creada");
+      toast.success("Variacion creada");
       setEditingCampaign(c);
     }
     setCreating(false);
@@ -79,15 +79,15 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-primary" />
-            A/B Test — Landing
+            <Megaphone className="h-5 w-5 text-primary" weight="fill" />
+            A/B Test - Landing
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Crea variaciones de tu landing para optimizar la conversión. Solo cambia la intro, el resto del funnel permanece igual.
+            Crea variaciones de tu landing para optimizar la conversion. Solo cambia la intro, el resto del funnel permanece igual.
           </p>
         </div>
         <Button size="sm" onClick={handleCreateVariation} disabled={creating}>
-          <Plus className="h-4 w-4 mr-2" /> Crear variación
+          <Plus className="h-4 w-4 mr-2" weight="bold" /> Crear variacion
         </Button>
       </div>
 
@@ -98,9 +98,9 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
       ) : campaigns.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <Megaphone className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="mb-1 font-medium">No hay variaciones aún</p>
-            <p className="text-sm">Crea tu primera variación para hacer A/B testing en la landing.</p>
+            <Megaphone className="h-10 w-10 mx-auto mb-3 opacity-50" weight="bold" />
+            <p className="mb-1 font-medium">No hay variaciones aun</p>
+            <p className="text-sm">Crea tu primera variacion para hacer A/B testing en la landing.</p>
           </CardContent>
         </Card>
       ) : (
@@ -116,25 +116,25 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
                   <p className="text-sm text-muted-foreground mt-0.5 truncate">/f/{funnel.id}?c={c.slug}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setEditingCampaign(c)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" weight="bold" /> Editar
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handleCopyUrl(c)} title="Copiar URL">
-                  <Link className="h-4 w-4" />
+                  <Link className="h-4 w-4" weight="bold" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon"><DotsThree className="h-4 w-4" weight="bold" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => duplicateCampaign(c.id).then(() => toast.success("Variación duplicada"))}>
-                      <Copy className="h-4 w-4 mr-2" /> Duplicar
+                    <DropdownMenuItem onClick={() => duplicateCampaign(c.id).then(() => toast.success("Variacion duplicada"))}>
+                      <Copy className="h-4 w-4 mr-2" weight="bold" /> Duplicar
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleCopyUrl(c)}>
-                      <Link className="h-4 w-4 mr-2" /> Copiar URL
+                      <Link className="h-4 w-4 mr-2" weight="bold" /> Copiar URL
                     </DropdownMenuItem>
                     {!c.is_default && (
-                      <DropdownMenuItem className="text-destructive" onClick={() => deleteCampaign(c.id).then(() => toast.success("Variación eliminada"))}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                      <DropdownMenuItem className="text-destructive" onClick={() => deleteCampaign(c.id).then(() => toast.success("Variacion eliminada"))}>
+                        <Trash className="h-4 w-4 mr-2" weight="bold" /> Eliminar
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -148,7 +148,7 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
   );
 }
 
-/* ── Inline campaign landing editor ── */
+/* -- Inline campaign landing editor -- */
 
 interface CampaignLandingInlineProps {
   funnel: Funnel;
@@ -176,7 +176,7 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
   if (!introStep) {
     return (
       <div className="p-6 text-center">
-        <p className="text-muted-foreground mb-4">Esta variación no tiene landing.</p>
+        <p className="text-muted-foreground mb-4">Esta variacion no tiene landing.</p>
         <Button variant="outline" onClick={onBack}>Volver</Button>
       </div>
     );
@@ -206,7 +206,7 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
       <div className="flex-1 bg-muted/30 overflow-auto flex flex-col">
         <div className="flex items-center gap-3 px-4 py-2 border-b bg-background">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <X className="h-4 w-4 mr-1.5" /> Volver a variaciones
+            <X className="h-4 w-4 mr-1.5" weight="bold" /> Volver a variaciones
           </Button>
           <Badge variant="secondary" className="text-xs">{campaign.name}</Badge>
           <div className="flex-1" />
@@ -215,13 +215,13 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
               onClick={() => setViewMode("mobile")}
               className={cn("p-1.5 rounded-md transition-colors", viewMode === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              <Smartphone className="h-3.5 w-3.5" />
+              <DeviceMobile className="h-3.5 w-3.5" weight="bold" />
             </button>
             <button
               onClick={() => setViewMode("desktop")}
               className={cn("p-1.5 rounded-md transition-colors", viewMode === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              <Monitor className="h-3.5 w-3.5" />
+              <Monitor className="h-3.5 w-3.5" weight="bold" />
             </button>
           </div>
         </div>
@@ -231,7 +231,7 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
             <div className={cn("p-6", isMobile ? "px-5 py-6" : "px-10 py-8")}>
               <div className="text-center" style={{ gap: `${previewS}px`, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="font-bold leading-tight" style={{ fontSize: `${previewH}px` }}>
-                  {ic.headline || "Título de la landing"}
+                  {ic.headline || "Titulo de la landing"}
                 </h1>
                 {ic.showVideo && ic.videoUrl && (
                   <div className="rounded-xl overflow-hidden aspect-video w-full">
@@ -240,13 +240,13 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
                       return embedUrl ? (
                         <iframe src={embedUrl} className="w-full h-full border-0" allowFullScreen />
                       ) : (
-                        <div className="bg-muted w-full h-full flex items-center justify-center text-muted-foreground text-sm">URL no válida</div>
+                        <div className="bg-muted w-full h-full flex items-center justify-center text-muted-foreground text-sm">URL no valida</div>
                       );
                     })()}
                   </div>
                 )}
                 <p className="text-muted-foreground leading-relaxed" style={{ fontSize: `${previewD}px` }}>
-                  {ic.description || "Descripción de la landing"}
+                  {ic.description || "Descripcion de la landing"}
                 </p>
                 <button
                   className="px-8 py-4 rounded-xl font-semibold w-full cursor-default"
@@ -263,16 +263,16 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
       {/* Properties panel */}
       <div className="w-80 border-l bg-background flex flex-col shrink-0">
         <div className="px-4 py-3 border-b">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Landing de la variación</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Landing de la variacion</span>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-4">
             <div>
-              <Label className="text-xs mb-1.5 block">Título</Label>
+              <Label className="text-xs mb-1.5 block">Titulo</Label>
               <Input value={ic.headline || ""} onChange={(e) => handleUpdate("headline", e.target.value)} className="h-9 text-sm" />
             </div>
             <div>
-              <Label className="text-xs mb-1.5 block">Descripción</Label>
+              <Label className="text-xs mb-1.5 block">Descripcion</Label>
               <textarea
                 className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background"
                 rows={3}
@@ -281,7 +281,7 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
               />
             </div>
             <div>
-              <Label className="text-xs mb-1.5 block">Texto del botón</Label>
+              <Label className="text-xs mb-1.5 block">Texto del boton</Label>
               <Input value={ic.cta || ""} onChange={(e) => handleUpdate("cta", e.target.value)} className="h-9 text-sm" />
             </div>
             <div className="flex items-center justify-between">
@@ -296,31 +296,31 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
             )}
             <Separator />
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Tamaño y espaciado</Label>
+              <Label className="text-xs font-semibold">Tamano y espaciado</Label>
               <div className="flex gap-1 border rounded-lg p-0.5">
                 <button onClick={() => setDevice("desktop")} className={cn("p-1.5 rounded-md transition-colors", device === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  <Monitor className="h-3.5 w-3.5" />
+                  <Monitor className="h-3.5 w-3.5" weight="bold" />
                 </button>
                 <button onClick={() => setDevice("mobile")} className={cn("p-1.5 rounded-md transition-colors", device === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  <Smartphone className="h-3.5 w-3.5" />
+                  <DeviceMobile className="h-3.5 w-3.5" weight="bold" />
                 </button>
               </div>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Título — {(ic as any)[hKey] || hDefault}px</Label>
+              <Label className="text-xs text-muted-foreground">Titulo - {(ic as any)[hKey] || hDefault}px</Label>
               <Slider min={12} max={60} step={1} value={[(ic as any)[hKey] || hDefault]} onValueChange={([v]) => handleUpdate(hKey, v)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Descripción — {(ic as any)[dKey] || dDefault}px</Label>
+              <Label className="text-xs text-muted-foreground">Descripcion - {(ic as any)[dKey] || dDefault}px</Label>
               <Slider min={10} max={32} step={1} value={[(ic as any)[dKey] || dDefault]} onValueChange={([v]) => handleUpdate(dKey, v)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Botón — {(ic as any)[cKey] || cDefault}px</Label>
+              <Label className="text-xs text-muted-foreground">Boton - {(ic as any)[cKey] || cDefault}px</Label>
               <Slider min={10} max={28} step={1} value={[(ic as any)[cKey] || cDefault]} onValueChange={([v]) => handleUpdate(cKey, v)} className="mt-1" />
             </div>
             <Separator />
             <div>
-              <Label className="text-xs text-muted-foreground">Espacio entre elementos — {(ic as any)[sKey] || sDefault}px</Label>
+              <Label className="text-xs text-muted-foreground">Espacio entre elementos - {(ic as any)[sKey] || sDefault}px</Label>
               <Slider min={4} max={48} step={2} value={[(ic as any)[sKey] || sDefault]} onValueChange={([v]) => handleUpdate(sKey, v)} className="mt-1" />
             </div>
           </div>

@@ -3,16 +3,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, CheckCircle2, Send, Loader2, AlertCircle, ExternalLink } from "lucide-react";
+import { Activity, CheckCircle, PaperPlaneTilt, SpinnerGap, Warning, ArrowSquareOut } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
-// fireMetaCapi is used in PublicFunnel; here we call the edge function directly for testing
 import type { Funnel, FunnelSettings } from "@/types/funnel";
 
 const TEST_EVENTS = [
-  { value: "PageView", label: "PageView", desc: "Visita a la página" },
-  { value: "ViewContent", label: "ViewContent", desc: "Visualización de contenido" },
-  { value: "Lead", label: "Lead", desc: "Envío de formulario" },
-  { value: "CompleteRegistration", label: "CompleteRegistration", desc: "Conversión / resultado" },
+  { value: "PageView", label: "PageView", desc: "Visita a la pagina" },
+  { value: "ViewContent", label: "ViewContent", desc: "Visualizacion de contenido" },
+  { value: "Lead", label: "Lead", desc: "Envio de formulario" },
+  { value: "CompleteRegistration", label: "CompleteRegistration", desc: "Conversion / resultado" },
   { value: "InitiateCheckout", label: "InitiateCheckout", desc: "Inicio de checkout" },
   { value: "Purchase", label: "Purchase", desc: "Compra realizada" },
 ];
@@ -78,18 +77,18 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
       if (res.ok && data.events_received) {
         setTestResult({
           ok: true,
-          message: `✅ Evento "${testEvent}" enviado correctamente. ${data.events_received} evento(s) recibido(s) por Meta.`,
+          message: `Evento "${testEvent}" enviado correctamente. ${data.events_received} evento(s) recibido(s) por Meta.`,
         });
       } else {
         setTestResult({
           ok: false,
-          message: `❌ Error: ${data.error?.message || JSON.stringify(data)}`,
+          message: `Error: ${data.error?.message || JSON.stringify(data)}`,
         });
       }
     } catch (err: any) {
       setTestResult({
         ok: false,
-        message: `❌ Error de red: ${err.message}`,
+        message: `Error de red: ${err.message}`,
       });
     } finally {
       setTestSending(false);
@@ -101,7 +100,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
       <div>
         <h2 className="text-2xl font-bold mb-1">Tracking</h2>
         <p className="text-sm text-muted-foreground">
-          Conecta Meta Pixel y la Conversions API para medir el rendimiento de tus campañas.
+          Conecta Meta Pixel y la Conversions API para medir el rendimiento de tus campanas.
         </p>
       </div>
 
@@ -109,7 +108,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
       <div className="border rounded-xl p-6 bg-card space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <Activity className="h-5 w-5 text-blue-500" />
+            <Activity className="h-5 w-5 text-blue-500" weight="bold" />
           </div>
           <div>
             <h3 className="text-sm font-semibold">Meta (Facebook)</h3>
@@ -117,7 +116,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
           </div>
           {isConfigured && (
             <div className="ml-auto flex items-center gap-1.5 text-xs text-green-600">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+              <CheckCircle className="h-3.5 w-3.5" weight="fill" />
               Conectado
             </div>
           )}
@@ -143,7 +142,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               placeholder="EAAxxxxxxx..."
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Genera el token en Meta Events Manager → Settings → Conversions API.
+              Genera el token en Meta Events Manager - Settings - Conversions API.
             </p>
           </div>
           <div>
@@ -155,14 +154,14 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               placeholder="TEST12345"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Solo para pruebas. Los eventos aparecerán en Meta Events Manager → Test Events.
+              Solo para pruebas. Los eventos apareceran en Meta Events Manager - Test Events.
             </p>
           </div>
         </div>
 
         {/* Events tracked */}
         <div className="border-t pt-4 mt-4">
-          <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Eventos que se trackean automáticamente</h4>
+          <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Eventos que se trackean automaticamente</h4>
           <div className="grid grid-cols-2 gap-2">
             {[
               { event: "PageView", desc: "Al cargar el funnel" },
@@ -171,7 +170,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               { event: "CompleteRegistration", desc: "Al mostrar resultado" },
             ].map(({ event, desc }) => (
               <div key={event} className="flex items-start gap-2 text-xs border rounded-lg p-2.5 bg-muted/30">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" weight="fill" />
                 <div>
                   <span className="font-mono font-medium">{event}</span>
                   <p className="text-muted-foreground text-[10px]">{desc}</p>
@@ -186,19 +185,19 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
       <div className="border rounded-xl p-6 bg-card space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-            <Send className="h-5 w-5 text-orange-500" />
+            <PaperPlaneTilt className="h-5 w-5 text-orange-500" weight="bold" />
           </div>
           <div>
             <h3 className="text-sm font-semibold">Probar eventos</h3>
             <p className="text-xs text-muted-foreground">
-              Envía un evento de prueba a Meta para verificar la conexión.
+              Envia un evento de prueba a Meta para verificar la conexion.
             </p>
           </div>
         </div>
 
         {!isConfigured && (
           <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <Warning className="h-4 w-4 shrink-0 mt-0.5" weight="bold" />
             <p>Configura el Pixel ID y el Access Token arriba para poder enviar eventos de prueba.</p>
           </div>
         )}
@@ -215,7 +214,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
                   <SelectItem key={e.value} value={e.value}>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs">{e.label}</span>
-                      <span className="text-muted-foreground text-xs">— {e.desc}</span>
+                      <span className="text-muted-foreground text-xs">- {e.desc}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -232,7 +231,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               placeholder="https://tu-dominio.com"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              La URL que aparecerá como origen del evento en Meta.
+              La URL que aparecera como origen del evento en Meta.
             </p>
           </div>
 
@@ -243,12 +242,12 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
           >
             {testSending ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <SpinnerGap className="h-4 w-4 mr-2 animate-spin" weight="bold" />
                 Enviando...
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <PaperPlaneTilt className="h-4 w-4 mr-2" weight="bold" />
                 Enviar evento de prueba
               </>
             )}
@@ -273,8 +272,8 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
             >
-              <ExternalLink className="h-3 w-3" />
-              Abrir Meta Events Manager → Test Events
+              <ArrowSquareOut className="h-3 w-3" weight="bold" />
+              Abrir Meta Events Manager - Test Events
             </a>
           )}
         </div>
