@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, ChartBar, Webhooks, Activity, Rocket, Flask } from "@phosphor-icons/react";
+import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, BarChart, Webhooks, Activity, Rocket, Flask } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ const editorTabs: { id: EditorTab; label: string; icon: typeof Lightning }[] = [
   { id: "tracking", label: "Tracking", icon: Activity },
   { id: "publish", label: "Publish", icon: Rocket },
   { id: "ab_test", label: "A/B Test", icon: Flask },
-  { id: "metrics", label: "Metrics", icon: ChartBar },
+  { id: "metrics", label: "Metrics", icon: BarChart },
 ];
 
 interface EditorTopBarProps {
