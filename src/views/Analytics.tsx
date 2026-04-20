@@ -36,17 +36,51 @@ function getFromDate(range: DateRange): string | null {
   return null;
 }
 
+function getCvrStyle(cvr: number): { color: string; bg: string; icon: any } {
+  if (cvr >= 10)  return { color: "text-yellow-600", bg: "bg-yellow-500/10", icon: Trophy };
+  if (cvr >= 5)   return { color: "text-green-600",  bg: "bg-green-500/10",  icon: null };
+  if (cvr >= 3)   return { color: "text-orange-600", bg: "bg-orange-500/10", icon: null };
+  return           { color: "text-red-600",    bg: "bg-red-500/10",    icon: null };
+}
+
 export default function Analytics() {
-  const { funnels, loading: funnelsLoading, fetchFunnels } = useFunnelStore();
+  const { funnels: allFunnels, loading: funnelsLoading, fetchFunnels } = useFunnelStore();
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [events, setEvents] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [funnelConversions, setFunnelConversions] = useState<Record<string, number>>({});
+
+  // Only live funnels have analytics
+  const funnels = allFunnels.filter((f) => !!f.saved_at && f.saved_at !== f.updated_at);
 
   useEffect(() => {
     fetchFunnels();
   }, [fetchFunnels]);
+
+  // Fetch per-funnel conversion rates for dropdown ordering + badges
+  useEffect(() => {
+    const fetchConversions = async () => {
+      if (funnels.length === 0) return;
+      const ids = funnels.map((f) => f.id);
+      const [eventsRes, leadsRes] = await Promise.all([
+        supabase.from("events").select("funnel_id").eq("event_type", "form_submit").in("funnel_id", ids),
+        supabase.from("leads").select("funnel_id").in("funnel_id", ids),
+      ]);
+      const submits: Record<string, number> = {};
+      const leadsMap: Record<string, number> = {};
+      funnels.forEach((f) => { submits[f.id] = 0; leadsMap[f.id] = 0; });
+      eventsRes.data?.forEach((e) => { if (e.funnel_id) submits[e.funnel_id] = (submits[e.funnel_id] || 0) + 1; });
+      leadsRes.data?.forEach((l) => { if (l.funnel_id) leadsMap[l.funnel_id] = (leadsMap[l.funnel_id] || 0) + 1; });
+      const cvrs: Record<string, number> = {};
+      funnels.forEach((f) => {
+        cvrs[f.id] = submits[f.id] > 0 ? (leadsMap[f.id] / submits[f.id]) * 100 : 0;
+      });
+      setFunnelConversions(cvrs);
+    };
+    fetchConversions();
+  }, [funnels.length]);
 
   useEffect(() => {
     const load = async () => {
@@ -181,22 +215,32 @@ export default function Analytics() {
               <CaretUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuContent align="start" className="w-64">
             <DropdownMenuItem
               onClick={() => setSelectedFunnelId("all")}
               className={selectedFunnelId === "all" ? "font-medium" : ""}
             >
               Todos los Funnels
             </DropdownMenuItem>
-            {funnels.map((f) => (
-              <DropdownMenuItem
-                key={f.id}
-                onClick={() => setSelectedFunnelId(f.id)}
-                className={selectedFunnelId === f.id ? "font-medium" : ""}
-              >
-                {f.name}
-              </DropdownMenuItem>
-            ))}
+            {[...funnels]
+              .sort((a, b) => (funnelConversions[b.id] || 0) - (funnelConversions[a.id] || 0))
+              .map((f) => {
+                const cvr = funnelConversions[f.id] || 0;
+                const { color, bg, icon: BadgeIcon } = getCvrStyle(cvr);
+                return (
+                  <DropdownMenuItem
+                    key={f.id}
+                    onClick={() => setSelectedFunnelId(f.id)}
+                    className={cn("justify-between gap-2", selectedFunnelId === f.id ? "font-medium" : "")}
+                  >
+                    <span className="truncate">{f.name}</span>
+                    <span className={cn("flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0", bg, color)}>
+                      {BadgeIcon && <BadgeIcon className="h-2.5 w-2.5" weight="fill" />}
+                      {cvr.toFixed(1)}%
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
           </DropdownMenuContent>
         </DropdownMenu>
 
