@@ -190,7 +190,6 @@ export function TopNav() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        </div>
       </div>
 
       {/* Center tabs */}
@@ -240,16 +239,14 @@ export function TopNav() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 relative"
+          className="h-8 w-8"
           onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
         >
           <GraduationCap className="h-4 w-4 text-muted-foreground" weight="bold" />
-          <div className="absolute bottom-0 right-0 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-[8px] font-bold text-primary-foreground">OB</span>
-          </div>
         </Button>
 
         {/* Profile */}
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
