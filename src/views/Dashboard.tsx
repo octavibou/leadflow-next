@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown, SquaresFour as SquaresFourIcon, Star, NotePencil, LinkSimple, Power, Archive, Export, CaretUpDown } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +28,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dateRange, setDateRange] = useState<DateRange>("7d");
+  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("all");
   const router = useRouter();
 
   const handleNewFunnel = () => {
@@ -85,7 +86,18 @@ const Dashboard = () => {
   };
 
   const filteredFunnels = funnels
-    .filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter((f) => {
+      if (!f.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
+      const isArchived = !!f.archived_at;
+      const isDraft = !isLive && !isArchived;
+      if (funnelFilter === "live")     return isLive;
+      if (funnelFilter === "drafts")   return isDraft;
+      if (funnelFilter === "archived") return isArchived;
+      if (funnelFilter === "offline")  return !isLive && !isArchived;
+      // favorites and shared: not yet implemented, show all for now
+      return true;
+    })
     .sort((a, b) => {
       const statusDiff = getFunnelStatusPriority(a) - getFunnelStatusPriority(b);
       if (statusDiff !== 0) return statusDiff;
@@ -114,7 +126,28 @@ const Dashboard = () => {
       <PendingInvitations />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Funnels</h1>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 group outline-none">
+              <h1 className="text-2xl font-bold">
+                {FUNNEL_FILTER_OPTIONS.find(o => o.value === funnelFilter)?.label}
+              </h1>
+              <CaretUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors mt-0.5" weight="bold" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            {FUNNEL_FILTER_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <DropdownMenuItem
+                key={value}
+                onClick={() => setFunnelFilter(value)}
+                className={`gap-2.5 ${funnelFilter === value ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              >
+                <Icon className="h-4 w-4 shrink-0" weight="bold" />
+                {label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex items-center gap-2">
 
           {/* Search */}
@@ -279,6 +312,18 @@ interface FunnelActionProps {
   onDelete: () => void;
   onTogglePublish: () => void;
 }
+
+type FunnelFilter = "all" | "favorites" | "drafts" | "live" | "offline" | "archived" | "shared";
+
+const FUNNEL_FILTER_OPTIONS: { value: FunnelFilter; label: string; icon: any }[] = [
+  { value: "all",       label: "Todos los Funnels", icon: SquaresFourIcon },
+  { value: "favorites", label: "Favoritos",          icon: Star },
+  { value: "drafts",    label: "Borradores",          icon: NotePencil },
+  { value: "live",      label: "Live",                icon: LinkSimple },
+  { value: "offline",   label: "Offline",             icon: Power },
+  { value: "archived",  label: "Archivados",          icon: Archive },
+  { value: "shared",    label: "Compartidos",         icon: Export },
+];
 
 type DateRange = "today" | "7d" | "month" | "year" | "all";
 
