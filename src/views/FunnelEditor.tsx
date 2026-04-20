@@ -12,7 +12,6 @@ import { GlobalSettingsSheet } from "@/components/editor/GlobalSettingsSheet";
 import { WebhookTab } from "@/components/editor/WebhookTab";
 import { TrackingTab } from "@/components/editor/TrackingTab";
 import { PublishTab } from "@/components/editor/PublishTab";
-import FunnelAnalytics from "@/components/analytics/FunnelAnalytics";
 import { CampaignsTab } from "@/components/editor/CampaignsTab";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -190,17 +189,9 @@ const FunnelEditor = () => {
       {activeTab === "metrics" && (
         <ScrollArea className="flex-1">
           <div className="p-6 max-w-5xl mx-auto">
-            {funnel.steps && funnel.steps.length > 0 ? (
-              <FunnelAnalytics
-                funnelId={funnel.id}
-                campaigns={campaigns}
-                steps={funnel.steps}
-              />
-            ) : (
-              <div className="text-center text-muted-foreground py-8">
-                No hay datos de análisis disponibles aún. Crea pasos en el funnel primero.
-              </div>
-            )}
+            <div className="text-center text-muted-foreground py-8">
+              Las métricas avanzadas están disponibles en la sección de Analytics. Haz clic en el botón "Analytics" en la navegación principal.
+            </div>
           </div>
         </ScrollArea>
       )}
