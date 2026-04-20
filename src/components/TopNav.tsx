@@ -236,14 +236,17 @@ export function TopNav() {
       {/* Right section */}
       <div className="flex items-center gap-2">
         {/* Academy button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+        <button
+          className="relative group"
           onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
         >
-          <GraduationCap className="h-4 w-4 text-muted-foreground" weight="bold" />
-        </Button>
+          <div className="p-2 hover:bg-muted rounded-md transition-colors">
+            <GraduationCap className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
+          </div>
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs font-medium rounded shadow-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
+            Skool
+          </div>
+        </button>
 
         {/* Profile */}
         <DropdownMenu>
