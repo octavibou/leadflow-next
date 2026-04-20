@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, DownloadSimple, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Rocket } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Rocket, Link } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -386,8 +386,12 @@ function FunnelDropdown({ funnel, onEdit, onCampaigns, onDuplicate, onExport, on
         <DropdownMenuItem onClick={onDuplicate}>
           <Copy className="h-4 w-4 mr-2" weight="bold" /> Duplicar
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onExport}>
-          <DownloadSimple className="h-4 w-4 mr-2" weight="bold" /> Exportar HTML
+        <DropdownMenuItem onClick={() => {
+          const url = `${window.location.origin}/f/${funnel.id}`;
+          navigator.clipboard.writeText(url);
+          toast.success("Link copiado");
+        }}>
+          <Link className="h-4 w-4 mr-2" weight="bold" /> Copiar link
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onClick={onDelete}>
           <Trash className="h-4 w-4 mr-2" weight="bold" /> Eliminar
