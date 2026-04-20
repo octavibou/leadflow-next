@@ -199,6 +199,8 @@ export function TopNav() {
           const active = !isExternal && pathname === tab.path;
           const disabled = !!(tab as any).soon;
           const Icon = tab.icon;
+          const isAcademy = tab.label === "Academy";
+          
           return (
             <Button
               key={tab.label}
@@ -215,6 +217,7 @@ export function TopNav() {
               disabled={disabled}
               className={cn(
                 "gap-1.5 h-8 rounded-md px-3 font-medium text-sm transition-colors",
+                isAcademy ? "gap-2 px-3" : "",
                 disabled
                   ? "text-muted-foreground/40 cursor-not-allowed"
                   : active
@@ -224,6 +227,11 @@ export function TopNav() {
             >
               <Icon className="h-3.5 w-3.5" weight={active ? "fill" : "bold"} />
               {tab.label}
+              {isAcademy && (
+                <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shrink-0 ml-1">
+                  <span className="text-[10px] font-bold text-primary-foreground">OB</span>
+                </div>
+              )}
               {disabled && (
                 <span className="text-[9px] bg-muted text-muted-foreground/60 rounded px-1.5 py-0.5 font-medium ml-0.5">soon</span>
               )}
