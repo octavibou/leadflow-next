@@ -65,22 +65,28 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Funnels</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+
+          {/* Search */}
           <div className="relative">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" weight="bold" />
+            <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" weight="bold" />
             <Input
               placeholder="Buscar funnels..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-56"
+              className="pl-8 h-8 w-48 text-sm"
             />
           </div>
-          {/* Date range picker */}
+
+          {/* Separator */}
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Date range */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-9 gap-2 min-w-[150px] justify-between text-sm font-normal">
+              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sm font-normal text-muted-foreground hover:text-foreground px-2.5">
                 {DATE_RANGE_LABELS[dateRange]}
-                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
+                <CaretDown className="h-3 w-3" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -88,7 +94,7 @@ const Dashboard = () => {
                 <DropdownMenuItem
                   key={key}
                   onClick={() => setDateRange(key)}
-                  className={dateRange === key ? "font-semibold" : ""}
+                  className={dateRange === key ? "font-medium" : ""}
                 >
                   {DATE_RANGE_LABELS[key]}
                 </DropdownMenuItem>
@@ -96,11 +102,15 @@ const Dashboard = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex items-center border rounded-lg">
+          {/* Separator */}
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* View toggle */}
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
-              className={viewMode === "grid" ? "bg-accent" : ""}
+              className={`h-8 w-8 ${viewMode === "grid" ? "bg-accent text-foreground" : "text-muted-foreground"}`}
               onClick={() => setViewMode("grid")}
             >
               <SquaresFour className="h-4 w-4" weight="bold" />
@@ -108,21 +118,26 @@ const Dashboard = () => {
             <Button
               variant="ghost"
               size="icon"
-              className={viewMode === "list" ? "bg-accent" : ""}
+              className={`h-8 w-8 ${viewMode === "list" ? "bg-accent text-foreground" : "text-muted-foreground"}`}
               onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" weight="bold" />
             </Button>
           </div>
-          <Button onClick={handleNewFunnel} variant={canCreateFunnel ? "default" : "outline"}>
+
+          {/* Separator */}
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* New funnel */}
+          <Button onClick={handleNewFunnel} size="sm" className="h-8 gap-1.5" variant={canCreateFunnel ? "default" : "outline"}>
             {canCreateFunnel ? (
-              <Plus className="h-4 w-4 mr-2" weight="bold" />
+              <Plus className="h-3.5 w-3.5" weight="bold" />
             ) : (
-              <Lock className="h-4 w-4 mr-2" weight="bold" />
+              <Lock className="h-3.5 w-3.5" weight="bold" />
             )}
-            New Funnel
+            Nuevo funnel
             {!limitsLoading && (
-              <span className="ml-1 text-xs opacity-70">({usage.funnels}/{limits.funnels})</span>
+              <span className="text-xs opacity-60">({usage.funnels}/{limits.funnels})</span>
             )}
           </Button>
         </div>
