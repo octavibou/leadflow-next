@@ -174,24 +174,6 @@ export default function Analytics() {
     // CVR = leads / impressions (from visitor to lead)
     const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
 
-    // Landing variants from campaigns table
-    const variants = campaigns.length > 0 
-      ? campaigns.map(c => ({
-          id: c.id,
-          name: c.name,
-          views: campaignMetrics[c.id]?.views || 0,
-          clicks: campaignMetrics[c.id]?.clicks || 0,
-        }))
-      : [{ id: "original", name: "Original", views: pageViews, clicks: formSubmits }];
-    
-    // Sort by CTR
-    const sortedVariants = [...variants].sort((a, b) => {
-      const ctrA = a.views > 0 ? a.clicks / a.views : 0;
-      const ctrB = b.views > 0 ? b.clicks / b.views : 0;
-      return ctrB - ctrA;
-    });
-    const bestVariantId = sortedVariants[0]?.id;
-
     // Step funnel data (exclude intro, start from first question step)
     const stepViews = events.filter((e) => e.event_type === "step_view");
     const funnelSteps = steps.filter((s) => s.type !== "intro");
@@ -204,6 +186,36 @@ export default function Analytics() {
     const iniciados = stepFunnel.length > 0 
       ? Math.max(...stepFunnel.map(s => s.count), formSubmits)
       : formSubmits;
+
+    // Landing variants from campaigns table + the funnel itself
+    const campaignVariants = campaigns.length > 0 
+      ? campaigns.map(c => ({
+          id: c.id,
+          name: c.name,
+          views: campaignMetrics[c.id]?.views || 0,
+          clicks: campaignMetrics[c.id]?.clicks || 0,
+          isFunnel: false,
+        }))
+      : [];
+    
+    // Add the funnel as a variant (shows funnel entry performance)
+    const funnelVariant = {
+      id: "funnel",
+      name: "Funnel",
+      views: iniciados,
+      clicks: totalLeads,
+      isFunnel: true,
+    };
+    
+    const variants = [...campaignVariants, funnelVariant];
+    
+    // Sort by CTR
+    const sortedVariants = [...variants].sort((a, b) => {
+      const ctrA = a.views > 0 ? a.clicks / a.views : 0;
+      const ctrB = b.views > 0 ? b.clicks / b.views : 0;
+      return ctrB - ctrA;
+    });
+    const bestVariantId = sortedVariants[0]?.id;
 
     // Chart data
     const now = new Date();
