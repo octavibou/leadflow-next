@@ -65,22 +65,23 @@ export default function Analytics() {
   }, [fetchFunnels]);
 
   // Fetch per-funnel conversion rates for dropdown ordering + badges
+  // Conversion = leads / page_views (impressions)
   useEffect(() => {
     const fetchConversions = async () => {
       if (funnels.length === 0) return;
       const ids = funnels.map((f) => f.id);
-      const [eventsRes, leadsRes] = await Promise.all([
-        supabase.from("events").select("funnel_id").eq("event_type", "form_submit").in("funnel_id", ids),
+      const [impressionsRes, leadsRes] = await Promise.all([
+        supabase.from("events").select("funnel_id").eq("event_type", "page_view").in("funnel_id", ids),
         supabase.from("leads").select("funnel_id").in("funnel_id", ids),
       ]);
-      const submits: Record<string, number> = {};
+      const impressions: Record<string, number> = {};
       const leadsMap: Record<string, number> = {};
-      funnels.forEach((f) => { submits[f.id] = 0; leadsMap[f.id] = 0; });
-      eventsRes.data?.forEach((e) => { if (e.funnel_id) submits[e.funnel_id] = (submits[e.funnel_id] || 0) + 1; });
+      funnels.forEach((f) => { impressions[f.id] = 0; leadsMap[f.id] = 0; });
+      impressionsRes.data?.forEach((e) => { if (e.funnel_id) impressions[e.funnel_id] = (impressions[e.funnel_id] || 0) + 1; });
       leadsRes.data?.forEach((l) => { if (l.funnel_id) leadsMap[l.funnel_id] = (leadsMap[l.funnel_id] || 0) + 1; });
       const cvrs: Record<string, number> = {};
       funnels.forEach((f) => {
-        cvrs[f.id] = submits[f.id] > 0 ? (leadsMap[f.id] / submits[f.id]) * 100 : 0;
+        cvrs[f.id] = impressions[f.id] > 0 ? (leadsMap[f.id] / impressions[f.id]) * 100 : 0;
       });
       setFunnelConversions(cvrs);
     };
@@ -130,8 +131,11 @@ export default function Analytics() {
     const pageViews = events.filter((e) => e.event_type === "page_view").length;
     const formSubmits = events.filter((e) => e.event_type === "form_submit").length;
     const totalLeads = leads.length;
+    
+    // CTR = clicks (form_submit) / impressions (page_view)
     const ctr = pageViews > 0 ? (formSubmits / pageViews) * 100 : 0;
-    const cvr = formSubmits > 0 ? (totalLeads / formSubmits) * 100 : 0;
+    // CVR = leads / impressions (from visitor to lead)
+    const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
 
     // Landing variants mock (in future, pull from campaigns/variants table)
     const variants = [
@@ -148,10 +152,15 @@ export default function Analytics() {
     // Step funnel data (exclude intro, start from first question step)
     const stepViews = events.filter((e) => e.event_type === "step_view");
     const funnelSteps = steps.filter((s) => s.type !== "intro");
-    const stepFunnel = funnelSteps.map((step, i) => {
-      const count = stepViews.filter((e) => e.metadata?.step_id === step.id).length || (i === 0 ? formSubmits : 0);
-      return { id: step.id, name: step.title || `Paso ${i + 1}`, count };
+    const stepFunnel = funnelSteps.map((step) => {
+      const count = stepViews.filter((e) => e.metadata?.step_id === step.id).length;
+      return { id: step.id, name: step.title || step.id, count };
     });
+    
+    // Iniciados = first step views (the highest count in stepFunnel, or form_submits as fallback)
+    const iniciados = stepFunnel.length > 0 
+      ? Math.max(...stepFunnel.map(s => s.count), formSubmits)
+      : formSubmits;
 
     // Chart data
     const now = new Date();
@@ -186,7 +195,7 @@ export default function Analytics() {
       leads: leads.filter((l) => l.created_at?.startsWith(key)).length,
     }));
 
-    return { pageViews, formSubmits, totalLeads, ctr, cvr, variants: sortedVariants, bestVariantId, stepFunnel, chartData };
+    return { pageViews, formSubmits, totalLeads, ctr, cvr, iniciados, variants: sortedVariants, bestVariantId, stepFunnel, chartData };
   }, [events, leads, steps, dateRange]);
 
   if (funnelsLoading) {
@@ -347,8 +356,8 @@ export default function Analytics() {
               {/* Funnel KPIs */}
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Iniciados</p>
-                  <p className="text-xl font-bold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
+              <p className="text-[11px] text-muted-foreground leading-none">Iniciados</p>
+              <p className="text-xl font-bold mt-0.5">{stats.iniciados.toLocaleString()}</p>
                 </div>
                 <div className="w-px h-8 bg-border" />
                 <div>
@@ -372,7 +381,7 @@ export default function Analytics() {
                     {stats.stepFunnel.map((step, idx) => {
                       const maxCount = Math.max(...stats.stepFunnel.map((s) => s.count), 1);
                       const heightPct = Math.max((step.count / maxCount) * 64, 8);
-                      const prev = idx === 0 ? stats.formSubmits : stats.stepFunnel[idx - 1].count;
+                      const prev = idx === 0 ? stats.iniciados : stats.stepFunnel[idx - 1].count;
                       const dropoff = prev > 0 ? Math.round(((prev - step.count) / prev) * 100) : 0;
                       const isLast = idx === stats.stepFunnel.length - 1;
 
