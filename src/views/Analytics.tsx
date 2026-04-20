@@ -37,7 +37,8 @@ function getFromDate(range: DateRange): string | null {
   return null;
 }
 
-function getCvrStyle(cvr: number): { color: string; bg: string; icon: any } {
+function getCvrStyle(cvr: number, isBest: boolean = false): { color: string; bg: string; icon: any } {
+  if (isBest)     return { color: "text-yellow-600", bg: "bg-yellow-500/10", icon: Trophy };
   if (cvr >= 10)  return { color: "text-yellow-600", bg: "bg-yellow-500/10", icon: Trophy };
   if (cvr >= 5)   return { color: "text-green-600",  bg: "bg-green-500/10",  icon: null };
   if (cvr >= 3)   return { color: "text-orange-600", bg: "bg-orange-500/10", icon: null };
@@ -293,9 +294,10 @@ export default function Analytics() {
             </DropdownMenuItem>
             {[...funnels]
               .sort((a, b) => (funnelConversions[b.id] || 0) - (funnelConversions[a.id] || 0))
-              .map((f) => {
+              .map((f, idx) => {
                 const cvr = funnelConversions[f.id] || 0;
-                const { color, bg, icon: BadgeIcon } = getCvrStyle(cvr);
+                const isBest = idx === 0;
+                const { color, bg, icon: BadgeIcon } = getCvrStyle(cvr, isBest);
                 return (
                   <DropdownMenuItem
                     key={f.id}
