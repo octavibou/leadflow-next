@@ -267,37 +267,53 @@ function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate
     const fetchData = async () => {
       const fromDate = getFromDate(dateRange);
 
-      // Build chart buckets for the last 7 days (visual sparkline always 7d)
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return d;
-      });
-      const chart7FromDate = last7Days[0].toISOString().split('T')[0] + 'T00:00:00';
-
-      // Leads query: apply dateRange filter
       let leadsQuery = supabase.from('leads').select('created_at').eq('funnel_id', funnel.id);
       if (fromDate) leadsQuery = leadsQuery.gte('created_at', fromDate);
 
-      // Events query: apply dateRange filter
       let eventsQuery = supabase.from('events').select('event_type, created_at').eq('funnel_id', funnel.id);
       if (fromDate) eventsQuery = eventsQuery.gte('created_at', fromDate);
 
-      // Chart always shows last 7 days for visual reference
-      let chartLeadsQuery = supabase.from('leads').select('created_at').eq('funnel_id', funnel.id).gte('created_at', chart7FromDate);
-
-      const [leadsRes, eventsRes, chartLeadsRes] = await Promise.all([leadsQuery, eventsQuery, chartLeadsQuery]);
+      const [leadsRes, eventsRes] = await Promise.all([leadsQuery, eventsQuery]);
 
       if (leadsRes.data) {
         setLeadsTotal(leadsRes.data.length);
-      }
 
-      if (chartLeadsRes.data) {
-        const leadsPerDay = last7Days.map((d) => ({
-          day: DAY_LABELS[d.getDay()],
-          leads: chartLeadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
+        // Build chart buckets based on dateRange
+        const now = new Date();
+        let buckets: Array<{ key: string; label: string }> = [];
+
+        if (dateRange === "7d") {
+          buckets = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(now);
+            d.setDate(d.getDate() - (6 - i));
+            return { key: d.toISOString().split('T')[0], label: DAY_LABELS[d.getDay()] };
+          });
+        } else if (dateRange === "month") {
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          buckets = Array.from({ length: daysInMonth }, (_, i) => {
+            const d = new Date(now.getFullYear(), now.getMonth(), i + 1);
+            return { key: d.toISOString().split('T')[0], label: String(i + 1) };
+          });
+        } else if (dateRange === "year" || dateRange === "all") {
+          const MONTH_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+          const startYear = dateRange === "year" ? now.getFullYear() : (leadsRes.data.length > 0
+            ? new Date(leadsRes.data[leadsRes.data.length - 1].created_at).getFullYear()
+            : now.getFullYear());
+          for (let y = startYear; y <= now.getFullYear(); y++) {
+            const startM = y === startYear && dateRange === "all" ? 0 : (y < now.getFullYear() ? 0 : 0);
+            const endM = y < now.getFullYear() ? 11 : now.getMonth();
+            for (let m = startM; m <= endM; m++) {
+              const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+              buckets.push({ key: monthKey, label: MONTH_LABELS[m] });
+            }
+          }
+        }
+
+        const grouped = buckets.map(({ key, label }) => ({
+          day: label,
+          leads: leadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(key)).length,
         }));
-        setChartData(leadsPerDay);
+        setChartData(grouped);
       }
 
       if (eventsRes.data) {
