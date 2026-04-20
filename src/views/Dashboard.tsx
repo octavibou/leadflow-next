@@ -303,9 +303,10 @@ function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate
           });
         } else if (dateRange === "month") {
           const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          buckets = Array.from({ length: daysInMonth }, (_, i) => {
-            const d = new Date(now.getFullYear(), now.getMonth(), i + 1);
-            return { key: d.toISOString().split('T')[0], label: String(i + 1) };
+          buckets = Array.from({ length: Math.ceil(daysInMonth / 2) }, (_, i) => {
+            const day = i * 2 + 1;
+            const d = new Date(now.getFullYear(), now.getMonth(), day);
+            return { key: d.toISOString().split('T')[0], label: String(day) };
           });
         } else if (dateRange === "year" || dateRange === "all") {
           const MONTH_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
