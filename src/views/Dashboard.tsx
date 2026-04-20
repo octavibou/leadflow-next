@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown, SquaresFour as SquaresFourIcon, Star, NotePencil, LinkSimple, Power, Archive, Export, CaretUpDown, Trophy } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown, SquaresFour as SquaresFourIcon, Star, NotePencil, LinkSimple, Power, Archive, Export, CaretUpDown } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -260,38 +260,22 @@ const Dashboard = () => {
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(() => {
-            // Calculate best funnel by conversion rate
-            let bestFunnelId = "";
-            let bestConvRate = -1;
-            filteredFunnels.forEach((f) => {
-              const impressions = funnelImpressionCounts[f.id] || 0;
-              const leads = funnelLeadCounts[f.id] || 0;
-              const convRate = impressions > 0 ? (leads / impressions) * 100 : 0;
-              if (convRate > bestConvRate) {
-                bestConvRate = convRate;
-                bestFunnelId = f.id;
-              }
-            });
-
-            return filteredFunnels.map((f) => (
-              <FunnelCard
-                key={f.id}
-                funnel={f}
-                isBest={f.id === bestFunnelId}
-                dateRange={dateRange}
-                onEdit={() => router.push(`/editor/${f.id}`)}
-                onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
-                onDuplicate={() => duplicateFunnel(f.id)}
-                onExport={() => handleExport(f.id)}
-                onDelete={() => deleteFunnel(f.id)}
-                onTogglePublish={() => {
-                  const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
-                  isLive ? unpublishFunnel(f.id) : saveFunnel(f.id);
-                }}
-              />
-            ));
-          })()}
+          {filteredFunnels.map((f) => (
+            <FunnelCard
+              key={f.id}
+              funnel={f}
+              dateRange={dateRange}
+              onEdit={() => router.push(`/editor/${f.id}`)}
+              onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
+              onDuplicate={() => duplicateFunnel(f.id)}
+              onExport={() => handleExport(f.id)}
+              onDelete={() => deleteFunnel(f.id)}
+              onTogglePublish={() => {
+                const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
+                isLive ? unpublishFunnel(f.id) : saveFunnel(f.id);
+              }}
+            />
+          ))}
         </div>
       ) : (
         <div className="space-y-2">
@@ -372,7 +356,7 @@ function getFromDate(range: DateRange): string | null {
 
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
 
-function FunnelCard({ funnel, isBest = false, dateRange = "7d", onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps & { isBest?: boolean }) {
+function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
   const [chartData, setChartData] = useState<Array<{ day: string; leads: number }>>([]);
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [impressions, setImpressions] = useState(0);
@@ -478,9 +462,6 @@ function FunnelCard({ funnel, isBest = false, dateRange = "7d", onEdit, onCampai
       <CardHeader>
         <CardTitle className="flex items-center gap-2 pr-8">
           {funnel.name}
-          {isBest && (
-            <Trophy className="h-4 w-4 text-yellow-600" weight="fill" />
-          )}
           {isLive && (
             <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
               <span className="relative flex h-2 w-2">
