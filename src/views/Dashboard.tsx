@@ -43,48 +43,57 @@ const Dashboard = () => {
   }, [fetchFunnels, currentWorkspaceId]);
 
   const [funnelLeadCounts, setFunnelLeadCounts] = useState<Record<string, number>>({});
+  const [funnelImpressionCounts, setFunnelImpressionCounts] = useState<Record<string, number>>({});
 
-  // Fetch lead counts for all funnels to sort by performance
+  // Fetch lead and impression counts for all funnels to sort by performance
   useEffect(() => {
-    const fetchLeadCounts = async () => {
+    const fetchCounts = async () => {
       if (funnels.length === 0) return;
-      const { data } = await supabase
-        .from('leads')
-        .select('funnel_id')
-        .in('funnel_id', funnels.map(f => f.id));
-      
-      if (data) {
+      const ids = funnels.map(f => f.id);
+
+      const [leadsRes, eventsRes] = await Promise.all([
+        supabase.from('leads').select('funnel_id').in('funnel_id', ids),
+        supabase.from('events').select('funnel_id').eq('event_type', 'page_view').in('funnel_id', ids),
+      ]);
+
+      if (leadsRes.data) {
         const counts: Record<string, number> = {};
         funnels.forEach(f => counts[f.id] = 0);
-        data.forEach(lead => {
-          if (lead.funnel_id) counts[lead.funnel_id] = (counts[lead.funnel_id] || 0) + 1;
+        leadsRes.data.forEach(l => {
+          if (l.funnel_id) counts[l.funnel_id] = (counts[l.funnel_id] || 0) + 1;
         });
         setFunnelLeadCounts(counts);
       }
+
+      if (eventsRes.data) {
+        const counts: Record<string, number> = {};
+        funnels.forEach(f => counts[f.id] = 0);
+        eventsRes.data.forEach(e => {
+          if (e.funnel_id) counts[e.funnel_id] = (counts[e.funnel_id] || 0) + 1;
+        });
+        setFunnelImpressionCounts(counts);
+      }
     };
-    fetchLeadCounts();
+    fetchCounts();
   }, [funnels]);
 
-  // Get funnel status priority: Live (0) > Borrador (1) > Archived (2)
+  // Status priority: Live (0) > Borrador (1) > Archived (2)
   const getFunnelStatusPriority = (f: any): number => {
-    const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
-    const isArchived = !!f.archived_at;
-    if (isArchived) return 2;
-    if (isLive) return 0;
-    return 1; // Borrador
+    if (!!f.archived_at) return 2;
+    if (!!f.saved_at && f.saved_at !== f.updated_at) return 0;
+    return 1;
   };
 
   const filteredFunnels = funnels
     .filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
-      // First sort by status
-      const statusA = getFunnelStatusPriority(a);
-      const statusB = getFunnelStatusPriority(b);
-      if (statusA !== statusB) return statusA - statusB;
-      // Then by leads (performance) descending
-      const leadsA = funnelLeadCounts[a.id] || 0;
-      const leadsB = funnelLeadCounts[b.id] || 0;
-      return leadsB - leadsA;
+      const statusDiff = getFunnelStatusPriority(a) - getFunnelStatusPriority(b);
+      if (statusDiff !== 0) return statusDiff;
+      // Second: leads descending
+      const leadsDiff = (funnelLeadCounts[b.id] || 0) - (funnelLeadCounts[a.id] || 0);
+      if (leadsDiff !== 0) return leadsDiff;
+      // Third: impressions descending (tiebreaker when leads are equal)
+      return (funnelImpressionCounts[b.id] || 0) - (funnelImpressionCounts[a.id] || 0);
     });
 
   const handleExport = (id: string) => {
