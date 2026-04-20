@@ -76,8 +76,9 @@ const PublicFunnel = () => {
       .single()
       .then(({ data, error }) => {
         if (data && !error) {
-          // Check if funnel is published
-          if (data.status !== "published") {
+          // Check if funnel is published (saved_at exists and is different from updated_at)
+          const isPublished = data.saved_at && data.saved_at !== data.updated_at;
+          if (!isPublished) {
             setLoading(false);
             return;
           }
@@ -89,9 +90,6 @@ const PublicFunnel = () => {
             type: data.type as FunnelType,
             settings: data.settings as any,
             steps: (data.steps as any) || [],
-            status: data.status,
-            published_at: data.published_at,
-            archived_at: data.archived_at,
             created_at: data.created_at,
             updated_at: data.updated_at,
             saved_at: data.saved_at || data.updated_at,
