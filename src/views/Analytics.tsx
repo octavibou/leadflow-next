@@ -53,7 +53,12 @@ export default function Analytics() {
   const [funnelConversions, setFunnelConversions] = useState<Record<string, number>>({});
 
   // Only live funnels have analytics
-  const funnels = allFunnels.filter((f) => !!f.saved_at && f.saved_at !== f.updated_at);
+  const funnels = useMemo(
+    () => allFunnels.filter((f) => !!f.saved_at && f.saved_at !== f.updated_at),
+    [allFunnels]
+  );
+
+  const funnelIds = useMemo(() => funnels.map((f) => f.id).join(","), [funnels]);
 
   useEffect(() => {
     fetchFunnels();
@@ -80,7 +85,7 @@ export default function Analytics() {
       setFunnelConversions(cvrs);
     };
     fetchConversions();
-  }, [funnels.length]);
+  }, [funnelIds]);
 
   useEffect(() => {
     const load = async () => {
@@ -116,7 +121,7 @@ export default function Analytics() {
       setLoading(false);
     };
     load();
-  }, [selectedFunnelId, dateRange, funnels]);
+  }, [selectedFunnelId, dateRange, funnelIds]);
 
   const selectedFunnel = selectedFunnelId === "all" ? null : funnels.find((f) => f.id === selectedFunnelId);
   const steps = (selectedFunnel?.steps as FunnelStep[]) || [];
