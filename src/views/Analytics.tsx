@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { CaretDown, CaretUpDown } from "@phosphor-icons/react";
+import { CaretDown, CaretUpDown, Trophy } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,17 +91,25 @@ export default function Analytics() {
     const formSubmits = events.filter((e) => e.event_type === "form_submit").length;
     const totalLeads = leads.length;
     const ctr = pageViews > 0 ? (formSubmits / pageViews) * 100 : 0;
-    const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
+    const cvr = formSubmits > 0 ? (totalLeads / formSubmits) * 100 : 0;
 
-    // Step funnel data
+    // Landing variants mock (in future, pull from campaigns/variants table)
+    const variants = [
+      { id: "original", name: "Original", views: pageViews, clicks: formSubmits },
+    ];
+    // Sort by CTR
+    const sortedVariants = [...variants].sort((a, b) => {
+      const ctrA = a.views > 0 ? a.clicks / a.views : 0;
+      const ctrB = b.views > 0 ? b.clicks / b.views : 0;
+      return ctrB - ctrA;
+    });
+    const bestVariantId = sortedVariants[0]?.id;
+
+    // Step funnel data (exclude intro, start from first question step)
     const stepViews = events.filter((e) => e.event_type === "step_view");
-    const stepFunnel = steps.map((step, i) => {
-      let count = 0;
-      if (step.type === "intro") {
-        count = pageViews;
-      } else {
-        count = stepViews.filter((e) => e.metadata?.step_id === step.id).length;
-      }
+    const funnelSteps = steps.filter((s) => s.type !== "intro");
+    const stepFunnel = funnelSteps.map((step, i) => {
+      const count = stepViews.filter((e) => e.metadata?.step_id === step.id).length || (i === 0 ? formSubmits : 0);
       return { id: step.id, name: step.title || `Paso ${i + 1}`, count };
     });
 
@@ -138,7 +146,7 @@ export default function Analytics() {
       leads: leads.filter((l) => l.created_at?.startsWith(key)).length,
     }));
 
-    return { pageViews, formSubmits, totalLeads, ctr, cvr, stepFunnel, chartData };
+    return { pageViews, formSubmits, totalLeads, ctr, cvr, variants: sortedVariants, bestVariantId, stepFunnel, chartData };
   }, [events, leads, steps, dateRange]);
 
   if (funnelsLoading) {
@@ -203,135 +211,200 @@ export default function Analytics() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
-          ))}
+        <div className="grid grid-cols-2 gap-6">
+          <div className="h-80 bg-muted rounded-lg animate-pulse" />
+          <div className="h-80 bg-muted rounded-lg animate-pulse" />
         </div>
       ) : (
-        <>
-          {/* KPI Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-[11px] text-muted-foreground leading-none">Impresiones</p>
-                <p className="text-2xl font-bold mt-1">{stats.pageViews.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
-                <p className="text-2xl font-bold mt-1">{stats.ctr.toFixed(1)}%</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
-                <p className="text-2xl font-bold mt-1">{stats.totalLeads.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-[11px] text-muted-foreground leading-none">Conversión</p>
-                <p className="text-2xl font-bold mt-1">{stats.cvr.toFixed(1)}%</p>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="grid grid-cols-2 gap-6">
+          {/* LANDING SECTION */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-semibold">Landing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Landing KPIs */}
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Visitas</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.pageViews.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Clics</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.ctr.toFixed(1)}%</p>
+                </div>
+              </div>
 
-          {/* Main Content */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Funnel Steps */}
-            <Card className="col-span-1">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Embudo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {stats.stepFunnel.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin pasos</p>
-                ) : (
-                  stats.stepFunnel.map((step, idx) => {
-                    const maxCount = Math.max(...stats.stepFunnel.map((s) => s.count), 1);
-                    const width = (step.count / maxCount) * 100;
-                    const prev = idx === 0 ? step.count : stats.stepFunnel[idx - 1].count;
-                    const dropoff = prev > 0 ? Math.round(((prev - step.count) / prev) * 100) : 0;
-
+              {/* Variants */}
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-3">Variantes</p>
+                <div className="space-y-2">
+                  {stats.variants.map((variant) => {
+                    const variantCtr = variant.views > 0 ? (variant.clicks / variant.views) * 100 : 0;
+                    const isBest = variant.id === stats.bestVariantId;
                     return (
-                      <div key={step.id}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground w-4">{idx + 1}</span>
-                            <span className="text-sm truncate">{step.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">{step.count}</span>
-                            {idx > 0 && dropoff > 0 && (
-                              <span className={cn(
-                                "text-[10px] px-1.5 py-0.5 rounded",
-                                dropoff > 50 ? "bg-red-500/10 text-red-600" :
-                                dropoff > 25 ? "bg-orange-500/10 text-orange-600" :
-                                "bg-green-500/10 text-green-600"
-                              )}>
-                                -{dropoff}%
-                              </span>
-                            )}
-                          </div>
+                      <div
+                        key={variant.id}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-lg border",
+                          isBest ? "border-primary/30 bg-primary/5" : "border-border"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isBest && <Trophy className="h-4 w-4 text-primary" weight="fill" />}
+                          <span className="text-sm font-medium">{variant.name}</span>
                         </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${width}%` }} />
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-[10px] text-muted-foreground">Visitas</p>
+                            <p className="text-sm font-semibold">{variant.views.toLocaleString()}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] text-muted-foreground">Clics</p>
+                            <p className="text-sm font-semibold">{variant.clicks.toLocaleString()}</p>
+                          </div>
+                          <div className="text-right min-w-[50px]">
+                            <p className="text-[10px] text-muted-foreground">CTR</p>
+                            <p className={cn("text-sm font-semibold", isBest && "text-primary")}>{variantCtr.toFixed(1)}%</p>
+                          </div>
                         </div>
                       </div>
                     );
-                  })
-                )}
-              </CardContent>
-            </Card>
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Chart */}
-            <Card className="col-span-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Leads</CardTitle>
-              </CardHeader>
-              <CardContent className="px-0 pb-0">
-                <div className="h-48 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats.chartData} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gradLeads" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <Tooltip
-                        content={({ active, payload, label }) =>
-                          active && payload?.length ? (
-                            <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
-                              <span className="font-semibold">{label}</span>
-                              <span className="ml-2 text-muted-foreground">{payload[0].value} leads</span>
+          {/* FUNNEL SECTION */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-semibold">Funnel</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Funnel KPIs */}
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Iniciados</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.totalLeads.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Conversión</p>
+                  <p className="text-xl font-bold mt-0.5">{stats.cvr.toFixed(1)}%</p>
+                </div>
+              </div>
+
+              {/* Step by step funnel */}
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-3">Pasos</p>
+                {stats.stepFunnel.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay pasos en este funnel</p>
+                ) : (
+                  <div className="space-y-2">
+                    {stats.stepFunnel.map((step, idx) => {
+                      const maxCount = Math.max(...stats.stepFunnel.map((s) => s.count), 1);
+                      const width = (step.count / maxCount) * 100;
+                      const prev = idx === 0 ? stats.formSubmits : stats.stepFunnel[idx - 1].count;
+                      const dropoff = prev > 0 ? Math.round(((prev - step.count) / prev) * 100) : 0;
+
+                      return (
+                        <div key={step.id} className="p-3 rounded-lg border border-border">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center justify-center h-5 w-5 rounded-full bg-muted text-[10px] font-semibold">
+                                {idx + 1}
+                              </span>
+                              <span className="text-sm font-medium truncate">{step.name}</span>
                             </div>
-                          ) : null
-                        }
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="leads"
-                        stroke="hsl(var(--chart-3))"
-                        strokeWidth={2}
-                        fill="url(#gradLeads)"
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-between px-4 pb-3 pt-1">
-                  {stats.chartData.map((item) => (
-                    <span key={item.label} className="text-[10px] text-muted-foreground">{item.label}</span>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-semibold">{step.count}</span>
+                              {idx > 0 && dropoff > 0 && (
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                                    dropoff > 50
+                                      ? "bg-red-500/10 text-red-600"
+                                      : dropoff > 25
+                                        ? "bg-orange-500/10 text-orange-600"
+                                        : "bg-green-500/10 text-green-600"
+                                  )}
+                                >
+                                  -{dropoff}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CHART - Full width */}
+          <Card className="col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">Leads en el tiempo</CardTitle>
+            </CardHeader>
+            <CardContent className="px-0 pb-0">
+              <div className="h-40 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.chartData} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradLeads" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip
+                      content={({ active, payload, label }) =>
+                        active && payload?.length ? (
+                          <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
+                            <span className="font-semibold">{label}</span>
+                            <span className="ml-2 text-muted-foreground">{payload[0].value} leads</span>
+                          </div>
+                        ) : null
+                      }
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="leads"
+                      stroke="hsl(var(--chart-3))"
+                      strokeWidth={2}
+                      fill="url(#gradLeads)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-between px-4 pb-3 pt-1">
+                {stats.chartData.map((item) => (
+                  <span key={item.label} className="text-[10px] text-muted-foreground">
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
