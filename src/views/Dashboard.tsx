@@ -230,9 +230,10 @@ interface FunnelActionProps {
   onTogglePublish: () => void;
 }
 
-type DateRange = "7d" | "month" | "year" | "all";
+type DateRange = "today" | "7d" | "month" | "year" | "all";
 
 const DATE_RANGE_LABELS: Record<DateRange, string> = {
+  "today": "Hoy",
   "7d": "Últimos 7 días",
   "month": "Este mes",
   "year": "Este año",
@@ -241,6 +242,9 @@ const DATE_RANGE_LABELS: Record<DateRange, string> = {
 
 function getFromDate(range: DateRange): string | null {
   const now = new Date();
+  if (range === "today") {
+    return now.toISOString().split("T")[0] + "T00:00:00";
+  }
   if (range === "7d") {
     const d = new Date(now);
     d.setDate(d.getDate() - 6);
@@ -282,7 +286,16 @@ function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate
         const now = new Date();
         let buckets: Array<{ key: string; label: string }> = [];
 
-        if (dateRange === "7d") {
+        if (dateRange === "today") {
+          const todayKey = now.toISOString().split('T')[0];
+          buckets = Array.from({ length: 12 }, (_, i) => {
+            const hour = i * 2;
+            return {
+              key: `${todayKey}T${String(hour).padStart(2, '0')}`,
+              label: `${String(hour).padStart(2, '0')}h`,
+            };
+          });
+        } else if (dateRange === "7d") {
           buckets = Array.from({ length: 7 }, (_, i) => {
             const d = new Date(now);
             d.setDate(d.getDate() - (6 - i));
