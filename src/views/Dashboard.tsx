@@ -42,9 +42,50 @@ const Dashboard = () => {
     fetchFunnels(currentWorkspaceId || undefined);
   }, [fetchFunnels, currentWorkspaceId]);
 
-  const filteredFunnels = funnels.filter((f) =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [funnelLeadCounts, setFunnelLeadCounts] = useState<Record<string, number>>({});
+
+  // Fetch lead counts for all funnels to sort by performance
+  useEffect(() => {
+    const fetchLeadCounts = async () => {
+      if (funnels.length === 0) return;
+      const { data } = await supabase
+        .from('leads')
+        .select('funnel_id')
+        .in('funnel_id', funnels.map(f => f.id));
+      
+      if (data) {
+        const counts: Record<string, number> = {};
+        funnels.forEach(f => counts[f.id] = 0);
+        data.forEach(lead => {
+          if (lead.funnel_id) counts[lead.funnel_id] = (counts[lead.funnel_id] || 0) + 1;
+        });
+        setFunnelLeadCounts(counts);
+      }
+    };
+    fetchLeadCounts();
+  }, [funnels]);
+
+  // Get funnel status priority: Live (0) > Borrador (1) > Archived (2)
+  const getFunnelStatusPriority = (f: any): number => {
+    const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
+    const isArchived = !!f.archived_at;
+    if (isArchived) return 2;
+    if (isLive) return 0;
+    return 1; // Borrador
+  };
+
+  const filteredFunnels = funnels
+    .filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      // First sort by status
+      const statusA = getFunnelStatusPriority(a);
+      const statusB = getFunnelStatusPriority(b);
+      if (statusA !== statusB) return statusA - statusB;
+      // Then by leads (performance) descending
+      const leadsA = funnelLeadCounts[a.id] || 0;
+      const leadsB = funnelLeadCounts[b.id] || 0;
+      return leadsB - leadsA;
+    });
 
   const handleExport = (id: string) => {
     const funnel = useFunnelStore.getState().getFunnel(id);
