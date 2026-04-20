@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Webhook, Users, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { Plus, Trash, ArrowsClockwise, Users, CaretDown, CaretUp, Rows } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -144,7 +144,7 @@ export function LeadRouter({ funnel, onUpdateSettings }: LeadRouterProps) {
                     <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          <Rows className="h-4 w-4 text-muted-foreground" />
                           <div>
                             <CardTitle className="text-base">
                               {client.name || "Sin nombre"}
@@ -152,7 +152,7 @@ export function LeadRouter({ funnel, onUpdateSettings }: LeadRouterProps) {
                             <div className="flex items-center gap-2 mt-1">
                               {client.webhookUrl ? (
                                 <Badge variant="secondary" className="text-xs">
-                                  <Webhook className="h-3 w-3 mr-1" />
+                                  <ArrowsClockwise className="h-3 w-3 mr-1" />
                                   Webhook configurado
                                 </Badge>
                               ) : (
@@ -176,12 +176,12 @@ export function LeadRouter({ funnel, onUpdateSettings }: LeadRouterProps) {
                               removeClient(client.id);
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash className="h-4 w-4" />
                           </Button>
                           {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            <CaretUp className="h-4 w-4 text-muted-foreground" />
                           ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <CaretDown className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                       </div>

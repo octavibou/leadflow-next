@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, X, Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,7 +109,7 @@ export default function WorkspaceSettings() {
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <Button variant="ghost" className="mb-4 gap-2" onClick={() => router.push("/dashboard")}>
-        <ArrowLeft className="h-4 w-4" /> Volver
+        <ArrowLeft className="h-4 w-4" weight="bold" /> Volver
       </Button>
 
       <h1 className="text-2xl font-bold mb-6">Configuración del Workspace</h1>
@@ -130,7 +130,7 @@ export default function WorkspaceSettings() {
                     onClick={handleRemoveLogo}
                     className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3 w-3" weight="bold" />
                   </button>
                 </div>
               ) : (
@@ -148,7 +148,7 @@ export default function WorkspaceSettings() {
                   disabled={uploading}
                   className="gap-2"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-4 w-4" weight="bold" />
                   {uploading ? "Subiendo..." : "Subir logo"}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">PNG, JPG. Máx 2MB</p>
@@ -192,7 +192,7 @@ export default function WorkspaceSettings() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="gap-2" disabled={workspaces.length <= 1}>
-                <Trash2 className="h-4 w-4" /> Eliminar workspace
+                <Trash className="h-4 w-4" weight="bold" /> Eliminar workspace
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

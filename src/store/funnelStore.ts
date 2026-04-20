@@ -13,6 +13,7 @@ interface FunnelStore {
   createFunnel: (name: string, type: FunnelType, workspaceId?: string) => Promise<Funnel | null>;
   updateFunnel: (id: string, updates: Partial<Funnel>) => void;
   saveFunnel: (id: string) => Promise<void>;
+  unpublishFunnel: (id: string) => Promise<void>;
   deleteFunnel: (id: string) => Promise<void>;
   duplicateFunnel: (id: string) => Promise<Funnel | null>;
   getFunnel: (id: string) => Funnel | undefined;
@@ -164,6 +165,21 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
     const funnel = dbToFunnel(data);
     set((s) => ({ funnels: [funnel, ...s.funnels] }));
     return funnel;
+  },
+
+  unpublishFunnel: async (id) => {
+    const funnel = get().funnels.find((f) => f.id === id);
+    if (!funnel) return;
+    // Set saved_at equal to updated_at so isLive becomes false
+    await supabase
+      .from("funnels")
+      .update({ saved_at: funnel.updated_at })
+      .eq("id", id);
+    set((s) => ({
+      funnels: s.funnels.map((f) =>
+        f.id === id ? { ...f, saved_at: f.updated_at } : f
+      ),
+    }));
   },
 
   getFunnel: (id) => get().funnels.find((f) => f.id === id),

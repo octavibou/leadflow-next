@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Check, ChevronDown, Send, CheckCircle2 } from "lucide-react";
+import { Copy, Check, CaretDown, PaperPlaneTilt, CheckCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useFunnelStore } from "@/store/funnelStore";
 import type { Funnel, FunnelSettings } from "@/types/funnel";
@@ -72,13 +72,13 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
             disabled={!settings.webhookUrl || testing}
             className="gap-2"
           >
-            <Send className="h-4 w-4" />
+            <PaperPlaneTilt className="h-4 w-4" weight="bold" />
             Probar
           </Button>
         </div>
         {settings.webhookUrl && (
           <div className="flex items-center gap-2 text-xs text-green-600">
-            <CheckCircle2 className="h-3.5 w-3.5" />
+            <CheckCircle className="h-3.5 w-3.5" weight="bold" />
             Webhook configurado
           </div>
         )}
@@ -98,7 +98,7 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
               <div key={field} className="flex items-center gap-2 text-xs">
                 <span className="font-mono bg-muted border rounded px-2 py-1.5 flex-1 truncate">{field}</span>
                 <button onClick={() => copyToClipboard(field)} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                  {copiedField === field ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                  {copiedField === field ? <Check className="w-3.5 h-3.5 text-green-500" weight="bold" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />}
                 </button>
               </div>
             ))}
@@ -106,11 +106,11 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
             <div>
               <div className="flex items-center gap-2 text-xs">
                 <button onClick={() => setExpandedQuestion(expandedQuestion === "__qualified" ? null : "__qualified")} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedQuestion === "__qualified" ? "rotate-180" : ""}`} />
+                  <CaretDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedQuestion === "__qualified" ? "rotate-180" : ""}`} weight="bold" />
                 </button>
                 <span className="font-mono bg-muted border rounded px-2 py-1.5 flex-1 truncate">qualified</span>
                 <button onClick={() => copyToClipboard("qualified")} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                  {copiedField === "qualified" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                  {copiedField === "qualified" ? <Check className="w-3.5 h-3.5 text-green-500" weight="bold" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />}
                 </button>
               </div>
               {expandedQuestion === "__qualified" && (
@@ -120,7 +120,7 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
                     <div key={val} className="flex items-center gap-2 text-[10px]">
                       <span className="font-mono bg-muted border rounded px-1.5 py-0.5 flex-1 truncate">{val}</span>
                       <button onClick={() => copyToClipboard(val)} className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors">
-                        {copiedField === val ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
+                        {copiedField === val ? <Check className="w-3 h-3 text-green-500" weight="bold" /> : <Copy className="w-3 h-3 text-muted-foreground" weight="bold" />}
                       </button>
                     </div>
                   ))}
@@ -131,7 +131,7 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
             <div className="flex items-center gap-2 text-xs">
               <span className="font-mono bg-muted border rounded px-2 py-1.5 flex-1 truncate">summary</span>
               <button onClick={() => copyToClipboard("summary")} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                {copiedField === "summary" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                {copiedField === "summary" ? <Check className="w-3.5 h-3.5 text-green-500" weight="bold" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />}
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 mb-2">Texto con todas las respuestas, ideal para notas en GHL.</p>
@@ -145,11 +145,11 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
                 <div key={step.id}>
                   <div className="flex items-center gap-2 text-xs">
                     <button onClick={() => setExpandedQuestion(isExpanded ? null : step.id)} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                      <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      <CaretDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} weight="bold" />
                     </button>
                     <span className="font-mono bg-muted border rounded px-2 py-1.5 flex-1 truncate" title={label}>{label}</span>
                     <button onClick={() => copyToClipboard(label)} className="shrink-0 p-1 rounded hover:bg-muted transition-colors">
-                      {copiedField === label ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                      {copiedField === label ? <Check className="w-3.5 h-3.5 text-green-500" weight="bold" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" weight="bold" />}
                     </button>
                   </div>
                   {isExpanded && options.length > 0 && (
@@ -159,7 +159,7 @@ export function WebhookTab({ funnel }: { funnel: Funnel }) {
                         <div key={opt.id} className="flex items-center gap-2 text-[10px]">
                           <span className="font-mono bg-muted border rounded px-1.5 py-0.5 flex-1 truncate" title={opt.label}>{opt.label}</span>
                           <button onClick={() => copyToClipboard(opt.label)} className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors">
-                            {copiedField === opt.label ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
+                            {copiedField === opt.label ? <Check className="w-3 h-3 text-green-500" weight="bold" /> : <Copy className="w-3 h-3 text-muted-foreground" weight="bold" />}
                           </button>
                         </div>
                       ))}

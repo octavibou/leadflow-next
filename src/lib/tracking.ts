@@ -19,14 +19,14 @@ export function trackEvent(
 }
 
 // ---- Lead saving ----
-export function saveLead(
+export async function saveLead(
   funnelId: string,
   campaignId: string | null,
   answers: Record<string, string>,
   result: string | null,
   metadata: Record<string, any> = {}
 ) {
-  supabase
+  const { error } = await supabase
     .from("leads")
     .insert({
       funnel_id: funnelId,
@@ -34,8 +34,11 @@ export function saveLead(
       answers: answers as any,
       result,
       metadata: metadata as any,
-    })
-    .then(() => {});
+    });
+  
+  if (error) {
+    console.error("[v0] Error saving lead:", error);
+  }
 }
 
 // ---- External tracking scripts ----

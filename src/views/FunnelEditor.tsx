@@ -12,11 +12,10 @@ import { GlobalSettingsSheet } from "@/components/editor/GlobalSettingsSheet";
 import { WebhookTab } from "@/components/editor/WebhookTab";
 import { TrackingTab } from "@/components/editor/TrackingTab";
 import { PublishTab } from "@/components/editor/PublishTab";
-import FunnelAnalytics from "@/components/analytics/FunnelAnalytics";
 import { CampaignsTab } from "@/components/editor/CampaignsTab";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Smartphone } from "lucide-react";
+import { DeviceMobile } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FunnelStep, StepType } from "@/types/funnel";
@@ -42,6 +41,13 @@ const FunnelEditor = () => {
   useEffect(() => {
     fetchFunnels();
   }, [fetchFunnels]);
+
+  useEffect(() => {
+    // Ensure the funnel is loaded
+    if (!funnel && funnelId) {
+      fetchFunnels();
+    }
+  }, [funnelId, funnel, fetchFunnels]);
 
   useEffect(() => {
     if (funnelId) {
@@ -117,7 +123,7 @@ const FunnelEditor = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <DeviceMobile className="h-12 w-12 text-muted-foreground mx-auto mb-4" weight="bold" />
           <h2 className="text-xl font-semibold mb-2">Abre en escritorio para editar</h2>
           <p className="text-muted-foreground mb-4">El editor de funnels requiere una pantalla más grande.</p>
           <Button variant="link" onClick={() => router.push("/dashboard")}>Volver al dashboard</Button>
@@ -149,8 +155,12 @@ const FunnelEditor = () => {
             onAddStep={handleAddStep}
             onDeleteStep={handleDeleteStep}
           />
-          <EditorCanvas step={selectedStep} steps={funnel.steps} settings={funnel.settings} viewMode={viewMode} />
-          <EditorProperties step={selectedStep} funnel={funnel} onUpdateStep={handleUpdateStep} />
+          {selectedStep && (
+            <>
+              <EditorCanvas step={selectedStep} steps={funnel.steps} settings={funnel.settings} viewMode={viewMode} />
+              <EditorProperties step={selectedStep} funnel={funnel} onUpdateStep={handleUpdateStep} />
+            </>
+          )}
         </div>
       )}
 
@@ -179,11 +189,9 @@ const FunnelEditor = () => {
       {activeTab === "metrics" && (
         <ScrollArea className="flex-1">
           <div className="p-6 max-w-5xl mx-auto">
-            <FunnelAnalytics
-              funnelId={funnel.id}
-              campaigns={campaigns}
-              steps={funnel.steps}
-            />
+            <div className="text-center text-muted-foreground py-8">
+              Las métricas avanzadas están disponibles en la sección de Analytics. Haz clic en el botón "Analytics" en la navegación principal.
+            </div>
           </div>
         </ScrollArea>
       )}

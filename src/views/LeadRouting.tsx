@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Webhook, Users, ChevronDown, ChevronUp, GripVertical, Link2 } from "lucide-react";
+import { Plus, Trash, ArrowsClockwise, Users, CaretDown, CaretUp, DotsSixVertical, Link } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,7 +97,7 @@ const LeadRouting = () => {
     if (error) {
       toast.error("Error al guardar");
     } else {
-      toast.success("Configuración guardada");
+      toast.success("Configuracion guardada");
     }
   }, [currentWorkspaceId, configRowId]);
 
@@ -117,7 +117,6 @@ const LeadRouting = () => {
         .single();
 
       if (error) {
-        // If upsert fails due to no unique constraint, try insert or select existing
         const { data: existing } = await supabase
           .from("route_invitations")
           .select("token")
@@ -225,19 +224,19 @@ const LeadRouting = () => {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Lead Routing</h1>
         <p className="text-muted-foreground mt-1">
-          Enruta los leads de tus funnels a tus clientes según las respuestas cualificadas.
+          Enruta los leads de tus funnels a tus clientes segun las respuestas cualificadas.
           Cada cliente recibe un POST a su webhook con los datos del lead.
         </p>
       </div>
 
       <Separator />
 
-      {/* Distribution config — two-step */}
+      {/* Distribution config */}
       <Card>
         <CardContent className="pt-5 space-y-4">
           <div className="space-y-2">
-            <Label className="text-sm font-semibold">¿Cuántos clientes reciben cada lead?</Label>
-            <p className="text-xs text-muted-foreground">Si un lead cualifica para varios clientes, ¿quieres enviarlo a todos o solo a uno?</p>
+            <Label className="text-sm font-semibold">Cuantos clientes reciben cada lead?</Label>
+            <p className="text-xs text-muted-foreground">Si un lead cualifica para varios clientes, quieres enviarlo a todos o solo a uno?</p>
           </div>
           <div className="flex gap-3">
             {([
@@ -264,14 +263,14 @@ const LeadRouting = () => {
             })}
           </div>
 
-          {/* Tiebreaker — only when mode is "one" */}
+          {/* Tiebreaker */}
           {routeConfig.distributionStrategy !== "all" && (
             <div className="space-y-2 pt-2 border-t">
-              <Label className="text-sm font-medium">¿Cómo decidimos a cuál enviarlo?</Label>
+              <Label className="text-sm font-medium">Como decidimos a cual enviarlo?</Label>
               <div className="flex gap-2 flex-wrap">
                 {([
-                  { value: "round_robin" as TiebreakerStrategy, label: "Distribución equitativa", desc: "Rota entre clientes" },
-                  { value: "least_recent" as TiebreakerStrategy, label: "Al menos reciente", desc: "El que lleva más tiempo sin recibir" },
+                  { value: "round_robin" as TiebreakerStrategy, label: "Distribucion equitativa", desc: "Rota entre clientes" },
+                  { value: "least_recent" as TiebreakerStrategy, label: "Al menos reciente", desc: "El que lleva mas tiempo sin recibir" },
                   { value: "priority" as TiebreakerStrategy, label: "Por prioridad", desc: "Siempre al de mayor prioridad" },
                 ]).map((opt) => {
                   const isSelected = routeConfig.distributionStrategy === opt.value;
@@ -299,12 +298,12 @@ const LeadRouting = () => {
         {routeConfig.clients.length === 0 && (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-              <Users className="h-10 w-10 text-muted-foreground mb-3" />
+              <Users className="h-10 w-10 text-muted-foreground mb-3" weight="bold" />
               <p className="text-sm text-muted-foreground mb-4">
-                No tienes clientes configurados. Añade uno para empezar a enrutar leads.
+                No tienes clientes configurados. Anade uno para empezar a enrutar leads.
               </p>
               <Button onClick={addClient}>
-                <Plus className="h-4 w-4 mr-2" /> Añadir cliente
+                <Plus className="h-4 w-4 mr-2" weight="bold" /> Anadir cliente
               </Button>
             </CardContent>
           </Card>
@@ -325,13 +324,13 @@ const LeadRouting = () => {
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <DotsSixVertical className="h-4 w-4 text-muted-foreground" weight="bold" />
                         <div>
                           <CardTitle className="text-base">{client.name || "Sin nombre"}</CardTitle>
                           <div className="flex items-center gap-2 mt-1">
                             {client.webhookUrl ? (
                               <Badge variant="secondary" className="text-xs">
-                                <Webhook className="h-3 w-3 mr-1" /> Webhook configurado
+                                <ArrowsClockwise className="h-3 w-3 mr-1" weight="bold" /> Webhook configurado
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs text-muted-foreground">Sin webhook</Badge>
@@ -349,9 +348,9 @@ const LeadRouting = () => {
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={(e) => { e.stopPropagation(); removeClient(client.id); }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash className="h-4 w-4" weight="bold" />
                         </Button>
-                        {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                        {isExpanded ? <CaretUp className="h-4 w-4 text-muted-foreground" weight="bold" /> : <CaretDown className="h-4 w-4 text-muted-foreground" weight="bold" />}
                       </div>
                     </div>
                   </CardHeader>
@@ -363,7 +362,7 @@ const LeadRouting = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Nombre del cliente</Label>
-                        <Input placeholder="Ej: Clínica Dental Madrid" value={client.name} onChange={(e) => updateClient(client.id, { name: e.target.value })} />
+                        <Input placeholder="Ej: Clinica Dental Madrid" value={client.name} onChange={(e) => updateClient(client.id, { name: e.target.value })} />
                       </div>
                       <div className="space-y-2">
                         <Label>Webhook URL</Label>
@@ -375,7 +374,7 @@ const LeadRouting = () => {
                       <div className="space-y-2 max-w-[120px]">
                         <Label>Prioridad</Label>
                         <Input type="number" min={1} value={client.priority} onChange={(e) => updateClient(client.id, { priority: parseInt(e.target.value) || 1 })} className="h-9" />
-                        <p className="text-[10px] text-muted-foreground">Menor número = mayor prioridad</p>
+                        <p className="text-[10px] text-muted-foreground">Menor numero = mayor prioridad</p>
                       </div>
                     )}
 
@@ -383,7 +382,7 @@ const LeadRouting = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-sm font-semibold">Respuestas que enrutan a este cliente</Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">Selecciona las opciones cualificadas o envía el link de onboarding al cliente.</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Selecciona las opciones cualificadas o envia el link de onboarding al cliente.</p>
                         </div>
                         <Button
                           variant="outline"
@@ -394,7 +393,7 @@ const LeadRouting = () => {
                             generateOnboardingLink(client);
                           }}
                         >
-                          <Link2 className="h-3 w-3" /> Copiar link de onboarding
+                          <Link className="h-3 w-3" weight="bold" /> Copiar link de onboarding
                         </Button>
                       </div>
                       {funnelsWithQuestions.length === 0 && (
@@ -432,7 +431,7 @@ const LeadRouting = () => {
 
       {routeConfig.clients.length > 0 && (
         <Button variant="outline" onClick={addClient} className="w-full">
-          <Plus className="h-4 w-4 mr-2" /> Añadir otro cliente
+          <Plus className="h-4 w-4 mr-2" weight="bold" /> Anadir otro cliente
         </Button>
       )}
     </div>
@@ -470,28 +469,33 @@ function FunnelQuestionMapping({ funnel, client, onToggle }: FunnelQuestionMappi
               <Badge variant="secondary" className="text-xs">{assignedCount} asignada{assignedCount !== 1 ? "s" : ""}</Badge>
             )}
           </div>
-          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          {expanded ? <CaretUp className="h-4 w-4 text-muted-foreground" weight="bold" /> : <CaretDown className="h-4 w-4 text-muted-foreground" weight="bold" />}
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-3 pl-4 space-y-3">
         {qualifiedQuestions.map((step) => {
-          const q = step.question!;
-          const qualifiedOptions = q.options.filter((o) => o.qualifies);
-          const selectedForQuestion = funnelAnswers[q.id] || [];
+          const question = step.question!;
+          const qualifyingOptions = question.options.filter((o) => o.qualifies);
+          const selectedAnswers = funnelAnswers[question.id] || [];
 
           return (
-            <div key={q.id} className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">{q.text}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {qualifiedOptions.map((opt) => (
-                  <label key={opt.id} className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors">
-                    <Checkbox checked={selectedForQuestion.includes(opt.id)} onCheckedChange={() => onToggle(q.id, opt.id)} />
-                    <span className="text-sm">
-                      {opt.emoji && <span className="mr-1">{opt.emoji}</span>}
-                      {opt.label}
-                    </span>
-                  </label>
-                ))}
+            <div key={question.id} className="space-y-2">
+              <p className="text-sm font-medium">{question.text}</p>
+              <div className="flex flex-wrap gap-2">
+                {qualifyingOptions.map((opt) => {
+                  const isSelected = selectedAnswers.includes(opt.id);
+                  return (
+                    <label
+                      key={opt.id}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md border cursor-pointer transition-colors ${
+                        isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <Checkbox checked={isSelected} onCheckedChange={() => onToggle(question.id, opt.id)} />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           );

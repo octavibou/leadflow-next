@@ -171,6 +171,8 @@ export interface FunnelStep {
   bookingConfig?: BookingConfig;
 }
 
+export type FunnelStatus = "draft" | "published";
+
 export interface Funnel {
   id: string;
   user_id: string;

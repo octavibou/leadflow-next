@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserPlus, Trash2, Mail, Clock, Check } from "lucide-react";
+import { UserPlus, Trash, Envelope, Clock, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,7 +89,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
     if (!inviteEmail.trim()) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail.trim())) {
-      toast.error("Email no válido");
+      toast.error("Email no valido");
       return;
     }
 
@@ -108,9 +108,9 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
 
     if (error) {
       if (error.code === "23505") {
-        toast.error("Ya existe una invitación para este email");
+        toast.error("Ya existe una invitacion para este email");
       } else {
-        toast.error("Error al enviar la invitación");
+        toast.error("Error al enviar la invitacion");
       }
     } else {
       // Send invitation email
@@ -136,7 +136,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
         },
       });
 
-      toast.success(`Invitación enviada a ${trimmedEmail}`);
+      toast.success(`Invitacion enviada a ${trimmedEmail}`);
       setInviteEmail("");
       loadData();
     }
@@ -146,7 +146,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const handleCancelInvitation = async (id: string) => {
     await supabase.from("workspace_invitations").delete().eq("id", id);
     setInvitations((prev) => prev.filter((i) => i.id !== id));
-    toast.success("Invitación cancelada");
+    toast.success("Invitacion cancelada");
   };
 
   const handleRemoveMember = async (memberId: string) => {
@@ -159,7 +159,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5" /> Equipo
+          <UserPlus className="h-5 w-5" weight="bold" /> Equipo
         </CardTitle>
         <CardDescription>Invita miembros a este workspace para colaborar</CardDescription>
       </CardHeader>
@@ -190,7 +190,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
             </Select>
           </div>
           <Button onClick={handleInvite} disabled={sending || !inviteEmail.trim()}>
-            <Mail className="h-4 w-4 mr-2" />
+            <Envelope className="h-4 w-4 mr-2" weight="bold" />
             {sending ? "Enviando..." : "Invitar"}
           </Button>
         </div>
@@ -203,10 +203,10 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
               <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-primary" />
+                    <Check className="h-4 w-4 text-primary" weight="bold" />
                   </div>
                   <p className="text-sm font-medium">
-                    {m.user_id === currentUserId ? "Tú" : m.user_id.slice(0, 8) + "..."}
+                    {m.user_id === currentUserId ? "Tu" : m.user_id.slice(0, 8) + "..."}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
                       className="h-8 w-8 text-destructive"
                       onClick={() => handleRemoveMember(m.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash className="h-4 w-4" weight="bold" />
                     </Button>
                   )}
                 </div>
@@ -228,13 +228,13 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
               <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-dashed">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Clock className="h-4 w-4 text-muted-foreground" weight="bold" />
                   </div>
                   <p className="text-sm font-medium">{inv.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
-                    Invitación enviada
+                    Invitacion enviada
                   </Badge>
                   <Badge variant="secondary">{ROLE_LABELS[inv.role]}</Badge>
                   <Button
@@ -243,7 +243,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
                     className="h-8 w-8 text-destructive"
                     onClick={() => handleCancelInvitation(inv.id)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash className="h-4 w-4" weight="bold" />
                   </Button>
                 </div>
               </div>
