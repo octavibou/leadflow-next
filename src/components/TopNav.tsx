@@ -140,17 +140,17 @@ export function TopNav() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="gap-2 font-semibold text-base px-2"
+                className="gap-2 font-medium text-sm px-2 h-9"
                 onClick={(e) => {
                   e.preventDefault();
                   handleWorkspaceClick();
                 }}
               >
-                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="h-6 w-6 rounded-md bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
                   {currentWorkspace?.logo_url ? (
                     <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-bold text-primary-foreground">
+                    <span className="text-xs font-semibold text-primary">
                       {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
                     </span>
                   )}
@@ -158,7 +158,7 @@ export function TopNav() {
                 <span className="max-w-[160px] truncate">
                   {currentWorkspace?.name || "Workspace"}
                 </span>
-                <CaretDown className="h-4 w-4 text-muted-foreground" weight="bold" />
+                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
