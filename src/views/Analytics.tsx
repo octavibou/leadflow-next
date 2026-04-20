@@ -1,18 +1,17 @@
-'use client';
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { ChartBar, CaretDown, Eye, Users, Target, ArrowRight, TrendUp, TrendDown, Funnel as FunnelIcon, Lightning, Browser, CaretUpDown } from "@phosphor-icons/react";
+import { CaretDown, CaretUpDown, Trophy } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
 import type { FunnelStep } from "@/types/funnel";
 
-// Types
 interface EventRow {
   campaign_id: string | null;
   event_type: string;
@@ -26,13 +25,14 @@ interface LeadRow {
   created_at: string;
 }
 
-type DateRange = "today" | "7d" | "30d" | "all";
+type DateRange = "today" | "7d" | "month" | "year" | "all";
 
 const DATE_RANGE_LABELS: Record<DateRange, string> = {
-  "today": "Hoy",
-  "7d": "7 días",
-  "30d": "30 días",
-  "all": "Todo",
+  today: "Hoy",
+  "7d": "Últimos 7 días",
+  month: "Este mes",
+  year: "Este año",
+  all: "Siempre",
 };
 
 const STEP_TYPE_LABELS: Record<string, string> = {
@@ -46,19 +46,18 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   thankyou: "Gracias",
 };
 
+const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
+
 function getFromDate(range: DateRange): string | null {
   const now = new Date();
   if (range === "today") return now.toISOString().split("T")[0] + "T00:00:00";
   if (range === "7d") {
     const d = new Date(now);
-    d.setDate(d.getDate() - 7);
+    d.setDate(d.getDate() - 6);
     return d.toISOString().split("T")[0] + "T00:00:00";
   }
-  if (range === "30d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0] + "T00:00:00";
-  }
+  if (range === "month") return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0] + "T00:00:00";
+  if (range === "year") return new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0] + "T00:00:00";
   return null;
 }
 
@@ -87,19 +86,18 @@ const AnalyticsPage = () => {
     }
   }, [selectedFunnelId, fetchCampaigns]);
 
-  // Fetch events and leads
   useEffect(() => {
     if (!selectedFunnelId) return;
     const load = async () => {
       setLoading(true);
       const fromDate = getFromDate(dateRange);
-      
+
       let eventsQuery = supabase
         .from("events")
         .select("campaign_id, event_type, metadata, created_at")
         .eq("funnel_id", selectedFunnelId)
         .order("created_at", { ascending: true });
-      
+
       let leadsQuery = supabase
         .from("leads")
         .select("campaign_id, result, created_at")
@@ -121,7 +119,6 @@ const AnalyticsPage = () => {
   const selectedFunnel = funnels.find((f) => f.id === selectedFunnelId);
   const steps = (selectedFunnel?.steps as FunnelStep[]) || [];
 
-  // Computed stats
   const stats = useMemo(() => {
     const pageViews = events.filter((e) => e.event_type === "page_view").length;
     const stepViews = events.filter((e) => e.event_type === "step_view");
@@ -130,41 +127,34 @@ const AnalyticsPage = () => {
     const ctr = pageViews > 0 ? (formSubmits / pageViews) * 100 : 0;
     const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
 
-    // Landing variants (campaigns) performance
+    // Landing variants
     const landingVariants = campaigns.map((c) => {
       const cEvents = events.filter((e) => e.campaign_id === c.id);
       const cViews = cEvents.filter((e) => e.event_type === "page_view").length;
       const cClicks = cEvents.filter((e) => e.event_type === "form_submit").length;
-      const cLeads = leads.filter((l) => l.campaign_id === c.id).length;
       return {
         id: c.id,
         name: c.name,
         views: cViews,
         clicks: cClicks,
-        leads: cLeads,
         ctr: cViews > 0 ? (cClicks / cViews) * 100 : 0,
-        cvr: cViews > 0 ? (cLeads / cViews) * 100 : 0,
       };
     });
 
-    // Add direct traffic
     const directEvents = events.filter((e) => !e.campaign_id);
     const directViews = directEvents.filter((e) => e.event_type === "page_view").length;
     const directClicks = directEvents.filter((e) => e.event_type === "form_submit").length;
-    const directLeads = leads.filter((l) => !l.campaign_id).length;
-    if (directViews > 0 || directLeads > 0) {
+    if (directViews > 0) {
       landingVariants.unshift({
         id: "direct",
         name: "Tráfico directo",
         views: directViews,
         clicks: directClicks,
-        leads: directLeads,
         ctr: directViews > 0 ? (directClicks / directViews) * 100 : 0,
-        cvr: directViews > 0 ? (directLeads / directViews) * 100 : 0,
       });
     }
 
-    // Step funnel data
+    // Step funnel
     const stepFunnel = steps.map((step, i) => {
       let count = 0;
       if (step.type === "intro") {
@@ -177,36 +167,46 @@ const AnalyticsPage = () => {
       const dropoff = prev > 0 ? ((prev - count) / prev) * 100 : 0;
       return {
         id: step.id,
-        name: step.type === "question" && step.question ? step.question.text.substring(0, 25) + (step.question.text.length > 25 ? "..." : "") : STEP_TYPE_LABELS[step.type],
+        name: step.type === "question" && step.question ? step.question.text.substring(0, 30) + (step.question.text.length > 30 ? "..." : "") : STEP_TYPE_LABELS[step.type],
         type: step.type,
         count,
         dropoff,
-        pctTotal: pageViews > 0 ? (count / pageViews) * 100 : 0,
       };
     });
 
-    // Time series for chart
-    const days = dateRange === "today" ? 24 : dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 30;
-    const chartData = Array.from({ length: Math.min(days, 14) }, (_, i) => {
-      const d = new Date();
-      if (dateRange === "today") {
-        d.setHours(d.getHours() - (days - 1 - i));
-        const hourStr = d.toISOString().substring(0, 13);
-        return {
-          label: `${d.getHours()}h`,
-          views: events.filter((e) => e.created_at.startsWith(hourStr) && e.event_type === "page_view").length,
-          leads: leads.filter((l) => l.created_at.startsWith(hourStr)).length,
-        };
-      } else {
-        d.setDate(d.getDate() - (Math.min(days, 14) - 1 - i));
-        const dateStr = d.toISOString().split("T")[0];
-        return {
-          label: d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }),
-          views: events.filter((e) => e.created_at.startsWith(dateStr) && e.event_type === "page_view").length,
-          leads: leads.filter((l) => l.created_at.startsWith(dateStr)).length,
-        };
+    // Chart data
+    const now = new Date();
+    let buckets: { key: string; label: string }[] = [];
+
+    if (dateRange === "today") {
+      buckets = Array.from({ length: 12 }, (_, i) => ({
+        key: `${now.toISOString().split("T")[0]}T${String(i * 2).padStart(2, "0")}`,
+        label: `${String(i * 2).padStart(2, "0")}h`,
+      }));
+    } else if (dateRange === "7d") {
+      buckets = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - (6 - i));
+        return { key: d.toISOString().split("T")[0], label: DAY_LABELS[d.getDay()] };
+      });
+    } else if (dateRange === "month") {
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      buckets = Array.from({ length: Math.ceil(daysInMonth / 2) }, (_, i) => {
+        const day = i * 2 + 1;
+        return { key: new Date(now.getFullYear(), now.getMonth(), day).toISOString().split("T")[0], label: String(day) };
+      });
+    } else {
+      const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      for (let m = 0; m <= now.getMonth(); m++) {
+        buckets.push({ key: `${now.getFullYear()}-${String(m + 1).padStart(2, "0")}`, label: MONTH_LABELS[m] });
       }
-    });
+    }
+
+    const chartData = buckets.map(({ key, label }) => ({
+      label,
+      leads: leads.filter((l) => l.created_at?.startsWith(key)).length,
+      views: events.filter((e) => e.event_type === "page_view" && e.created_at?.startsWith(key)).length,
+    }));
 
     return { pageViews, formSubmits, totalLeads, ctr, cvr, landingVariants, stepFunnel, chartData };
   }, [events, leads, campaigns, steps, dateRange]);
@@ -215,22 +215,24 @@ const AnalyticsPage = () => {
 
   if (funnelsLoading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="flex-1 p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 bg-muted rounded" />
+          <div className="grid grid-cols-3 gap-6">
+            <div className="h-80 bg-muted rounded" />
+            <div className="h-80 bg-muted rounded col-span-2" />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex-1 p-6 space-y-6 overflow-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ChartBar className="h-6 w-6 text-primary" weight="fill" />
-          <h1 className="text-xl font-semibold">Analytics</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Funnel selector */}
+          <h1 className="text-2xl font-bold">Analytics</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-8 gap-2 text-sm font-normal min-w-[180px] justify-between">
@@ -238,284 +240,229 @@ const AnalyticsPage = () => {
                 <CaretUpDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[220px]">
+            <DropdownMenuContent align="start" className="w-[220px]">
               {funnels.map((f) => (
-                <DropdownMenuItem
-                  key={f.id}
-                  onClick={() => setSelectedFunnelId(f.id)}
-                  className={selectedFunnelId === f.id ? "font-medium" : ""}
-                >
+                <DropdownMenuItem key={f.id} onClick={() => setSelectedFunnelId(f.id)} className={selectedFunnelId === f.id ? "font-medium" : ""}>
                   {f.name}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Date range */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sm font-normal text-muted-foreground hover:text-foreground px-2.5">
-                {DATE_RANGE_LABELS[dateRange]}
-                <CaretDown className="h-3 w-3" weight="bold" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map((key) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => setDateRange(key)}
-                  className={dateRange === key ? "font-medium" : ""}
-                >
-                  {DATE_RANGE_LABELS[key]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sm font-normal text-muted-foreground hover:text-foreground px-2.5">
+              {DATE_RANGE_LABELS[dateRange]}
+              <CaretDown className="h-3 w-3" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map((key) => (
+              <DropdownMenuItem key={key} onClick={() => setDateRange(key)} className={dateRange === key ? "font-medium" : ""}>
+                {DATE_RANGE_LABELS[key]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {!selectedFunnel ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <FunnelIcon className="h-12 w-12 mx-auto mb-4 opacity-30" weight="bold" />
-            <p className="text-sm">Selecciona un funnel para ver sus analytics</p>
-          </CardContent>
-        </Card>
+        <div className="text-center text-muted-foreground py-20">
+          <p>Selecciona un funnel para ver sus analytics</p>
+        </div>
       ) : loading ? (
         <div className="flex items-center justify-center h-[50vh]">
           <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT COLUMN - Landing Performance (1/3) */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Browser className="h-4 w-4 text-muted-foreground" weight="bold" />
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Landing</h2>
-            </div>
-
-            {/* Landing KPIs */}
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard label="Impresiones" value={stats.pageViews} />
-              <MetricCard label="CTR" value={`${stats.ctr.toFixed(1)}%`} trend={stats.ctr > 5 ? "up" : stats.ctr > 0 ? "neutral" : "down"} />
-            </div>
-
-            {/* Variants comparison */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Variantes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+        <div className="grid grid-cols-3 gap-6">
+          {/* Landing Performance - 1/3 */}
+          <Card className="overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-base">Landing Performance</CardTitle>
+              <div className="flex items-center gap-4 mt-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Visitas</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.pageViews.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-6 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Clics</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-6 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.ctr.toFixed(1)}%</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Variants */}
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">Variantes</p>
                 {stats.landingVariants.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">Sin variantes</p>
+                  <p className="text-sm text-muted-foreground">Sin variantes</p>
                 ) : (
-                  stats.landingVariants.map((v) => (
-                    <div key={v.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium truncate max-w-[140px]">{v.name}</span>
+                  <div className="space-y-2">
+                    {stats.landingVariants.map((v, idx) => (
+                      <div key={v.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{v.views} vis</span>
-                          <span className={cn(
-                            "text-xs font-semibold px-1.5 py-0.5 rounded",
-                            v.ctr === bestCtr && bestCtr > 0 ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"
-                          )}>
+                          {v.ctr === bestCtr && bestCtr > 0 && <Trophy className="h-3.5 w-3.5 text-yellow-500" weight="fill" />}
+                          <span className="text-sm">{v.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="text-muted-foreground">{v.views}</span>
+                          <span className={cn("font-semibold", v.ctr === bestCtr && bestCtr > 0 ? "text-green-600" : "text-foreground")}>
                             {v.ctr.toFixed(1)}%
                           </span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-all",
-                            v.ctr === bestCtr && bestCtr > 0 ? "bg-green-500" : "bg-primary/60"
-                          )}
-                          style={{ width: `${Math.min(v.ctr * 10, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Mini chart */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Tendencia</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-2">
-                <div className="h-24">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats.chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="landingGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <Area
-                        type="monotone"
-                        dataKey="views"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={1.5}
-                        fill="url(#landingGrad)"
-                        dot={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* RIGHT COLUMN - Funnel Performance (2/3) */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FunnelIcon className="h-4 w-4 text-muted-foreground" weight="bold" />
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Funnel</h2>
-            </div>
-
-            {/* Funnel KPIs */}
-            <div className="grid grid-cols-4 gap-3">
-              <MetricCard label="Iniciados" value={stats.formSubmits} />
-              <MetricCard label="Leads" value={stats.totalLeads} />
-              <MetricCard label="Conv. Rate" value={`${stats.cvr.toFixed(1)}%`} trend={stats.cvr > 10 ? "up" : stats.cvr > 0 ? "neutral" : "down"} />
-              <MetricCard label="Drop-off avg" value={`${stats.stepFunnel.length > 1 ? (stats.stepFunnel.slice(1).reduce((a, s) => a + s.dropoff, 0) / (stats.stepFunnel.length - 1)).toFixed(0) : 0}%`} trend="neutral" />
-            </div>
-
-            {/* Step-by-step timeline */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Embudo paso a paso</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.stepFunnel.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-8">Sin pasos</p>
-                ) : (
-                  <div className="space-y-1">
-                    {stats.stepFunnel.map((step, i) => (
-                      <div key={step.id} className="relative">
-                        {/* Connection line */}
-                        {i < stats.stepFunnel.length - 1 && (
-                          <div className="absolute left-[19px] top-10 w-0.5 h-4 bg-border" />
-                        )}
-                        <div className="flex items-center gap-3 py-2">
-                          {/* Step indicator */}
-                          <div className={cn(
-                            "h-10 w-10 rounded-lg flex items-center justify-center shrink-0 text-sm font-semibold",
-                            i === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                          )}>
-                            {i + 1}
-                          </div>
-
-                          {/* Step info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium truncate">{step.name}</span>
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm font-semibold">{step.count}</span>
-                                {i > 0 && (
-                                  <span className={cn(
-                                    "text-xs px-1.5 py-0.5 rounded font-medium",
-                                    step.dropoff > 50 ? "bg-red-500/10 text-red-600" :
-                                    step.dropoff > 25 ? "bg-orange-500/10 text-orange-600" :
-                                    "bg-green-500/10 text-green-600"
-                                  )}>
-                                    -{step.dropoff.toFixed(0)}%
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {/* Progress bar */}
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={cn(
-                                  "h-full rounded-full transition-all",
-                                  i === 0 ? "bg-primary" : "bg-primary/60"
-                                )}
-                                style={{ width: `${step.pctTotal}%` }}
-                              />
-                            </div>
-                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Leads over time chart */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Leads en el tiempo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-32">
+              {/* Chart */}
+              <div className="h-24">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradViews" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip
+                      content={({ active, payload, label }) =>
+                        active && payload?.length ? (
+                          <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
+                            <span className="font-semibold">{label}</span>
+                            <span className="ml-2 text-muted-foreground">{payload[0].value} visitas</span>
+                          </div>
+                        ) : null
+                      }
+                    />
+                    <Area type="monotone" dataKey="views" stroke="hsl(var(--chart-1))" strokeWidth={2} fill="url(#gradViews)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-between px-1">
+                {stats.chartData.map((item) => (
+                  <span key={item.label} className="text-[10px] text-muted-foreground">{item.label}</span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Funnel Performance - 2/3 */}
+          <Card className="col-span-2 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-base">Funnel Performance</CardTitle>
+              <div className="flex items-center gap-4 mt-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Iniciados</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-6 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.totalLeads.toLocaleString()}</p>
+                </div>
+                <div className="w-px h-6 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Conv.</p>
+                  <p className="text-sm font-semibold mt-0.5">{stats.cvr.toFixed(1)}%</p>
+                </div>
+                <div className="w-px h-6 bg-border" />
+                <div>
+                  <p className="text-[11px] text-muted-foreground leading-none">Drop-off avg</p>
+                  <p className="text-sm font-semibold mt-0.5">
+                    {stats.stepFunnel.length > 1 ? (stats.stepFunnel.slice(1).reduce((a, s) => a + s.dropoff, 0) / (stats.stepFunnel.length - 1)).toFixed(0) : 0}%
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Step timeline */}
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-3">Flujo del Funnel</p>
+                {stats.stepFunnel.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">Sin pasos en este funnel</p>
+                ) : (
+                  <div className="space-y-0">
+                    {stats.stepFunnel.map((step, idx) => (
+                      <div key={step.id} className="flex items-center gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                            idx === 0 ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+                          )}>
+                            {idx + 1}
+                          </div>
+                          {idx < stats.stepFunnel.length - 1 && <div className="w-0.5 h-6 bg-border" />}
+                        </div>
+                        <div className="flex-1 flex items-center justify-between py-2">
+                          <div>
+                            <p className="text-sm font-medium">{step.name}</p>
+                            <p className="text-xs text-muted-foreground">{step.count} visitas</p>
+                          </div>
+                          {idx > 0 && (
+                            <span className={cn(
+                              "text-xs px-2 py-0.5 rounded-full",
+                              step.dropoff < 20 ? "bg-green-500/10 text-green-600" :
+                              step.dropoff < 40 ? "bg-yellow-500/10 text-yellow-600" :
+                              "bg-red-500/10 text-red-600"
+                            )}>
+                              -{step.dropoff.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Leads chart */}
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">Leads generados</p>
+                <div className="h-28">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={stats.chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="leadsGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                        <linearGradient id="gradLeads" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} className="fill-muted-foreground" />
                       <Tooltip
                         content={({ active, payload, label }) =>
                           active && payload?.length ? (
-                            <div className="bg-popover border rounded-lg px-2 py-1.5 text-xs shadow-md">
-                              <p className="font-medium mb-0.5">{label}</p>
-                              <p className="text-muted-foreground">{payload[0].value} leads</p>
+                            <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
+                              <span className="font-semibold">{label}</span>
+                              <span className="ml-2 text-muted-foreground">{payload[0].value} leads</span>
                             </div>
                           ) : null
                         }
                       />
-                      <Area
-                        type="monotone"
-                        dataKey="leads"
-                        stroke="hsl(var(--chart-2))"
-                        strokeWidth={2}
-                        fill="url(#leadsGrad)"
-                        dot={false}
-                        activeDot={{ r: 3, strokeWidth: 0 }}
-                      />
+                      <Area type="monotone" dataKey="leads" stroke="hsl(var(--chart-3))" strokeWidth={2} fill="url(#gradLeads)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="flex justify-between px-1 mt-1">
+                  {stats.chartData.map((item) => (
+                    <span key={item.label} className="text-[10px] text-muted-foreground">{item.label}</span>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
   );
 };
-
-// Metric Card Component
-function MetricCard({ label, value, trend }: { label: string; value: string | number; trend?: "up" | "down" | "neutral" }) {
-  return (
-    <Card>
-      <CardContent className="p-3">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xl font-bold">{value}</span>
-          {trend && (
-            <span className={cn(
-              "h-4 w-4 flex items-center justify-center rounded-full",
-              trend === "up" ? "bg-green-500/10 text-green-600" :
-              trend === "down" ? "bg-red-500/10 text-red-600" :
-              "bg-muted text-muted-foreground"
-            )}>
-              {trend === "up" ? <TrendUp className="h-2.5 w-2.5" weight="bold" /> :
-               trend === "down" ? <TrendDown className="h-2.5 w-2.5" weight="bold" /> :
-               <ArrowRight className="h-2.5 w-2.5" weight="bold" />}
-            </span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default AnalyticsPage;
