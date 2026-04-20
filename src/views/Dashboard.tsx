@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Sparkle, Rocket, Link } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -194,41 +194,46 @@ interface FunnelActionProps {
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
 
 function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
-  const typeLabel = FUNNEL_TYPE_LABELS[funnel.type as keyof typeof FUNNEL_TYPE_LABELS];
   const [chartData, setChartData] = useState<Array<{ day: string; leads: number }>>([]);
   const [leadsTotal, setLeadsTotal] = useState(0);
+  const [impressions, setImpressions] = useState(0);
+  const [formStarts, setFormStarts] = useState(0);
 
   useEffect(() => {
-    const fetchLeadsData = async () => {
+    const fetchData = async () => {
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
         return d;
       });
-
       const fromDate = last7Days[0].toISOString().split('T')[0] + 'T00:00:00';
 
-      const { data, error } = await supabase
-        .from('leads')
-        .select('created_at')
-        .eq('funnel_id', funnel.id)
-        .gte('created_at', fromDate);
+      const [leadsRes, eventsRes] = await Promise.all([
+        supabase.from('leads').select('created_at').eq('funnel_id', funnel.id),
+        supabase.from('events').select('event_type, created_at').eq('funnel_id', funnel.id).gte('created_at', fromDate),
+      ]);
 
-      if (error || !data) return;
+      if (leadsRes.data) {
+        const leadsPerDay = last7Days.map((d) => ({
+          day: DAY_LABELS[d.getDay()],
+          leads: leadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
+        }));
+        setChartData(leadsPerDay);
+        setLeadsTotal(leadsRes.data.length);
+      }
 
-      const leadsPerDay = last7Days.map((d) => ({
-        day: DAY_LABELS[d.getDay()],
-        leads: data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
-      }));
-
-      setChartData(leadsPerDay);
-      setLeadsTotal(data.length);
+      if (eventsRes.data) {
+        setImpressions(eventsRes.data.filter((e) => e.event_type === 'page_view').length);
+        setFormStarts(eventsRes.data.filter((e) => e.event_type === 'form_submit').length);
+      }
     };
 
-    fetchLeadsData();
+    fetchData();
   }, [funnel.id]);
 
   const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
+  const ctr = impressions > 0 ? ((formStarts / impressions) * 100).toFixed(1) : "0.0";
+  const convRate = impressions > 0 ? ((leadsTotal / impressions) * 100).toFixed(1) : "0.0";
 
   return (
     <Card
@@ -263,21 +268,33 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
               Live
             </span>
           )}
-        </CardTitle>
-        <CardDescription className="flex gap-2 mt-2">
-          <Badge variant="secondary" className="gap-1 text-xs">
-            <Sparkle className="h-2.5 w-2.5" weight="fill" />
-            {typeLabel}
-          </Badge>
-          <Badge variant="secondary" className="text-xs">
-            {leadsTotal} leads
-          </Badge>
           {!isLive && (
-            <Badge variant="outline" className="gap-1 text-xs text-yellow-600 border-yellow-300 bg-yellow-500/10">
-              Borrador
-            </Badge>
+            <span className="text-xs font-normal text-yellow-600">Borrador</span>
           )}
-        </CardDescription>
+        </CardTitle>
+
+        {/* Metrics row */}
+        <div className="flex items-center gap-4 mt-3">
+          <div>
+            <p className="text-[11px] text-muted-foreground leading-none">Impresiones</p>
+            <p className="text-sm font-semibold mt-0.5">{impressions.toLocaleString()}</p>
+          </div>
+          <div className="w-px h-6 bg-border" />
+          <div>
+            <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
+            <p className="text-sm font-semibold mt-0.5">{ctr}%</p>
+          </div>
+          <div className="w-px h-6 bg-border" />
+          <div>
+            <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
+            <p className="text-sm font-semibold mt-0.5">{leadsTotal.toLocaleString()}</p>
+          </div>
+          <div className="w-px h-6 bg-border" />
+          <div>
+            <p className="text-[11px] text-muted-foreground leading-none">Conv.</p>
+            <p className="text-sm font-semibold mt-0.5">{convRate}%</p>
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="px-0 pb-0">
