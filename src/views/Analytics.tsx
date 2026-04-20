@@ -306,49 +306,51 @@ export default function Analytics() {
                 </div>
               </div>
 
-              {/* Step by step funnel */}
+              {/* Step by step funnel — horizontal */}
               <div>
                 <p className="text-[11px] text-muted-foreground mb-3">Pasos</p>
                 {stats.stepFunnel.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay pasos en este funnel</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="flex items-end gap-0 overflow-x-auto pb-1">
                     {stats.stepFunnel.map((step, idx) => {
                       const maxCount = Math.max(...stats.stepFunnel.map((s) => s.count), 1);
-                      const width = (step.count / maxCount) * 100;
+                      const heightPct = Math.max((step.count / maxCount) * 64, 8);
                       const prev = idx === 0 ? stats.formSubmits : stats.stepFunnel[idx - 1].count;
                       const dropoff = prev > 0 ? Math.round(((prev - step.count) / prev) * 100) : 0;
+                      const isLast = idx === stats.stepFunnel.length - 1;
 
                       return (
-                        <div key={step.id} className="p-3 rounded-lg border border-border">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="flex items-center justify-center h-5 w-5 rounded-full bg-muted text-[10px] font-semibold">
-                                {idx + 1}
-                              </span>
-                              <span className="text-sm font-medium truncate">{step.name}</span>
+                        <div key={step.id} className="flex items-end gap-0 flex-1 min-w-0">
+                          {/* Step column */}
+                          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+                            {/* Drop-off badge */}
+                            {idx > 0 && dropoff > 0 ? (
+                              <span className={cn(
+                                "text-[9px] font-medium px-1 py-0.5 rounded",
+                                dropoff > 50 ? "bg-red-500/10 text-red-600"
+                                  : dropoff > 25 ? "bg-orange-500/10 text-orange-600"
+                                  : "bg-green-500/10 text-green-600"
+                              )}>-{dropoff}%</span>
+                            ) : <span className="h-[18px]" />}
+                            {/* Bar */}
+                            <div className="w-full flex items-end justify-center" style={{ height: 64 }}>
+                              <div
+                                className="w-full bg-primary/20 rounded-t-sm relative group"
+                                style={{ height: heightPct }}
+                              >
+                                <div className="absolute inset-x-0 top-0 h-0.5 bg-primary rounded-t-sm" />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold">{step.count}</span>
-                              {idx > 0 && dropoff > 0 && (
-                                <span
-                                  className={cn(
-                                    "text-[10px] font-medium px-1.5 py-0.5 rounded",
-                                    dropoff > 50
-                                      ? "bg-red-500/10 text-red-600"
-                                      : dropoff > 25
-                                        ? "bg-orange-500/10 text-orange-600"
-                                        : "bg-green-500/10 text-green-600"
-                                  )}
-                                >
-                                  -{dropoff}%
-                                </span>
-                              )}
-                            </div>
+                            {/* Count + label */}
+                            <p className="text-xs font-semibold leading-none">{step.count}</p>
+                            <p className="text-[10px] text-muted-foreground text-center truncate w-full px-1 leading-tight">{step.name}</p>
+                            <span className="flex items-center justify-center h-4 w-4 rounded-full bg-muted text-[9px] font-semibold">{idx + 1}</span>
                           </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${width}%` }} />
-                          </div>
+                          {/* Arrow connector */}
+                          {!isLast && (
+                            <div className="flex items-center pb-10 px-0.5 text-muted-foreground/30 text-xs shrink-0">›</div>
+                          )}
                         </div>
                       );
                     })}
