@@ -1,63 +1,9 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/login",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-];
-
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
-
-  // Skip Supabase initialization if env vars are missing (development mode)
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
-    return response;
-  }
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const { pathname } = request.nextUrl;
-
-  const isPublicPath = PUBLIC_PATHS.includes(pathname);
-  const isPublicFunnel = pathname.startsWith("/f/");
-  const isOnboarding = pathname.startsWith("/onboarding/");
-  const isUnsubscribe = pathname === "/unsubscribe";
-
-  if (!session && !isPublicPath && !isPublicFunnel && !isOnboarding && !isUnsubscribe) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (session && isPublicPath) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  return response;
+  // Allow all requests in development mode
+  return NextResponse.next();
 }
 
 export const config = {
