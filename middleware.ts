@@ -1,3 +1,4 @@
+// Updated: 2026-04-20 10:18
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
