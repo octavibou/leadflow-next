@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+// Simple middleware - no auth required for dev mode
+export function middleware(_request: NextRequest) {
   return NextResponse.next();
 }
 
