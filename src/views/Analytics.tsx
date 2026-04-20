@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { CaretDown, CaretUpDown, Trophy } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
+import { useCampaignStore } from "@/store/campaignStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,12 +46,14 @@ function getCvrStyle(cvr: number): { color: string; bg: string; icon: any } {
 
 export default function Analytics() {
   const { funnels: allFunnels, loading: funnelsLoading, fetchFunnels } = useFunnelStore();
+  const { campaigns, fetchCampaigns } = useCampaignStore();
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [events, setEvents] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [funnelConversions, setFunnelConversions] = useState<Record<string, number>>({});
+  const [campaignMetrics, setCampaignMetrics] = useState<Record<string, { views: number; clicks: number }>>({});
 
   // Only live funnels have analytics
   const funnels = useMemo(
@@ -63,6 +66,19 @@ export default function Analytics() {
   useEffect(() => {
     fetchFunnels();
   }, [fetchFunnels]);
+
+  // Fetch campaigns when a single funnel is selected
+  useEffect(() => {
+    if (selectedFunnelId !== "all") {
+      fetchCampaigns(selectedFunnelId);
+    } else {
+      // Fetch campaigns from all live funnels
+      const ids = funnels.map(f => f.id);
+      if (ids.length > 0) {
+        Promise.all(ids.map(id => fetchCampaigns(id)));
+      }
+    }
+  }, [selectedFunnelId, funnels.length, fetchCampaigns]);
 
   // Fetch per-funnel conversion rates for dropdown ordering + badges
   // Conversion = leads / page_views (impressions)
@@ -119,6 +135,27 @@ export default function Analytics() {
       const [eventsRes, leadsRes] = await Promise.all([eventsQuery, leadsQuery]);
       setEvents(eventsRes.data || []);
       setLeads(leadsRes.data || []);
+      
+      // Fetch campaign metrics (views and clicks by campaign)
+      const campaignIds = campaigns.map(c => c.id);
+      if (campaignIds.length > 0) {
+        const campaignEventsRes = await supabase
+          .from("events")
+          .select("metadata, event_type")
+          .in("metadata->campaign_id", campaignIds);
+        
+        const metrics: Record<string, { views: number; clicks: number }> = {};
+        campaigns.forEach(c => { metrics[c.id] = { views: 0, clicks: 0 }; });
+        campaignEventsRes.data?.forEach((e) => {
+          const campaignId = e.metadata?.campaign_id;
+          if (campaignId && metrics[campaignId]) {
+            if (e.event_type === "page_view") metrics[campaignId].views++;
+            if (e.event_type === "form_submit") metrics[campaignId].clicks++;
+          }
+        });
+        setCampaignMetrics(metrics);
+      }
+      
       setLoading(false);
     };
     load();
@@ -137,10 +174,16 @@ export default function Analytics() {
     // CVR = leads / impressions (from visitor to lead)
     const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
 
-    // Landing variants mock (in future, pull from campaigns/variants table)
-    const variants = [
-      { id: "original", name: "Original", views: pageViews, clicks: formSubmits },
-    ];
+    // Landing variants from campaigns table
+    const variants = campaigns.length > 0 
+      ? campaigns.map(c => ({
+          id: c.id,
+          name: c.name,
+          views: campaignMetrics[c.id]?.views || 0,
+          clicks: campaignMetrics[c.id]?.clicks || 0,
+        }))
+      : [{ id: "original", name: "Original", views: pageViews, clicks: formSubmits }];
+    
     // Sort by CTR
     const sortedVariants = [...variants].sort((a, b) => {
       const ctrA = a.views > 0 ? a.clicks / a.views : 0;
@@ -196,7 +239,7 @@ export default function Analytics() {
     }));
 
     return { pageViews, formSubmits, totalLeads, ctr, cvr, iniciados, variants: sortedVariants, bestVariantId, stepFunnel, chartData };
-  }, [events, leads, steps, dateRange]);
+  }, [events, leads, steps, dateRange, campaigns, campaignMetrics]);
 
   if (funnelsLoading) {
     return (
