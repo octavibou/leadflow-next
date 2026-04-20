@@ -243,7 +243,7 @@ export function TopNav() {
           <div className="p-2 hover:bg-muted rounded-md transition-colors">
             <GraduationCap className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
           </div>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs font-medium rounded shadow-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-popover text-popover-foreground text-xs font-medium rounded shadow-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
             Skool
           </div>
         </button>
