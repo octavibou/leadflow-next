@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
-import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link } from "@phosphor-icons/react";
+import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +27,7 @@ const Dashboard = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [dateRange, setDateRange] = useState<DateRange>("7d");
   const router = useRouter();
 
   const handleNewFunnel = () => {
@@ -74,6 +75,27 @@ const Dashboard = () => {
               className="pl-9 w-56"
             />
           </div>
+          {/* Date range picker */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 min-w-[150px] justify-between">
+                {DATE_RANGE_LABELS[dateRange]}
+                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map((key) => (
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => setDateRange(key)}
+                  className={dateRange === key ? "font-semibold" : ""}
+                >
+                  {DATE_RANGE_LABELS[key]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <div className="flex items-center border rounded-lg">
             <Button
               variant="ghost"
@@ -144,6 +166,7 @@ const Dashboard = () => {
             <FunnelCard
               key={f.id}
               funnel={f}
+              dateRange={dateRange}
               onEdit={() => router.push(`/editor/${f.id}`)}
               onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
               onDuplicate={() => duplicateFunnel(f.id)}
@@ -183,6 +206,7 @@ const Dashboard = () => {
 
 interface FunnelActionProps {
   funnel: any;
+  dateRange?: DateRange;
   onEdit: () => void;
   onCampaigns: () => void;
   onDuplicate: () => void;
@@ -191,9 +215,34 @@ interface FunnelActionProps {
   onTogglePublish: () => void;
 }
 
+type DateRange = "7d" | "month" | "year" | "all";
+
+const DATE_RANGE_LABELS: Record<DateRange, string> = {
+  "7d": "Últimos 7 días",
+  "month": "Este mes",
+  "year": "Este año",
+  "all": "Siempre",
+};
+
+function getFromDate(range: DateRange): string | null {
+  const now = new Date();
+  if (range === "7d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().split("T")[0] + "T00:00:00";
+  }
+  if (range === "month") {
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0] + "T00:00:00";
+  }
+  if (range === "year") {
+    return new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0] + "T00:00:00";
+  }
+  return null; // all time
+}
+
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
 
-function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
+function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
   const [chartData, setChartData] = useState<Array<{ day: string; leads: number }>>([]);
   const [leadsTotal, setLeadsTotal] = useState(0);
   const [impressions, setImpressions] = useState(0);
@@ -201,25 +250,39 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
 
   useEffect(() => {
     const fetchData = async () => {
+      const fromDate = getFromDate(dateRange);
+
+      // Build chart buckets for the last 7 days (visual sparkline always 7d)
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
         return d;
       });
-      const fromDate = last7Days[0].toISOString().split('T')[0] + 'T00:00:00';
+      const chart7FromDate = last7Days[0].toISOString().split('T')[0] + 'T00:00:00';
 
-      const [leadsRes, eventsRes] = await Promise.all([
-        supabase.from('leads').select('created_at').eq('funnel_id', funnel.id),
-        supabase.from('events').select('event_type, created_at').eq('funnel_id', funnel.id).gte('created_at', fromDate),
-      ]);
+      // Leads query: apply dateRange filter
+      let leadsQuery = supabase.from('leads').select('created_at').eq('funnel_id', funnel.id);
+      if (fromDate) leadsQuery = leadsQuery.gte('created_at', fromDate);
+
+      // Events query: apply dateRange filter
+      let eventsQuery = supabase.from('events').select('event_type, created_at').eq('funnel_id', funnel.id);
+      if (fromDate) eventsQuery = eventsQuery.gte('created_at', fromDate);
+
+      // Chart always shows last 7 days for visual reference
+      let chartLeadsQuery = supabase.from('leads').select('created_at').eq('funnel_id', funnel.id).gte('created_at', chart7FromDate);
+
+      const [leadsRes, eventsRes, chartLeadsRes] = await Promise.all([leadsQuery, eventsQuery, chartLeadsQuery]);
 
       if (leadsRes.data) {
+        setLeadsTotal(leadsRes.data.length);
+      }
+
+      if (chartLeadsRes.data) {
         const leadsPerDay = last7Days.map((d) => ({
           day: DAY_LABELS[d.getDay()],
-          leads: leadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
+          leads: chartLeadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(d.toISOString().split('T')[0])).length,
         }));
         setChartData(leadsPerDay);
-        setLeadsTotal(leadsRes.data.length);
       }
 
       if (eventsRes.data) {
@@ -229,7 +292,7 @@ function FunnelCard({ funnel, onEdit, onCampaigns, onDuplicate, onExport, onDele
     };
 
     fetchData();
-  }, [funnel.id]);
+  }, [funnel.id, dateRange]);
 
   const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
   const ctr = impressions > 0 ? ((formStarts / impressions) * 100).toFixed(1) : "0.0";
