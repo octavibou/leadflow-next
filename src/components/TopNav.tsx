@@ -32,7 +32,6 @@ import { toast } from "sonner";
 const tabs = [
   { label: "Funnels", path: "/dashboard", icon: Lightning },
   { label: "Analytics", path: "/analytics", icon: ChartBar },
-  { label: "Academy", path: "https://www.skool.com/leadcommerce-4121", icon: GraduationCap, external: true },
   { label: "Route", path: "/routing", icon: Path, soon: true },
 ];
 
@@ -110,8 +109,23 @@ export function TopNav() {
 
   return (
     <header className="h-14 border-b bg-background flex items-center px-4 gap-6 shrink-0">
-      {/* Workspace Switcher */}
+      {/* Left section with Academy + Workspace */}
       <div className="flex items-center gap-2">
+        {/* Academy button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 relative"
+          onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
+        >
+          <GraduationCap className="h-4 w-4 text-muted-foreground" weight="bold" />
+          <div className="absolute bottom-0 right-0 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-[8px] font-bold text-primary-foreground">OB</span>
+          </div>
+        </Button>
+
+        {/* Workspace Switcher */}
+        <div className="flex items-center gap-2">
         {editingName ? (
           <div className="flex items-center gap-2 px-2">
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
@@ -199,7 +213,6 @@ export function TopNav() {
           const active = !isExternal && pathname === tab.path;
           const disabled = !!(tab as any).soon;
           const Icon = tab.icon;
-          const isAcademy = tab.label === "Academy";
           
           return (
             <Button
@@ -217,7 +230,6 @@ export function TopNav() {
               disabled={disabled}
               className={cn(
                 "gap-1.5 h-8 rounded-md px-3 font-medium text-sm transition-colors",
-                isAcademy ? "gap-2 px-3" : "",
                 disabled
                   ? "text-muted-foreground/40 cursor-not-allowed"
                   : active
@@ -227,11 +239,6 @@ export function TopNav() {
             >
               <Icon className="h-3.5 w-3.5" weight={active ? "fill" : "bold"} />
               {tab.label}
-              {isAcademy && (
-                <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shrink-0 ml-1">
-                  <span className="text-[10px] font-bold text-primary-foreground">OB</span>
-                </div>
-              )}
               {disabled && (
                 <span className="text-[9px] bg-muted text-muted-foreground/60 rounded px-1.5 py-0.5 font-medium ml-0.5">soon</span>
               )}
