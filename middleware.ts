@@ -1,11 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-// Simple middleware - no auth required for dev mode
-export function middleware(_request: NextRequest) {
+export function middleware() {
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico).*)"],
-};
