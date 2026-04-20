@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { CaretDown, CaretUpDown, Trophy } from "@phosphor-icons/react";
+import { CaretDown, CaretUpDown } from "@phosphor-icons/react";
 import { useFunnelStore } from "@/store/funnelStore";
-import { useCampaignStore } from "@/store/campaignStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,19 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
 import type { FunnelStep } from "@/types/funnel";
-
-interface EventRow {
-  campaign_id: string | null;
-  event_type: string;
-  metadata: any;
-  created_at: string;
-}
-
-interface LeadRow {
-  campaign_id: string | null;
-  result: string | null;
-  created_at: string;
-}
 
 type DateRange = "today" | "7d" | "month" | "year" | "all";
 
@@ -33,17 +19,6 @@ const DATE_RANGE_LABELS: Record<DateRange, string> = {
   month: "Este mes",
   year: "Este año",
   all: "Siempre",
-};
-
-const STEP_TYPE_LABELS: Record<string, string> = {
-  intro: "Landing",
-  question: "Pregunta",
-  contact: "Contacto",
-  results: "Resultados",
-  booking: "Reserva",
-  vsl: "VSL",
-  delivery: "Entrega",
-  thankyou: "Gracias",
 };
 
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
@@ -61,13 +36,12 @@ function getFromDate(range: DateRange): string | null {
   return null;
 }
 
-const AnalyticsPage = () => {
+export default function Analytics() {
   const { funnels, loading: funnelsLoading, fetchFunnels } = useFunnelStore();
-  const { campaigns, fetchCampaigns } = useCampaignStore();
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange>("7d");
-  const [events, setEvents] = useState<EventRow[]>([]);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -81,12 +55,6 @@ const AnalyticsPage = () => {
   }, [funnels, selectedFunnelId]);
 
   useEffect(() => {
-    if (selectedFunnelId) {
-      fetchCampaigns(selectedFunnelId);
-    }
-  }, [selectedFunnelId, fetchCampaigns]);
-
-  useEffect(() => {
     if (!selectedFunnelId) return;
     const load = async () => {
       setLoading(true);
@@ -94,13 +62,12 @@ const AnalyticsPage = () => {
 
       let eventsQuery = supabase
         .from("events")
-        .select("campaign_id, event_type, metadata, created_at")
-        .eq("funnel_id", selectedFunnelId)
-        .order("created_at", { ascending: true });
+        .select("event_type, metadata, created_at")
+        .eq("funnel_id", selectedFunnelId);
 
       let leadsQuery = supabase
         .from("leads")
-        .select("campaign_id, result, created_at")
+        .select("created_at")
         .eq("funnel_id", selectedFunnelId);
 
       if (fromDate) {
@@ -109,8 +76,8 @@ const AnalyticsPage = () => {
       }
 
       const [eventsRes, leadsRes] = await Promise.all([eventsQuery, leadsQuery]);
-      setEvents((eventsRes.data as EventRow[]) || []);
-      setLeads((leadsRes.data as LeadRow[]) || []);
+      setEvents(eventsRes.data || []);
+      setLeads(leadsRes.data || []);
       setLoading(false);
     };
     load();
@@ -121,57 +88,21 @@ const AnalyticsPage = () => {
 
   const stats = useMemo(() => {
     const pageViews = events.filter((e) => e.event_type === "page_view").length;
-    const stepViews = events.filter((e) => e.event_type === "step_view");
     const formSubmits = events.filter((e) => e.event_type === "form_submit").length;
     const totalLeads = leads.length;
     const ctr = pageViews > 0 ? (formSubmits / pageViews) * 100 : 0;
     const cvr = pageViews > 0 ? (totalLeads / pageViews) * 100 : 0;
 
-    // Landing variants
-    const landingVariants = campaigns.map((c) => {
-      const cEvents = events.filter((e) => e.campaign_id === c.id);
-      const cViews = cEvents.filter((e) => e.event_type === "page_view").length;
-      const cClicks = cEvents.filter((e) => e.event_type === "form_submit").length;
-      return {
-        id: c.id,
-        name: c.name,
-        views: cViews,
-        clicks: cClicks,
-        ctr: cViews > 0 ? (cClicks / cViews) * 100 : 0,
-      };
-    });
-
-    const directEvents = events.filter((e) => !e.campaign_id);
-    const directViews = directEvents.filter((e) => e.event_type === "page_view").length;
-    const directClicks = directEvents.filter((e) => e.event_type === "form_submit").length;
-    if (directViews > 0) {
-      landingVariants.unshift({
-        id: "direct",
-        name: "Tráfico directo",
-        views: directViews,
-        clicks: directClicks,
-        ctr: directViews > 0 ? (directClicks / directViews) * 100 : 0,
-      });
-    }
-
-    // Step funnel
+    // Step funnel data
+    const stepViews = events.filter((e) => e.event_type === "step_view");
     const stepFunnel = steps.map((step, i) => {
       let count = 0;
       if (step.type === "intro") {
         count = pageViews;
       } else {
         count = stepViews.filter((e) => e.metadata?.step_id === step.id).length;
-        if (step.type === "contact" && count === 0) count = formSubmits;
       }
-      const prev = i === 0 ? count : (steps[i - 1] ? stepViews.filter((e) => e.metadata?.step_id === steps[i - 1].id).length || pageViews : pageViews);
-      const dropoff = prev > 0 ? ((prev - count) / prev) * 100 : 0;
-      return {
-        id: step.id,
-        name: step.type === "question" && step.question ? step.question.text.substring(0, 30) + (step.question.text.length > 30 ? "..." : "") : STEP_TYPE_LABELS[step.type],
-        type: step.type,
-        count,
-        dropoff,
-      };
+      return { id: step.id, name: step.title || `Paso ${i + 1}`, count };
     });
 
     // Chart data
@@ -205,50 +136,54 @@ const AnalyticsPage = () => {
     const chartData = buckets.map(({ key, label }) => ({
       label,
       leads: leads.filter((l) => l.created_at?.startsWith(key)).length,
-      views: events.filter((e) => e.event_type === "page_view" && e.created_at?.startsWith(key)).length,
     }));
 
-    return { pageViews, formSubmits, totalLeads, ctr, cvr, landingVariants, stepFunnel, chartData };
-  }, [events, leads, campaigns, steps, dateRange]);
-
-  const bestCtr = Math.max(...stats.landingVariants.map((v) => v.ctr), 0);
+    return { pageViews, formSubmits, totalLeads, ctr, cvr, stepFunnel, chartData };
+  }, [events, leads, steps, dateRange]);
 
   if (funnelsLoading) {
     return (
       <div className="flex-1 p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-muted rounded" />
-          <div className="grid grid-cols-3 gap-6">
-            <div className="h-80 bg-muted rounded" />
-            <div className="h-80 bg-muted rounded col-span-2" />
-          </div>
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+          ))}
         </div>
       </div>
     );
   }
 
+  if (funnels.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-muted-foreground">Crea tu primer funnel para ver analytics</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-auto">
+    <div className="flex-1 overflow-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-8 gap-2 text-sm font-normal min-w-[180px] justify-between">
-                <span className="truncate">{selectedFunnel?.name || "Seleccionar funnel"}</span>
-                <CaretUpDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[220px]">
-              {funnels.map((f) => (
-                <DropdownMenuItem key={f.id} onClick={() => setSelectedFunnelId(f.id)} className={selectedFunnelId === f.id ? "font-medium" : ""}>
-                  {f.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 group outline-none">
+              <h1 className="text-2xl font-bold">{selectedFunnel?.name || "Seleccionar"}</h1>
+              <CaretUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {funnels.map((f) => (
+              <DropdownMenuItem
+                key={f.id}
+                onClick={() => setSelectedFunnelId(f.id)}
+                className={selectedFunnelId === f.id ? "font-medium" : ""}
+              >
+                {f.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -267,170 +202,99 @@ const AnalyticsPage = () => {
         </DropdownMenu>
       </div>
 
-      {!selectedFunnel ? (
-        <div className="text-center text-muted-foreground py-20">
-          <p>Selecciona un funnel para ver sus analytics</p>
-        </div>
-      ) : loading ? (
-        <div className="flex items-center justify-center h-[50vh]">
-          <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+      {loading ? (
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+          ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-6">
-          {/* Landing Performance - 1/3 */}
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-base">Landing Performance</CardTitle>
-              <div className="flex items-center gap-4 mt-3">
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Visitas</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.pageViews.toLocaleString()}</p>
-                </div>
-                <div className="w-px h-6 bg-border" />
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Clics</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
-                </div>
-                <div className="w-px h-6 bg-border" />
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.ctr.toFixed(1)}%</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Variants */}
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">Variantes</p>
-                {stats.landingVariants.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin variantes</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.landingVariants.map((v, idx) => (
-                      <div key={v.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
-                        <div className="flex items-center gap-2">
-                          {v.ctr === bestCtr && bestCtr > 0 && <Trophy className="h-3.5 w-3.5 text-yellow-500" weight="fill" />}
-                          <span className="text-sm">{v.name}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-muted-foreground">{v.views}</span>
-                          <span className={cn("font-semibold", v.ctr === bestCtr && bestCtr > 0 ? "text-green-600" : "text-foreground")}>
-                            {v.ctr.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <p className="text-[11px] text-muted-foreground leading-none">Impresiones</p>
+                <p className="text-2xl font-bold mt-1">{stats.pageViews.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <p className="text-[11px] text-muted-foreground leading-none">CTR</p>
+                <p className="text-2xl font-bold mt-1">{stats.ctr.toFixed(1)}%</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
+                <p className="text-2xl font-bold mt-1">{stats.totalLeads.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <p className="text-[11px] text-muted-foreground leading-none">Conversión</p>
+                <p className="text-2xl font-bold mt-1">{stats.cvr.toFixed(1)}%</p>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Chart */}
-              <div className="h-24">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradViews" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Tooltip
-                      content={({ active, payload, label }) =>
-                        active && payload?.length ? (
-                          <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
-                            <span className="font-semibold">{label}</span>
-                            <span className="ml-2 text-muted-foreground">{payload[0].value} visitas</span>
-                          </div>
-                        ) : null
-                      }
-                    />
-                    <Area type="monotone" dataKey="views" stroke="hsl(var(--chart-1))" strokeWidth={2} fill="url(#gradViews)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex justify-between px-1">
-                {stats.chartData.map((item) => (
-                  <span key={item.label} className="text-[10px] text-muted-foreground">{item.label}</span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Funnel Performance - 2/3 */}
-          <Card className="col-span-2 overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-base">Funnel Performance</CardTitle>
-              <div className="flex items-center gap-4 mt-3">
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Iniciados</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.formSubmits.toLocaleString()}</p>
-                </div>
-                <div className="w-px h-6 bg-border" />
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Leads</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.totalLeads.toLocaleString()}</p>
-                </div>
-                <div className="w-px h-6 bg-border" />
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Conv.</p>
-                  <p className="text-sm font-semibold mt-0.5">{stats.cvr.toFixed(1)}%</p>
-                </div>
-                <div className="w-px h-6 bg-border" />
-                <div>
-                  <p className="text-[11px] text-muted-foreground leading-none">Drop-off avg</p>
-                  <p className="text-sm font-semibold mt-0.5">
-                    {stats.stepFunnel.length > 1 ? (stats.stepFunnel.slice(1).reduce((a, s) => a + s.dropoff, 0) / (stats.stepFunnel.length - 1)).toFixed(0) : 0}%
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Step timeline */}
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-3">Flujo del Funnel</p>
+          {/* Main Content */}
+          <div className="grid grid-cols-3 gap-4">
+            {/* Funnel Steps */}
+            <Card className="col-span-1">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Embudo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
                 {stats.stepFunnel.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4">Sin pasos en este funnel</p>
+                  <p className="text-sm text-muted-foreground">Sin pasos</p>
                 ) : (
-                  <div className="space-y-0">
-                    {stats.stepFunnel.map((step, idx) => (
-                      <div key={step.id} className="flex items-center gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-                            idx === 0 ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
-                          )}>
-                            {idx + 1}
+                  stats.stepFunnel.map((step, idx) => {
+                    const maxCount = Math.max(...stats.stepFunnel.map((s) => s.count), 1);
+                    const width = (step.count / maxCount) * 100;
+                    const prev = idx === 0 ? step.count : stats.stepFunnel[idx - 1].count;
+                    const dropoff = prev > 0 ? Math.round(((prev - step.count) / prev) * 100) : 0;
+
+                    return (
+                      <div key={step.id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground w-4">{idx + 1}</span>
+                            <span className="text-sm truncate">{step.name}</span>
                           </div>
-                          {idx < stats.stepFunnel.length - 1 && <div className="w-0.5 h-6 bg-border" />}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{step.count}</span>
+                            {idx > 0 && dropoff > 0 && (
+                              <span className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded",
+                                dropoff > 50 ? "bg-red-500/10 text-red-600" :
+                                dropoff > 25 ? "bg-orange-500/10 text-orange-600" :
+                                "bg-green-500/10 text-green-600"
+                              )}>
+                                -{dropoff}%
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 flex items-center justify-between py-2">
-                          <div>
-                            <p className="text-sm font-medium">{step.name}</p>
-                            <p className="text-xs text-muted-foreground">{step.count} visitas</p>
-                          </div>
-                          {idx > 0 && (
-                            <span className={cn(
-                              "text-xs px-2 py-0.5 rounded-full",
-                              step.dropoff < 20 ? "bg-green-500/10 text-green-600" :
-                              step.dropoff < 40 ? "bg-yellow-500/10 text-yellow-600" :
-                              "bg-red-500/10 text-red-600"
-                            )}>
-                              -{step.dropoff.toFixed(0)}%
-                            </span>
-                          )}
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${width}%` }} />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })
                 )}
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Leads chart */}
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">Leads generados</p>
-                <div className="h-28">
+            {/* Chart */}
+            <Card className="col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Leads</CardTitle>
+              </CardHeader>
+              <CardContent className="px-0 pb-0">
+                <div className="h-48 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats.chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                    <AreaChart data={stats.chartData} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gradLeads" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
@@ -447,22 +311,28 @@ const AnalyticsPage = () => {
                           ) : null
                         }
                       />
-                      <Area type="monotone" dataKey="leads" stroke="hsl(var(--chart-3))" strokeWidth={2} fill="url(#gradLeads)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                      <Area
+                        type="monotone"
+                        dataKey="leads"
+                        stroke="hsl(var(--chart-3))"
+                        strokeWidth={2}
+                        fill="url(#gradLeads)"
+                        dot={false}
+                        activeDot={{ r: 4, strokeWidth: 0 }}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex justify-between px-1 mt-1">
+                <div className="flex justify-between px-4 pb-3 pt-1">
                   {stats.chartData.map((item) => (
                     <span key={item.label} className="text-[10px] text-muted-foreground">{item.label}</span>
                   ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
     </div>
   );
-};
-
-export default AnalyticsPage;
+}
