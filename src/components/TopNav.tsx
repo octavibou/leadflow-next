@@ -204,6 +204,7 @@ export function TopNav() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        </div>
       </div>
 
       {/* Center tabs */}
