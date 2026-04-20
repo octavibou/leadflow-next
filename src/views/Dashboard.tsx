@@ -107,7 +107,7 @@ const Dashboard = () => {
       </div>
 
       {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <Skeleton className="aspect-[16/10] w-full rounded-t-lg" />
@@ -139,7 +139,7 @@ const Dashboard = () => {
           )}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredFunnels.map((f) => (
             <FunnelCard
               key={f.id}
