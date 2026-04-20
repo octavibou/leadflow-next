@@ -38,7 +38,7 @@ function getFromDate(range: DateRange): string | null {
 
 export default function Analytics() {
   const { funnels, loading: funnelsLoading, fetchFunnels } = useFunnelStore();
-  const [selectedFunnelId, setSelectedFunnelId] = useState<string>("");
+  const [selectedFunnelId, setSelectedFunnelId] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [events, setEvents] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
@@ -49,26 +49,27 @@ export default function Analytics() {
   }, [fetchFunnels]);
 
   useEffect(() => {
-    if (funnels.length > 0 && !selectedFunnelId) {
-      setSelectedFunnelId(funnels[0].id);
-    }
-  }, [funnels, selectedFunnelId]);
-
-  useEffect(() => {
-    if (!selectedFunnelId) return;
     const load = async () => {
+      if (funnels.length === 0) return;
       setLoading(true);
       const fromDate = getFromDate(dateRange);
+      const funnelIds = funnels.map((f) => f.id);
 
       let eventsQuery = supabase
         .from("events")
-        .select("event_type, metadata, created_at")
-        .eq("funnel_id", selectedFunnelId);
+        .select("event_type, metadata, created_at, funnel_id");
 
       let leadsQuery = supabase
         .from("leads")
-        .select("created_at")
-        .eq("funnel_id", selectedFunnelId);
+        .select("created_at, funnel_id");
+
+      if (selectedFunnelId === "all") {
+        eventsQuery = eventsQuery.in("funnel_id", funnelIds);
+        leadsQuery = leadsQuery.in("funnel_id", funnelIds);
+      } else {
+        eventsQuery = eventsQuery.eq("funnel_id", selectedFunnelId);
+        leadsQuery = leadsQuery.eq("funnel_id", selectedFunnelId);
+      }
 
       if (fromDate) {
         eventsQuery = eventsQuery.gte("created_at", fromDate);
@@ -81,9 +82,9 @@ export default function Analytics() {
       setLoading(false);
     };
     load();
-  }, [selectedFunnelId, dateRange]);
+  }, [selectedFunnelId, dateRange, funnels]);
 
-  const selectedFunnel = funnels.find((f) => f.id === selectedFunnelId);
+  const selectedFunnel = selectedFunnelId === "all" ? null : funnels.find((f) => f.id === selectedFunnelId);
   const steps = (selectedFunnel?.steps as FunnelStep[]) || [];
 
   const stats = useMemo(() => {
@@ -176,11 +177,17 @@ export default function Analytics() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 group outline-none">
-              <h1 className="text-2xl font-bold">{selectedFunnel?.name || "Seleccionar"}</h1>
+              <h1 className="text-2xl font-bold">{selectedFunnel?.name || "Todos los Funnels"}</h1>
               <CaretUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem
+              onClick={() => setSelectedFunnelId("all")}
+              className={selectedFunnelId === "all" ? "font-medium" : ""}
+            >
+              Todos los Funnels
+            </DropdownMenuItem>
             {funnels.map((f) => (
               <DropdownMenuItem
                 key={f.id}
