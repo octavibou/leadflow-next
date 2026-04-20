@@ -202,7 +202,7 @@ export function TopNav() {
           return (
             <Button
               key={tab.label}
-              variant="ghost"
+              variant={active ? "default" : "ghost"}
               size="sm"
               onClick={() => {
                 if (disabled) return;
@@ -214,18 +214,18 @@ export function TopNav() {
               }}
               disabled={disabled}
               className={cn(
-                "gap-2 rounded-lg px-4",
+                "gap-1.5 h-8 rounded-md px-3 font-medium text-sm transition-colors",
                 disabled
-                  ? "text-muted-foreground/50 cursor-not-allowed"
+                  ? "text-muted-foreground/40 cursor-not-allowed"
                   : active
-                    ? "bg-accent text-accent-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
-              <Icon className="h-4 w-4" weight={active ? "fill" : "bold"} />
+              <Icon className="h-3.5 w-3.5" weight={active ? "fill" : "bold"} />
               {tab.label}
               {disabled && (
-                <span className="text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 ml-1 font-medium">soon</span>
+                <span className="text-[9px] bg-muted text-muted-foreground/60 rounded px-1.5 py-0.5 font-medium ml-0.5">soon</span>
               )}
             </Button>
           );
