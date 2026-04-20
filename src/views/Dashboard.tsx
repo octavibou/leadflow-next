@@ -78,7 +78,7 @@ const Dashboard = () => {
           {/* Date range picker */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 min-w-[150px] justify-between">
+              <Button variant="outline" className="h-9 gap-2 min-w-[150px] justify-between text-sm font-normal">
                 {DATE_RANGE_LABELS[dateRange]}
                 <CaretDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
               </Button>
