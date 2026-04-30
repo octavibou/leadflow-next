@@ -17,3 +17,18 @@ verify_jwt = false
 
 [functions.meta-capi]
 verify_jwt = false
+
+[functions.update-subscription]
+verify_jwt = false
+
+[functions.create-portal]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.report-lead-usage]
+verify_jwt = false

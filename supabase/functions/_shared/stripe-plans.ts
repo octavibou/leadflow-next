@@ -1,8 +1,10 @@
 export const STRIPE_API_VERSION = "2023-10-16";
 export const STRIPE_CATALOG_NAMESPACE = "leadflow_metered_v3";
 export const LEGACY_CATALOG_NAMESPACE_PREFIX = "leadflow_metered_";
-export const YEARLY_DISCOUNT_FACTOR = 0.8;
 export const PORTAL_PENDING_UPGRADE_TTL_MS = 30 * 60 * 1000;
+
+// Fixed EUR → USD rate for currency_options (matches Adaptive Pricing ~1.08-1.10)
+export const EUR_TO_USD_RATE = 1.10;
 
 export const SUPPORTED_PLANS = ["starter", "grow", "scale"] as const;
 export type SupportedPlan = (typeof SUPPORTED_PLANS)[number];
@@ -15,6 +17,7 @@ type PlanDefinition = {
   baseProductKey: string;
   overageProductKey: string;
   baseMonthlyCents: number;
+  baseYearlyCents: number;
   overageCents: number;
   leadsIncluded: number;
   funnels: number;
@@ -30,6 +33,7 @@ export const PLAN_CATALOG: Record<SupportedPlan, PlanDefinition> = {
     baseProductKey: "plan_starter_base",
     overageProductKey: "plan_starter_overage",
     baseMonthlyCents: 4900,
+    baseYearlyCents: 49900,
     overageCents: 50,
     leadsIncluded: 200,
     funnels: 2,
@@ -43,6 +47,7 @@ export const PLAN_CATALOG: Record<SupportedPlan, PlanDefinition> = {
     baseProductKey: "plan_grow_base",
     overageProductKey: "plan_grow_overage",
     baseMonthlyCents: 14900,
+    baseYearlyCents: 149900,
     overageCents: 35,
     leadsIncluded: 500,
     funnels: 10,
@@ -56,6 +61,7 @@ export const PLAN_CATALOG: Record<SupportedPlan, PlanDefinition> = {
     baseProductKey: "plan_scale_base",
     overageProductKey: "plan_scale_overage",
     baseMonthlyCents: 29900,
+    baseYearlyCents: 299900,
     overageCents: 20,
     leadsIncluded: 1000,
     funnels: 50,
@@ -76,8 +82,31 @@ export function getBasePriceKey(plan: SupportedPlan, interval: BillingInterval):
   return `${plan}_base_${interval}`;
 }
 
-export function getOveragePriceKey(plan: SupportedPlan): string {
-  return `${plan}_overage`;
+export function getOveragePriceKey(plan: SupportedPlan, interval: BillingInterval = "monthly"): string {
+  return `${plan}_overage_${interval}`;
+}
+
+/** Which catalog product (`metadata.lf_product`) a given `lf_price_key` should belong to. */
+export function getExpectedProductKeyForLfPriceKey(lfPriceKey: string): string | null {
+  const baseM = lfPriceKey.match(/^(starter|grow|scale)_base_(monthly|yearly)$/);
+  if (baseM) {
+    const plan = baseM[1] as SupportedPlan;
+    if (!isSupportedPlan(plan)) return null;
+    return getPlanConfig(plan).baseProductKey;
+  }
+  const overM = lfPriceKey.match(/^(starter|grow|scale)_overage_(monthly|yearly)$/);
+  if (overM) {
+    const plan = overM[1] as SupportedPlan;
+    if (!isSupportedPlan(plan)) return null;
+    return getPlanConfig(plan).overageProductKey;
+  }
+  const legacyM = lfPriceKey.match(/^(starter|grow|scale)_overage$/);
+  if (legacyM) {
+    const plan = legacyM[1] as SupportedPlan;
+    if (!isSupportedPlan(plan)) return null;
+    return getPlanConfig(plan).overageProductKey;
+  }
+  return null;
 }
 
 export function getPlanLimits(plan: SupportedPlan) {

@@ -8,11 +8,13 @@ export default function AppLayout({ children }: { children?: React.ReactNode }) 
       <div className="min-h-screen flex w-full bg-sidebar">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 p-2 pl-0">
-          <div className="flex-1 bg-background rounded-xl border shadow-sm overflow-hidden flex flex-col">
-            <header className="h-12 flex items-center px-4 border-b">
-              <SidebarTrigger />
+          <div className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm overflow-hidden flex flex-col">
+            {/* Dark header */}
+            <header className="h-12 flex items-center px-4 text-zinc-100">
+              <SidebarTrigger className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" />
             </header>
-            <main className="flex-1 overflow-auto">
+            {/* Main content with rounded top corners */}
+            <main className="flex-1 overflow-auto bg-background rounded-t-2xl">
               {children}
             </main>
           </div>

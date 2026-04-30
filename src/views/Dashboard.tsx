@@ -3,11 +3,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown, SquaresFour as SquaresFourIcon, Star, NotePencil, LinkSimple, Power, Archive, Export, CaretUpDown } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { PlasticButton } from "@/components/ui/plastic-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter, CardAction } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,10 +17,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useFunnelStore } from "@/store/funnelStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { FUNNEL_TYPE_LABELS } from "@/types/funnel";
-import { TemplatePicker } from "@/components/TemplatePicker";
-import { PendingInvitations } from "@/components/workspace/PendingInvitations";
 import { exportFunnelToHtml } from "@/lib/exportHtml";
 import { supabase } from "@/integrations/supabase/client";
+
+const TemplatePicker = dynamic(
+  () => import("@/components/TemplatePicker").then((m) => m.TemplatePicker),
+  { ssr: false }
+);
+
+const PendingInvitations = dynamic(
+  () => import("@/components/workspace/PendingInvitations").then((m) => m.PendingInvitations),
+  { ssr: false }
+);
 
 const Dashboard = () => {
   const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel, saveFunnel, unpublishFunnel } = useFunnelStore();
@@ -45,6 +55,7 @@ const Dashboard = () => {
 
   const [funnelLeadCounts, setFunnelLeadCounts] = useState<Record<string, number>>({});
   const [funnelImpressionCounts, setFunnelImpressionCounts] = useState<Record<string, number>>({});
+  const [funnelMetrics, setFunnelMetrics] = useState<Record<string, FunnelMetrics>>({});
 
   // Fetch lead and impression counts for all funnels to sort by performance
   useEffect(() => {
@@ -78,6 +89,62 @@ const Dashboard = () => {
     fetchCounts();
   }, [funnels]);
 
+  // Fetch card metrics in one batch to avoid N+1 requests (2 per funnel)
+  useEffect(() => {
+    const fetchCardMetrics = async () => {
+      if (!supabase || funnels.length === 0) {
+        setFunnelMetrics({});
+        return;
+      }
+
+      const ids = funnels.map((f) => f.id);
+      const fromDate = getFromDate(dateRange);
+
+      let leadsQuery = supabase.from("leads").select("funnel_id, created_at").in("funnel_id", ids);
+      let eventsQuery = supabase.from("events").select("funnel_id, event_type, created_at").in("funnel_id", ids);
+      if (fromDate) {
+        leadsQuery = leadsQuery.gte("created_at", fromDate);
+        eventsQuery = eventsQuery.gte("created_at", fromDate);
+      }
+
+      const [leadsRes, eventsRes] = await Promise.all([leadsQuery, eventsQuery]);
+      const nextMetrics: Record<string, FunnelMetrics> = {};
+      const leadsCreatedAtByFunnel: Record<string, string[]> = {};
+
+      ids.forEach((id) => {
+        leadsCreatedAtByFunnel[id] = [];
+        nextMetrics[id] = {
+          leadsTotal: 0,
+          impressions: 0,
+          formStarts: 0,
+          chartData: [],
+        };
+      });
+
+      leadsRes.data?.forEach((lead: any) => {
+        const funnelId = lead.funnel_id;
+        if (!funnelId || !nextMetrics[funnelId]) return;
+        nextMetrics[funnelId].leadsTotal += 1;
+        if (lead.created_at) leadsCreatedAtByFunnel[funnelId].push(lead.created_at);
+      });
+
+      eventsRes.data?.forEach((event: any) => {
+        const funnelId = event.funnel_id;
+        if (!funnelId || !nextMetrics[funnelId]) return;
+        if (event.event_type === "page_view") nextMetrics[funnelId].impressions += 1;
+        if (event.event_type === "form_submit") nextMetrics[funnelId].formStarts += 1;
+      });
+
+      ids.forEach((id) => {
+        nextMetrics[id].chartData = buildLeadChartData(leadsCreatedAtByFunnel[id], dateRange);
+      });
+
+      setFunnelMetrics(nextMetrics);
+    };
+
+    fetchCardMetrics();
+  }, [funnels, dateRange]);
+
   // Status priority: Live (0) > Borrador (1) > Archived (2)
   const getFunnelStatusPriority = (f: any): number => {
     if (!!f.archived_at) return 2;
@@ -89,7 +156,7 @@ const Dashboard = () => {
     .filter((f) => {
       if (!f.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       const isLive = !!f.saved_at && f.saved_at !== f.updated_at;
-      const isArchived = !!f.archived_at;
+      const isArchived = !!(f as any).archived_at;
       const isDraft = !isLive && !isArchived;
       if (funnelFilter === "live")     return isLive;
       if (funnelFilter === "drafts")   return isDraft;
@@ -212,17 +279,23 @@ const Dashboard = () => {
           <div className="w-px h-5 bg-border mx-1" />
 
           {/* New funnel */}
-          <Button onClick={handleNewFunnel} size="sm" className="h-8 gap-1.5" variant={canCreateFunnel ? "default" : "outline"}>
-            {canCreateFunnel ? (
+          {canCreateFunnel ? (
+            <PlasticButton onClick={handleNewFunnel} className="h-8 px-3 text-sm">
               <Plus className="h-3.5 w-3.5" weight="bold" />
-            ) : (
+              Nuevo funnel
+              {!limitsLoading && (
+                <span className="text-xs opacity-70">({usage.funnels}/{limits.funnels})</span>
+              )}
+            </PlasticButton>
+          ) : (
+            <Button onClick={handleNewFunnel} size="sm" className="h-8 gap-1.5" variant="outline">
               <Lock className="h-3.5 w-3.5" weight="bold" />
-            )}
-            Nuevo funnel
-            {!limitsLoading && (
-              <span className="text-xs opacity-60">({usage.funnels}/{limits.funnels})</span>
-            )}
-          </Button>
+              Nuevo funnel
+              {!limitsLoading && (
+                <span className="text-xs opacity-60">({usage.funnels}/{limits.funnels})</span>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -265,6 +338,7 @@ const Dashboard = () => {
               key={f.id}
               funnel={f}
               dateRange={dateRange}
+              metrics={funnelMetrics[f.id]}
               onEdit={() => router.push(`/editor/${f.id}`)}
               onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
               onDuplicate={() => duplicateFunnel(f.id)}
@@ -305,6 +379,7 @@ const Dashboard = () => {
 interface FunnelActionProps {
   funnel: any;
   dateRange?: DateRange;
+  metrics?: FunnelMetrics;
   onEdit: () => void;
   onCampaigns: () => void;
   onDuplicate: () => void;
@@ -326,6 +401,13 @@ const FUNNEL_FILTER_OPTIONS: { value: FunnelFilter; label: string; icon: any }[]
 ];
 
 type DateRange = "today" | "7d" | "month" | "year" | "all";
+type ChartPoint = { day: string; leads: number };
+type FunnelMetrics = {
+  leadsTotal: number;
+  impressions: number;
+  formStarts: number;
+  chartData: ChartPoint[];
+};
 
 const DATE_RANGE_LABELS: Record<DateRange, string> = {
   "today": "Hoy",
@@ -356,83 +438,58 @@ function getFromDate(range: DateRange): string | null {
 
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
 
-function FunnelCard({ funnel, dateRange = "7d", onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
-  const [chartData, setChartData] = useState<Array<{ day: string; leads: number }>>([]);
-  const [leadsTotal, setLeadsTotal] = useState(0);
-  const [impressions, setImpressions] = useState(0);
-  const [formStarts, setFormStarts] = useState(0);
+function buildLeadChartData(leadsCreatedAt: string[], dateRange: DateRange): ChartPoint[] {
+  const now = new Date();
+  let buckets: Array<{ key: string; label: string }> = [];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const fromDate = getFromDate(dateRange);
+  if (dateRange === "today") {
+    const todayKey = now.toISOString().split("T")[0];
+    buckets = Array.from({ length: 12 }, (_, i) => {
+      const hour = i * 2;
+      return {
+        key: `${todayKey}T${String(hour).padStart(2, "0")}`,
+        label: `${String(hour).padStart(2, "0")}h`,
+      };
+    });
+  } else if (dateRange === "7d") {
+    buckets = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (6 - i));
+      return { key: d.toISOString().split("T")[0], label: DAY_LABELS[d.getDay()] };
+    });
+  } else if (dateRange === "month") {
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    buckets = Array.from({ length: Math.ceil(daysInMonth / 2) }, (_, i) => {
+      const day = i * 2 + 1;
+      const d = new Date(now.getFullYear(), now.getMonth(), day);
+      return { key: d.toISOString().split("T")[0], label: String(day) };
+    });
+  } else if (dateRange === "year" || dateRange === "all") {
+    const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const startYear = dateRange === "year"
+      ? now.getFullYear()
+      : (leadsCreatedAt.length > 0 ? new Date(leadsCreatedAt[leadsCreatedAt.length - 1]).getFullYear() : now.getFullYear());
 
-      let leadsQuery = supabase.from('leads').select('created_at').eq('funnel_id', funnel.id);
-      if (fromDate) leadsQuery = leadsQuery.gte('created_at', fromDate);
-
-      let eventsQuery = supabase.from('events').select('event_type, created_at').eq('funnel_id', funnel.id);
-      if (fromDate) eventsQuery = eventsQuery.gte('created_at', fromDate);
-
-      const [leadsRes, eventsRes] = await Promise.all([leadsQuery, eventsQuery]);
-
-      if (leadsRes.data) {
-        setLeadsTotal(leadsRes.data.length);
-
-        // Build chart buckets based on dateRange
-        const now = new Date();
-        let buckets: Array<{ key: string; label: string }> = [];
-
-        if (dateRange === "today") {
-          const todayKey = now.toISOString().split('T')[0];
-          buckets = Array.from({ length: 12 }, (_, i) => {
-            const hour = i * 2;
-            return {
-              key: `${todayKey}T${String(hour).padStart(2, '0')}`,
-              label: `${String(hour).padStart(2, '0')}h`,
-            };
-          });
-        } else if (dateRange === "7d") {
-          buckets = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(now);
-            d.setDate(d.getDate() - (6 - i));
-            return { key: d.toISOString().split('T')[0], label: DAY_LABELS[d.getDay()] };
-          });
-        } else if (dateRange === "month") {
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          buckets = Array.from({ length: Math.ceil(daysInMonth / 2) }, (_, i) => {
-            const day = i * 2 + 1;
-            const d = new Date(now.getFullYear(), now.getMonth(), day);
-            return { key: d.toISOString().split('T')[0], label: String(day) };
-          });
-        } else if (dateRange === "year" || dateRange === "all") {
-          const MONTH_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-          const startYear = dateRange === "year" ? now.getFullYear() : (leadsRes.data.length > 0
-            ? new Date(leadsRes.data[leadsRes.data.length - 1].created_at).getFullYear()
-            : now.getFullYear());
-          for (let y = startYear; y <= now.getFullYear(); y++) {
-            const startM = y === startYear && dateRange === "all" ? 0 : (y < now.getFullYear() ? 0 : 0);
-            const endM = y < now.getFullYear() ? 11 : now.getMonth();
-            for (let m = startM; m <= endM; m++) {
-              const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
-              buckets.push({ key: monthKey, label: MONTH_LABELS[m] });
-            }
-          }
-        }
-
-        const grouped = buckets.map(({ key, label }) => ({
-          day: label,
-          leads: leadsRes.data.filter((l) => l.created_at && l.created_at.startsWith(key)).length,
-        }));
-        setChartData(grouped);
+    for (let y = startYear; y <= now.getFullYear(); y++) {
+      const endM = y < now.getFullYear() ? 11 : now.getMonth();
+      for (let m = 0; m <= endM; m++) {
+        const monthKey = `${y}-${String(m + 1).padStart(2, "0")}`;
+        buckets.push({ key: monthKey, label: MONTH_LABELS[m] });
       }
+    }
+  }
 
-      if (eventsRes.data) {
-        setImpressions(eventsRes.data.filter((e) => e.event_type === 'page_view').length);
-        setFormStarts(eventsRes.data.filter((e) => e.event_type === 'form_submit').length);
-      }
-    };
+  return buckets.map(({ key, label }) => ({
+    day: label,
+    leads: leadsCreatedAt.filter((createdAt) => createdAt?.startsWith(key)).length,
+  }));
+}
 
-    fetchData();
-  }, [funnel.id, dateRange]);
+function FunnelCard({ funnel, dateRange = "7d", metrics, onEdit, onCampaigns, onDuplicate, onExport, onDelete, onTogglePublish }: FunnelActionProps) {
+  const leadsTotal = metrics?.leadsTotal || 0;
+  const impressions = metrics?.impressions || 0;
+  const formStarts = metrics?.formStarts || 0;
+  const chartData = metrics?.chartData || buildLeadChartData([], dateRange);
 
   const isLive = !!funnel.saved_at && funnel.saved_at !== funnel.updated_at;
   const ctr = impressions > 0 ? ((formStarts / impressions) * 100).toFixed(1) : "0.0";

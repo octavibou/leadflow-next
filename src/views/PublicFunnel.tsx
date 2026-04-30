@@ -7,7 +7,7 @@ import type { Funnel, FunnelStep, FunnelType } from "@/types/funnel";
 import { computeResults, interpolate, formatNumber } from "@/lib/resultsEngine";
 import {
   trackEvent, saveLead, injectMetaPixel, injectGoogleTag,
-  fireExternalEvent, extractUtms, fireMetaCapi,
+  fireExternalEvent, extractUtms, fireMetaCapi, getOrCreateFunnelSessionId,
 } from "@/lib/tracking";
 
 interface CampaignSettings {
@@ -59,11 +59,14 @@ const PublicFunnel = () => {
   const [campaignSettings, setCampaignSettings] = useState<CampaignSettings>({});
   const utmsRef = useRef<Record<string, string>>({});
   const trackedPageView = useRef(false);
+  const sessionIdRef = useRef<string>("");
+  const qualificationTrackedRef = useRef(false);
   const searchParams = useSearchParams();
 
   // Extract UTMs once
   useEffect(() => {
     utmsRef.current = extractUtms();
+    sessionIdRef.current = getOrCreateFunnelSessionId();
   }, []);
 
   // Load funnel
@@ -147,8 +150,10 @@ const PublicFunnel = () => {
   useEffect(() => {
     if (!funnel || trackedPageView.current) return;
     trackedPageView.current = true;
-    const params = { funnel_id: funnelId, campaign_id: campaignId, ...utmsRef.current };
-    trackEvent(funnel.id, campaignId, "page_view", { ...utmsRef.current });
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
+    const params = { funnel_id: funnelId, campaign_id: campaignId, session_id: sessionId, ...utmsRef.current };
+    trackEvent(funnel.id, campaignId, "session_started", { session_id: sessionId, ...utmsRef.current });
+    trackEvent(funnel.id, campaignId, "page_view", { session_id: sessionId, ...utmsRef.current });
     // Pixel + CAPI: PageView
     fireCapiEvent("PageView");
     // Legacy campaign-level tracking
@@ -156,6 +161,22 @@ const PublicFunnel = () => {
       fireExternalEvent("page_view", params);
     }
   }, [funnel, funnelId, campaignId, campaignSettings, fireCapiEvent]);
+
+  useEffect(() => {
+    if (!funnel || qualificationTrackedRef.current) return;
+
+    const answeredQuestionCount = Object.keys(answers).length;
+    const totalQuestionCount = funnel.steps.filter((s) => s.type === "question").length;
+    if (totalQuestionCount === 0 || answeredQuestionCount < totalQuestionCount) return;
+
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
+    trackEvent(funnel.id, campaignId, "qualification_evaluated", {
+      session_id: sessionId,
+      qualified,
+      evaluated_questions: totalQuestionCount,
+    });
+    qualificationTrackedRef.current = true;
+  }, [answers, qualified, funnel, campaignId]);
 
   const goNext = useCallback(() => {
     if (!funnel) return;
@@ -220,7 +241,14 @@ const PublicFunnel = () => {
     setTotalScore((prev) => prev + option.score);
     if (!option.qualifies) setQualified(false);
     // Track step_view
-    trackEvent(funnel.id, campaignId, "step_view", { step_id: step.id, step_type: "question", answer: optionValue });
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
+    trackEvent(funnel.id, campaignId, "step_view", {
+      session_id: sessionId,
+      step_id: step.id,
+      step_type: "question",
+      answer: optionValue,
+      qualifies: option.qualifies,
+    });
     // Meta CAPI: ViewContent
     fireCapiEvent("ViewContent", {}, { content_name: step.question.text, content_ids: [step.id] });
     if (campaignSettings.trackingEnabled) {
@@ -234,8 +262,9 @@ const PublicFunnel = () => {
   };
 
   const handleContactSubmit = () => {
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
     // Track form_submit event
-    trackEvent(funnel.id, campaignId, "form_submit", { ...utmsRef.current });
+    trackEvent(funnel.id, campaignId, "form_submit", { session_id: sessionId, ...utmsRef.current });
     // Meta CAPI: Lead
     fireCapiEvent("Lead", {}, { funnel_id: funnel.id, campaign_id: campaignId });
     if (campaignSettings.trackingEnabled) {
@@ -244,6 +273,7 @@ const PublicFunnel = () => {
 
     // Save lead to DB
     saveLead(funnel.id, campaignId, answers, qualified ? "qualified" : "disqualified", {
+      session_id: sessionId,
       formData,
       ...utmsRef.current,
     });
@@ -338,7 +368,8 @@ const PublicFunnel = () => {
 
     // Track result_assigned
     const resultLabel = hasEngine ? "engine" : (qualified ? "qualified" : "disqualified");
-    trackEvent(funnel.id, campaignId, "result_assigned", { step_id: step.id, result: resultLabel });
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
+    trackEvent(funnel.id, campaignId, "result_assigned", { session_id: sessionId, step_id: step.id, result: resultLabel });
     // Meta CAPI: CompleteRegistration
     fireCapiEvent("CompleteRegistration", {}, { result: resultLabel, funnel_id: funnel.id });
     if (campaignSettings.trackingEnabled) {

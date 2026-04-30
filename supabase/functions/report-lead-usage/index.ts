@@ -19,6 +19,9 @@ const corsHeaders = {
 };
 
 const MAX_ATTEMPTS = 5;
+const BATCH_SIZE = 50;
+/** Hasta ~1000 filas por invocación; evita quedarse corto ante picos (>50 pendientes). */
+const MAX_BATCHES_PER_REQUEST = 20;
 
 async function resolveMeteredItemId(
   stripe: Stripe,
@@ -62,27 +65,28 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Pull a batch of pending items (oldest first)
-    const { data: queue, error: qErr } = await supabaseAdmin
-      .from("lead_usage_queue")
-      .select("id, subscription_id, lead_id, attempts")
-      .eq("status", "pending")
-      .lt("attempts", MAX_ATTEMPTS)
-      .order("created_at", { ascending: true })
-      .limit(50);
-
-    if (qErr) throw qErr;
-    if (!queue || queue.length === 0) {
-      return new Response(JSON.stringify({ ok: true, processed: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
+    let processed = 0;
     let success = 0;
     let failed = 0;
+    let batches = 0;
 
-    for (const item of queue) {
+    for (let b = 0; b < MAX_BATCHES_PER_REQUEST; b++) {
+      const { data: queue, error: qErr } = await supabaseAdmin
+        .from("lead_usage_queue")
+        .select("id, subscription_id, lead_id, attempts")
+        .eq("status", "pending")
+        .lt("attempts", MAX_ATTEMPTS)
+        .order("created_at", { ascending: true })
+        .limit(BATCH_SIZE);
+
+      if (qErr) throw qErr;
+      if (!queue || queue.length === 0) {
+        break;
+      }
+
+      batches += 1;
+
+      for (const item of queue) {
       try {
         const { data: sub } = await supabaseAdmin
           .from("subscriptions")
@@ -164,9 +168,13 @@ serve(async (req) => {
         }).eq("id", item.id);
         failed++;
       }
+      }
+
+      processed += queue.length;
     }
 
-    return new Response(JSON.stringify({ ok: true, processed: queue.length, success, failed }), {
+    return new Response(JSON.stringify({ ok: true, processed, success, failed, batches }), {
+
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

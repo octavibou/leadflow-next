@@ -314,6 +314,8 @@ export type Database = {
           period_start: string | null
           plan_limits: Json
           plan_name: string
+          presentment_amount: number | null
+          presentment_currency: string | null
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string
@@ -332,6 +334,8 @@ export type Database = {
           period_start?: string | null
           plan_limits?: Json
           plan_name?: string
+          presentment_amount?: number | null
+          presentment_currency?: string | null
           status?: string
           stripe_customer_id: string
           stripe_subscription_id: string
@@ -350,6 +354,8 @@ export type Database = {
           period_start?: string | null
           plan_limits?: Json
           plan_name?: string
+          presentment_amount?: number | null
+          presentment_currency?: string | null
           status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string

@@ -33,7 +33,7 @@ async function createUpgradePortalConfiguration(
 
   const products = await Promise.all(
     orderedPlans.map(async (plan) => {
-      const basePrice = await findPriceByKey(stripe, getBasePriceKey(plan, interval));
+      const basePrice = await findPriceByKey(stripe, getBasePriceKey(plan, interval), "eur");
       const productId = typeof basePrice.product === "string"
         ? basePrice.product
         : basePrice.product.id;
@@ -74,6 +74,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const payload = await req.json();
+    const { plan, interval, user_id: userIdFromBody } = payload;
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -81,10 +84,17 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) throw new Error("User not authenticated");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    const { plan, interval } = await req.json();
+    let userId: string | null = null;
+    if (token === serviceRoleKey && typeof userIdFromBody === "string" && userIdFromBody.length > 0) {
+      userId = userIdFromBody;
+    } else {
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+      if (userError || !user) throw new Error("User not authenticated");
+      userId = user.id;
+    }
+
     if (!isSupportedPlan(plan)) throw new Error("Invalid plan");
     if (!["monthly", "yearly"].includes(interval)) throw new Error("Invalid interval");
 
@@ -99,7 +109,7 @@ serve(async (req) => {
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
       .select("stripe_subscription_id, stripe_customer_id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!sub?.stripe_subscription_id || !sub?.stripe_customer_id) {
@@ -107,7 +117,19 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: STRIPE_API_VERSION });
-    const currentSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+    let currentSub: Stripe.Subscription;
+    try {
+      currentSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+    } catch (error: any) {
+      const message = String(error?.message ?? "");
+      if (/No such subscription|resource_missing/i.test(message)) {
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ status: "canceled", metered_subscription_item_id: null })
+          .eq("user_id", userId);
+      }
+      throw error;
+    }
 
     const UPDATABLE = ["active", "trialing", "past_due"];
     if (!UPDATABLE.includes(currentSub.status)) {
@@ -119,8 +141,12 @@ serve(async (req) => {
       });
     }
 
-    const origin = req.headers.get("origin") || req.headers.get("referer") || "https://leadflow.es";
-    const returnUrl = `${origin.replace(/\/$/, "")}/profile`;
+    const headerOrigin = req.headers.get("x-app-origin")
+      || req.headers.get("origin")
+      || req.headers.get("referer")
+      || "http://localhost:3000";
+    const normalizedOrigin = headerOrigin.replace(/\/$/, "");
+    const returnUrl = `${normalizedOrigin}/profile`;
     let preparedSub: Stripe.Subscription | null = null;
 
     try {
@@ -134,7 +160,23 @@ serve(async (req) => {
       }
 
       const baseItem = preparedSub.items.data[0];
-      const targetPrice = await findPriceByKey(stripe, getBasePriceKey(selectedPlan, billingInterval));
+      const targetPrice = await findPriceByKey(stripe, getBasePriceKey(selectedPlan, billingInterval), "eur");
+
+      // Stripe throws "no changes to confirm" if target price is already active.
+      // Treat this as a successful no-op to avoid surfacing a 500 to the UI.
+      if (baseItem.price?.id === targetPrice.id && (baseItem.quantity ?? 1) === 1) {
+        return new Response(JSON.stringify({
+          ok: true,
+          alreadyOnTargetPlan: true,
+          plan: selectedPlan,
+          interval: billingInterval,
+          message: "Subscription already matches selected plan.",
+          portalUrl: returnUrl,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
 
       const configurationId = await createUpgradePortalConfiguration(stripe, billingInterval, selectedPlan);
 

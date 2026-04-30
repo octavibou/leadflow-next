@@ -9,6 +9,7 @@ import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { PLANS } from "@/lib/pricing";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { PlasticButton } from "@/components/ui/plastic-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,7 @@ import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAppAssistant } from "@/contexts/AppAssistantContext";
 
 const tabs = [
   { label: "Funnels", path: "/dashboard", icon: Lightning },
@@ -47,6 +49,7 @@ export function TopNav() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const { open: assistantOpen, setOpen: setAssistantOpen } = useAppAssistant();
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -108,7 +111,7 @@ export function TopNav() {
   };
 
   return (
-    <header className="h-14 border-b bg-background flex items-center px-4 gap-6 shrink-0">
+    <header className="h-14 flex items-center px-4 gap-6 shrink-0 bg-zinc-900 text-zinc-100">
       {/* Left section with Workspace */}
       <div className="flex items-center gap-2">
         {/* Workspace Switcher */}
@@ -140,17 +143,17 @@ export function TopNav() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="gap-2 font-medium text-sm px-2 h-9"
+                className="gap-2 font-medium text-sm px-2 h-9 text-zinc-100 hover:bg-zinc-800 hover:text-white"
                 onClick={(e) => {
                   e.preventDefault();
                   handleWorkspaceClick();
                 }}
               >
-                <div className="h-6 w-6 rounded-md bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="h-6 w-6 rounded-lg bg-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
                   {currentWorkspace?.logo_url ? (
                     <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-semibold text-primary">
+                    <span className="text-xs font-semibold text-zinc-100">
                       {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
                     </span>
                   )}
@@ -158,7 +161,7 @@ export function TopNav() {
                 <span className="max-w-[160px] truncate">
                   {currentWorkspace?.name || "Workspace"}
                 </span>
-                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" weight="bold" />
+                <CaretDown className="h-3.5 w-3.5 text-zinc-400" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
@@ -172,7 +175,7 @@ export function TopNav() {
                     ws.id === currentWorkspaceId && "bg-accent"
                   )}
                 >
-                  <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                  <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="text-xs font-semibold text-primary">
                       {ws.name.charAt(0).toUpperCase()}
                     </span>
@@ -193,40 +196,38 @@ export function TopNav() {
       </div>
 
       {/* Center tabs */}
-      <nav className="flex items-center gap-1 flex-1 justify-center">
+      <nav className="flex items-center gap-1.5 flex-1 justify-center">
         {tabs.map((tab) => {
-          const isExternal = !!(tab as any).external;
-          const active = !isExternal && pathname === tab.path;
+          const active = pathname === tab.path;
           const disabled = !!(tab as any).soon;
           const Icon = tab.icon;
+          
+          if (active) {
+            return (
+              <PlasticButton
+                key={tab.label}
+                variant="primary"
+                onClick={() => router.push(tab.path)}
+                className="h-8 px-3"
+              >
+                <Icon className="h-3.5 w-3.5" weight="fill" />
+                {tab.label}
+              </PlasticButton>
+            );
+          }
           
           return (
             <Button
               key={tab.label}
-              variant={active ? "default" : "ghost"}
-              size="sm"
-              onClick={() => {
-                if (disabled) return;
-                if (isExternal) {
-                  window.open(tab.path, "_blank", "noopener,noreferrer");
-                } else {
-                  router.push(tab.path);
-                }
-              }}
+              variant="ghost"
+              onClick={() => !disabled && router.push(tab.path)}
               disabled={disabled}
-              className={cn(
-                "gap-1.5 h-8 rounded-md px-3 font-medium text-sm transition-colors",
-                disabled
-                  ? "text-muted-foreground/40 cursor-not-allowed"
-                  : active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
+              className="h-8 px-3 gap-2 text-zinc-400 hover:text-white hover:bg-zinc-800"
             >
-              <Icon className="h-3.5 w-3.5" weight={active ? "fill" : "bold"} />
+              <Icon className="h-3.5 w-3.5" weight="bold" />
               {tab.label}
               {disabled && (
-                <span className="text-[9px] bg-muted text-muted-foreground/60 rounded px-1.5 py-0.5 font-medium ml-0.5">soon</span>
+                <span className="text-[9px] bg-white/20 text-white/60 rounded px-1.5 py-0.5 font-medium ml-0.5">soon</span>
               )}
             </Button>
           );
@@ -236,24 +237,31 @@ export function TopNav() {
       {/* Right section */}
       <div className="flex items-center gap-2">
         {/* Academy button */}
-        <button
-          className="relative group"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
+          className="h-8 w-8 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
         >
-          <div className="p-2 hover:bg-muted rounded-md transition-colors">
-            <GraduationCap className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" weight="bold" />
-          </div>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-popover text-popover-foreground text-xs font-medium rounded shadow-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
-            Skool
-          </div>
-        </button>
+          <GraduationCap className="h-4 w-4" weight="bold" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setAssistantOpen(!assistantOpen)}
+          className="h-8 w-8 rounded-lg text-zinc-200 hover:bg-zinc-800 hover:text-white"
+          aria-label={assistantOpen ? "Cerrar asistente" : "Abrir asistente"}
+        >
+          <Sparkle className="h-4 w-4" weight="fill" />
+        </Button>
 
         {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold">
+            <Button variant="ghost" size="icon" className="rounded-lg hover:bg-zinc-800">
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold rounded-lg">
                   {initials}
                 </AvatarFallback>
               </Avatar>

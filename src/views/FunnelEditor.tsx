@@ -2,17 +2,13 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
 import { EditorSidebar } from "@/components/editor/EditorSidebar";
 import { EditorCanvas } from "@/components/editor/EditorCanvas";
 import { EditorProperties } from "@/components/editor/EditorProperties";
 import { EditorTopBar } from "@/components/editor/EditorTopBar";
-import { GlobalSettingsSheet } from "@/components/editor/GlobalSettingsSheet";
-import { WebhookTab } from "@/components/editor/WebhookTab";
-import { TrackingTab } from "@/components/editor/TrackingTab";
-import { PublishTab } from "@/components/editor/PublishTab";
-import { CampaignsTab } from "@/components/editor/CampaignsTab";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DeviceMobile } from "@phosphor-icons/react";
@@ -21,6 +17,31 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FunnelStep, StepType } from "@/types/funnel";
 
 export type EditorTab = "funnel" | "ab_test" | "webhook" | "tracking" | "publish" | "metrics";
+
+const GlobalSettingsSheet = dynamic(
+  () => import("@/components/editor/GlobalSettingsSheet").then((m) => m.GlobalSettingsSheet),
+  { ssr: false }
+);
+const WebhookTab = dynamic(
+  () => import("@/components/editor/WebhookTab").then((m) => m.WebhookTab),
+  { ssr: false }
+);
+const TrackingTab = dynamic(
+  () => import("@/components/editor/TrackingTab").then((m) => m.TrackingTab),
+  { ssr: false }
+);
+const PublishTab = dynamic(
+  () => import("@/components/editor/PublishTab").then((m) => m.PublishTab),
+  { ssr: false }
+);
+const CampaignsTab = dynamic(
+  () => import("@/components/editor/CampaignsTab").then((m) => m.CampaignsTab),
+  { ssr: false }
+);
+const FunnelMetricsTab = dynamic(
+  () => import("@/components/editor/FunnelMetricsTab").then((m) => m.FunnelMetricsTab),
+  { ssr: false }
+);
 
 const FunnelEditor = () => {
   const params = useParams();
@@ -50,10 +71,11 @@ const FunnelEditor = () => {
   }, [funnelId, funnel, fetchFunnels]);
 
   useEffect(() => {
-    if (funnelId) {
+    // Campaign data is only needed in the A/B testing tab.
+    if (activeTab === "ab_test" && funnelId) {
       fetchCampaigns(funnelId);
     }
-  }, [funnelId, fetchCampaigns]);
+  }, [activeTab, funnelId, fetchCampaigns]);
 
   const handleUpdateStep = useCallback((stepId: string, updates: Partial<FunnelStep>) => {
     if (!funnel) return;
@@ -188,11 +210,7 @@ const FunnelEditor = () => {
 
       {activeTab === "metrics" && (
         <ScrollArea className="flex-1">
-          <div className="p-6 max-w-5xl mx-auto">
-            <div className="text-center text-muted-foreground py-8">
-              Las métricas avanzadas están disponibles en la sección de Analytics. Haz clic en el botón "Analytics" en la navegación principal.
-            </div>
-          </div>
+          <FunnelMetricsTab funnel={funnel} />
         </ScrollArea>
       )}
 

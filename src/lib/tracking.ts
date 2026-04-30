@@ -1,5 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const FUNNEL_SESSION_STORAGE_KEY = "leadflow_funnel_session_id";
+
+export function getOrCreateFunnelSessionId(): string {
+  if (typeof window === "undefined") {
+    return crypto.randomUUID();
+  }
+
+  const existing = window.localStorage.getItem(FUNNEL_SESSION_STORAGE_KEY);
+  if (existing) return existing;
+
+  const created = crypto.randomUUID();
+  window.localStorage.setItem(FUNNEL_SESSION_STORAGE_KEY, created);
+  return created;
+}
+
 // ---- Internal event tracking ----
 export function trackEvent(
   funnelId: string,
@@ -35,9 +50,17 @@ export async function saveLead(
       result,
       metadata: metadata as any,
     });
-  
+
   if (error) {
     console.error("[v0] Error saving lead:", error);
+    return;
+  }
+
+  if (typeof window !== "undefined") {
+    void fetch("/api/billing/process-lead-usage", {
+      method: "POST",
+      keepalive: true,
+    }).catch(() => {});
   }
 }
 

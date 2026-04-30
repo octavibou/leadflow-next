@@ -1,11 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   STRIPE_API_VERSION,
   STRIPE_CATALOG_NAMESPACE,
   LEGACY_CATALOG_NAMESPACE_PREFIX,
-  YEARLY_DISCOUNT_FACTOR,
+  EUR_TO_USD_RATE,
   SUPPORTED_PLANS,
   type SupportedPlan,
   buildBaseDescription,
@@ -14,6 +13,10 @@ import {
   getOveragePriceKey,
   getPlanConfig,
 } from "../_shared/stripe-plans.ts";
+
+function eurToUsdCents(eurCents: number): number {
+  return Math.round(eurCents * EUR_TO_USD_RATE);
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +27,10 @@ const VALID_PRICE_KEYS = new Set(
   SUPPORTED_PLANS.flatMap((plan) => [
     getBasePriceKey(plan, "monthly"),
     getBasePriceKey(plan, "yearly"),
-    getOveragePriceKey(plan),
+    getOveragePriceKey(plan, "monthly"),
+    getOveragePriceKey(plan, "yearly"),
+    // Legacy keys (without interval suffix)
+    `${plan}_overage`,
   ]),
 );
 
@@ -92,112 +98,130 @@ async function detachDefaultPrice(stripe: Stripe, product: Stripe.Product): Prom
   }
 }
 
-async function normalizeOverageProduct(
+async function findOrCreateOveragePrice(
   stripe: Stripe,
-  product: Stripe.Product,
-  canonicalPrice: Stripe.Price,
+  productId: string,
   plan: SupportedPlan,
-): Promise<number> {
+  interval: "monthly" | "yearly",
+): Promise<string> {
   const config = getPlanConfig(plan);
-  let archivedPrices = 0;
-
-  await detachDefaultPrice(stripe, product);
-  await stripe.products.update(product.id, {
-    name: config.overageName,
-    description: buildOverageDescription(plan),
-    metadata: {
-      ...(product.metadata ?? {}),
-      lf_namespace: STRIPE_CATALOG_NAMESPACE,
-      lf_product: config.overageProductKey,
-      lf_kind: "plan_overage_product",
-      lf_plan: plan,
-    },
+  const priceKey = getOveragePriceKey(plan, interval);
+  
+  const search = await stripe.prices.search({
+    query: `product:'${productId}' AND metadata['lf_price_key']:'${priceKey}' AND active:'true'`,
+    limit: 1,
   });
 
-  await stripe.prices.update(canonicalPrice.id, {
-    metadata: {
-      ...(canonicalPrice.metadata ?? {}),
-      lf_namespace: STRIPE_CATALOG_NAMESPACE,
-      lf_price_key: getOveragePriceKey(plan),
-      lf_kind: "plan_overage",
-      lf_plan: plan,
-    },
-    nickname: `${config.baseName} Overage (per lead)`,
-  });
-
-  const prices = await listActivePricesForProduct(stripe, product.id);
-  for (const price of prices) {
-    if (price.id === canonicalPrice.id) continue;
-    if (!isCatalogPrice(price)) continue;
-    if (await archivePrice(stripe, price.id)) archivedPrices++;
+  if (search.data.length > 0) {
+    const existingPrice = search.data[0];
+    const hasCurrencyOptions = existingPrice.currency_options && Object.keys(existingPrice.currency_options).length > 0;
+    if (!hasCurrencyOptions) {
+      await stripe.prices.update(existingPrice.id, {
+        currency_options: {
+          usd: {
+            unit_amount: eurToUsdCents(config.overageCents),
+            tax_behavior: "inclusive",
+          },
+        },
+      });
+    }
+    return existingPrice.id;
   }
 
-  return archivedPrices;
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: config.overageCents,
+    currency: "eur",
+    currency_options: {
+      usd: {
+        unit_amount: eurToUsdCents(config.overageCents),
+        tax_behavior: "inclusive",
+      },
+    },
+    recurring: {
+      interval: interval === "yearly" ? "year" : "month",
+      usage_type: "metered",
+      aggregate_usage: "sum",
+    },
+    tax_behavior: "inclusive",
+    nickname: `${config.baseName} Overage ${interval === "yearly" ? "Yearly" : "Monthly"} (per lead)`,
+    metadata: {
+      lf_namespace: STRIPE_CATALOG_NAMESPACE,
+      lf_price_key: priceKey,
+      lf_kind: "plan_overage",
+      lf_plan: plan,
+      lf_interval: interval,
+    },
+  });
+
+  return price.id;
 }
 
-async function ensureCanonicalOverageCatalog(stripe: Stripe): Promise<{
-  archivedPrices: number;
-  createdProducts: number;
-  keptProducts: number;
-  overageByPlan: Record<SupportedPlan, { priceId: string; productId: string }>;
-}> {
-  const overageByPlan = {} as Record<SupportedPlan, { priceId: string; productId: string }>;
-  let archivedPrices = 0;
-  let createdProducts = 0;
-  let keptProducts = 0;
+async function findOrCreateOverageProduct(stripe: Stripe, plan: SupportedPlan): Promise<string> {
+  const config = getPlanConfig(plan);
+  const search = await stripe.products.search({
+    query: `metadata['lf_namespace']:'${STRIPE_CATALOG_NAMESPACE}' AND metadata['lf_product']:'${config.overageProductKey}' AND active:'true'`,
+    limit: 1,
+  });
 
-  for (const plan of SUPPORTED_PLANS) {
-    const search = await stripe.prices.search({
-      query: `metadata['lf_price_key']:'${getOveragePriceKey(plan)}' AND active:'true'`,
-      limit: 100,
-    });
-
-    const [canonicalPrice, ...duplicates] = search.data;
-    for (const duplicate of duplicates) {
-      if (await archivePrice(stripe, duplicate.id)) archivedPrices++;
-    }
-
-    if (canonicalPrice) {
-      const productId = typeof canonicalPrice.product === "string"
-        ? canonicalPrice.product
-        : canonicalPrice.product.id;
-      const product = await stripe.products.retrieve(productId);
-      archivedPrices += await normalizeOverageProduct(stripe, product, canonicalPrice, getPlanFromPrice(canonicalPrice) ?? plan);
-      keptProducts++;
-      overageByPlan[plan] = { priceId: canonicalPrice.id, productId };
-      continue;
-    }
-
-    const config = getPlanConfig(plan);
-    const product = await stripe.products.create({
+  if (search.data.length > 0) {
+    const product = search.data[0];
+    await stripe.products.update(product.id, {
       name: config.overageName,
       description: buildOverageDescription(plan),
       metadata: {
+        ...(product.metadata ?? {}),
         lf_namespace: STRIPE_CATALOG_NAMESPACE,
         lf_product: config.overageProductKey,
         lf_kind: "plan_overage_product",
         lf_plan: plan,
       },
     });
-    const price = await stripe.prices.create({
-      product: product.id,
-      unit_amount: config.overageCents,
-      currency: "eur",
-      recurring: { interval: "month", usage_type: "metered", aggregate_usage: "sum" },
-      tax_behavior: "inclusive",
-      nickname: `${config.baseName} Overage (per lead)`,
-      metadata: {
-        lf_namespace: STRIPE_CATALOG_NAMESPACE,
-        lf_price_key: getOveragePriceKey(plan),
-        lf_kind: "plan_overage",
-        lf_plan: plan,
-      },
-    });
-    createdProducts++;
-    overageByPlan[plan] = { priceId: price.id, productId: product.id };
+    return product.id;
   }
 
-  return { archivedPrices, createdProducts, keptProducts, overageByPlan };
+  const product = await stripe.products.create({
+    name: config.overageName,
+    description: buildOverageDescription(plan),
+    metadata: {
+      lf_namespace: STRIPE_CATALOG_NAMESPACE,
+      lf_product: config.overageProductKey,
+      lf_kind: "plan_overage_product",
+      lf_plan: plan,
+    },
+  });
+  return product.id;
+}
+
+async function ensureCanonicalOverageCatalog(stripe: Stripe): Promise<{
+  archivedPrices: number;
+  createdProducts: number;
+  overageByPlan: Record<SupportedPlan, { monthlyPriceId: string; yearlyPriceId: string; productId: string }>;
+}> {
+  const overageByPlan = {} as Record<SupportedPlan, { monthlyPriceId: string; yearlyPriceId: string; productId: string }>;
+  let archivedPrices = 0;
+  let createdProducts = 0;
+
+  for (const plan of SUPPORTED_PLANS) {
+    const productId = await findOrCreateOverageProduct(stripe, plan);
+    
+    // Archive legacy overage prices (without interval suffix)
+    const legacySearch = await stripe.prices.search({
+      query: `metadata['lf_price_key']:'${plan}_overage' AND active:'true'`,
+      limit: 100,
+    });
+    for (const legacyPrice of legacySearch.data) {
+      if (await archivePrice(stripe, legacyPrice.id)) archivedPrices++;
+    }
+
+    const monthlyPriceId = await findOrCreateOveragePrice(stripe, productId, plan, "monthly");
+    const yearlyPriceId = await findOrCreateOveragePrice(stripe, productId, plan, "yearly");
+
+    overageByPlan[plan] = { monthlyPriceId, yearlyPriceId, productId };
+    createdProducts++;
+  }
+
+  return { archivedPrices, createdProducts, overageByPlan };
 }
 
 async function archiveCatalogBaseArtifacts(
@@ -291,16 +315,48 @@ async function findOrCreateBasePrice(
     limit: 1,
   });
 
-  if (search.data.length > 0) return search.data[0].id;
-
-  const amount = interval === "yearly"
-    ? Math.round(config.baseMonthlyCents * YEARLY_DISCOUNT_FACTOR * 12)
+  const amountEur = interval === "yearly"
+    ? config.baseYearlyCents
     : config.baseMonthlyCents;
+  const amountUsd = eurToUsdCents(amountEur);
+
+  if (search.data.length > 0) {
+    const existingPrice = search.data[0];
+    
+    // If amount matches, just ensure currency_options exist
+    if (existingPrice.unit_amount === amountEur) {
+      const hasCurrencyOptions = existingPrice.currency_options && Object.keys(existingPrice.currency_options).length > 0;
+      if (!hasCurrencyOptions) {
+        try {
+          await stripe.prices.update(existingPrice.id, {
+            currency_options: {
+              usd: {
+                unit_amount: amountUsd,
+                tax_behavior: "inclusive",
+              },
+            },
+          });
+        } catch {
+          // Ignore currency_options update errors
+        }
+      }
+      return existingPrice.id;
+    }
+    
+    // Amount changed - archive old price and create new one
+    await stripe.prices.update(existingPrice.id, { active: false });
+  }
 
   return (await stripe.prices.create({
     product: productId,
-    unit_amount: amount,
+    unit_amount: amountEur,
     currency: "eur",
+    currency_options: {
+      usd: {
+        unit_amount: amountUsd,
+        tax_behavior: "inclusive",
+      },
+    },
     recurring: { interval: interval === "yearly" ? "year" : "month" },
     tax_behavior: "inclusive",
     nickname: `${config.baseName} ${interval === "yearly" ? "Yearly" : "Monthly"}`,
@@ -319,26 +375,22 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) throw new Error("User not authenticated");
-
+    // Admin-only setup function - no auth required (called manually)
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: STRIPE_API_VERSION });
 
     const url = new URL(req.url);
     const cleanCatalog = url.searchParams.get("clean") !== "false";
     const overageCatalog = await ensureCanonicalOverageCatalog(stripe);
+    // Resolve canonical base product ids before cleanup so we never archive their prices (only overage was preserved before = bug)
+    const baseProductIds = await Promise.all(
+      SUPPORTED_PLANS.map((plan) => findOrCreateBaseProduct(stripe, plan)),
+    );
+    const preservedProductIds = new Set<string>([
+      ...Object.values(overageCatalog.overageByPlan).map((e) => e.productId),
+      ...baseProductIds,
+    ]);
     const cleanup = cleanCatalog
-      ? await archiveCatalogBaseArtifacts(
-        stripe,
-        new Set(Object.values(overageCatalog.overageByPlan).map((entry) => entry.productId)),
-      )
+      ? await archiveCatalogBaseArtifacts(stripe, preservedProductIds)
       : { productsArchived: 0, pricesArchived: 0 };
 
     const results: Array<Record<string, unknown>> = [];
@@ -355,7 +407,8 @@ serve(async (req) => {
         baseProductId,
         monthlyPriceId,
         yearlyPriceId,
-        meteredPriceId: overage.priceId,
+        meteredMonthlyPriceId: overage.monthlyPriceId,
+        meteredYearlyPriceId: overage.yearlyPriceId,
         overageProductId: overage.productId,
         leadsIncluded: config.leadsIncluded,
         overageCents: config.overageCents,
@@ -368,7 +421,6 @@ serve(async (req) => {
         ...cleanup,
         pricesArchived: cleanup.pricesArchived + overageCatalog.archivedPrices,
         overageProductsCreated: overageCatalog.createdProducts,
-        overageProductsKept: overageCatalog.keptProducts,
       },
       plans: results,
     }), {

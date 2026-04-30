@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload, X, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, Upload, X, Trash, MagnifyingGlass, Users } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TeamMembers } from "@/components/workspace/TeamMembers";
+import { cn } from "@/lib/utils";
 
 export default function WorkspaceSettings() {
   const router = useRouter();
@@ -33,6 +34,8 @@ export default function WorkspaceSettings() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeSection, setActiveSection] = useState<"general" | "team" | "danger">("general");
+  const [navQuery, setNavQuery] = useState("");
 
   useEffect(() => {
     if (workspace) {
@@ -106,126 +109,211 @@ export default function WorkspaceSettings() {
 
   if (!workspace) return null;
 
+  const sections: Array<{
+    id: "general" | "team" | "danger";
+    label: string;
+    description: string;
+    icon: any;
+  }> = [
+    { id: "general", label: "General", description: "Nombre e imagen del workspace", icon: null },
+    { id: "team", label: "Usuarios", description: "Miembros y permisos", icon: Users },
+    { id: "danger", label: "Zona de peligro", description: "Acciones irreversibles", icon: Trash },
+  ];
+
+  const filteredSections = sections.filter((s) => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return true;
+    return `${s.label} ${s.description}`.toLowerCase().includes(q);
+  });
+
+  const pageTitle = "Configuración";
+  const pageSubtitle = workspace.name;
+
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <Button variant="ghost" className="mb-4 gap-2" onClick={() => router.push("/dashboard")}>
-        <ArrowLeft className="h-4 w-4" weight="bold" /> Volver
-      </Button>
+    <div className="mx-auto w-full max-w-6xl p-6">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Button
+            variant="ghost"
+            className="mb-2 -ml-2 gap-2 px-2"
+            onClick={() => router.push("/dashboard")}
+          >
+            <ArrowLeft className="h-4 w-4" weight="bold" /> Volver
+          </Button>
+          <h1 className="text-2xl font-bold leading-tight">{pageTitle}</h1>
+          <p className="text-sm text-muted-foreground truncate">{pageSubtitle}</p>
+        </div>
+      </div>
 
-      <h1 className="text-2xl font-bold mb-6">Configuración del Workspace</h1>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>Nombre y logo de tu workspace</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Logo</Label>
-            <div className="flex items-center gap-4">
-              {logoUrl ? (
-                <div className="relative h-16 w-16 rounded-xl border overflow-hidden bg-muted">
-                  <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                  <button
-                    onClick={handleRemoveLogo}
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                  >
-                    <X className="h-3 w-3" weight="bold" />
-                  </button>
-                </div>
-              ) : (
-                <div className="h-16 w-16 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
-                  <span className="text-2xl font-bold text-muted-foreground">
-                    {workspace.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="gap-2"
-                >
-                  <Upload className="h-4 w-4" weight="bold" />
-                  {uploading ? "Subiendo..." : "Subir logo"}
-                </Button>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG. Máx 2MB</p>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleUploadLogo}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ws-name">Nombre</Label>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[18rem_1fr]">
+        {/* Sidebar */}
+        <aside className="rounded-lg border bg-background p-3">
+          <div className="relative">
+            <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" weight="bold" />
             <Input
-              id="ws-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre del workspace"
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Buscar…"
+              className="h-9 pl-9"
             />
           </div>
-
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <TeamMembers workspaceId={workspace.id} />
-
-      <Card className="border-destructive/50 mt-6">
-        <CardHeader>
-          <CardTitle className="text-destructive">Zona de peligro</CardTitle>
-          <CardDescription>
-            Eliminar este workspace borrará todos los funnels, leads y configuraciones asociadas. Esta acción no se puede deshacer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="gap-2" disabled={workspaces.length <= 1}>
-                <Trash className="h-4 w-4" weight="bold" /> Eliminar workspace
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Eliminar "{workspace.name}"?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se eliminarán permanentemente todos los funnels, campañas, leads y datos de este workspace. Esta acción no se puede deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={async () => {
-                    const ok = await deleteWorkspace(workspace.id);
-                    if (ok) {
-                      toast.success("Workspace eliminado");
-                      router.push("/dashboard");
-                    } else {
-                      toast.error("Error al eliminar el workspace");
-                    }
-                  }}
+          <div className="mt-3 space-y-1">
+            {filteredSections.map((s) => {
+              const Icon = s.icon;
+              const active = s.id === activeSection;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActiveSection(s.id)}
+                  className={cn(
+                    "w-full rounded-md px-3 py-2 text-left transition",
+                    active ? "bg-muted" : "hover:bg-muted/60"
+                  )}
                 >
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          {workspaces.length <= 1 && (
-            <p className="text-xs text-muted-foreground mt-2">No puedes eliminar tu único workspace.</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        {Icon ? <Icon className="h-4 w-4 text-muted-foreground" weight="bold" /> : null}
+                        {s.label}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                        {s.description}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Content */}
+        <section className="min-w-0 space-y-6">
+          {activeSection === "general" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>General</CardTitle>
+                <CardDescription>Nombre y logo de tu workspace</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Logo</Label>
+                  <div className="flex items-center gap-4">
+                    {logoUrl ? (
+                      <div className="relative h-16 w-16 rounded-xl border overflow-hidden bg-muted">
+                        <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                        <button
+                          onClick={handleRemoveLogo}
+                          className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                          aria-label="Quitar logo"
+                          type="button"
+                        >
+                          <X className="h-3 w-3" weight="bold" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="h-16 w-16 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
+                        <span className="text-2xl font-bold text-muted-foreground">
+                          {workspace.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="gap-2"
+                      >
+                        <Upload className="h-4 w-4" weight="bold" />
+                        {uploading ? "Subiendo..." : "Subir logo"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG. Máx 2MB</p>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleUploadLogo}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ws-name">Nombre</Label>
+                  <Input
+                    id="ws-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nombre del workspace"
+                  />
+                </div>
+
+                <Button onClick={handleSave} disabled={saving || !name.trim()}>
+                  {saving ? "Guardando..." : "Guardar cambios"}
+                </Button>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+
+          {activeSection === "team" && (
+            <div className="space-y-6">
+              <TeamMembers workspaceId={workspace.id} />
+            </div>
+          )}
+
+          {activeSection === "danger" && (
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Zona de peligro</CardTitle>
+                <CardDescription>
+                  Eliminar este workspace borrará todos los funnels, leads y configuraciones asociadas. Esta acción no se puede deshacer.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="gap-2" disabled={workspaces.length <= 1}>
+                      <Trash className="h-4 w-4" weight="bold" /> Eliminar workspace
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar "{workspace.name}"?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se eliminarán permanentemente todos los funnels, campañas, leads y datos de este workspace. Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          const ok = await deleteWorkspace(workspace.id);
+                          if (ok) {
+                            toast.success("Workspace eliminado");
+                            router.push("/dashboard");
+                          } else {
+                            toast.error("Error al eliminar el workspace");
+                          }
+                        }}
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                {workspaces.length <= 1 && (
+                  <p className="text-xs text-muted-foreground mt-2">No puedes eliminar tu único workspace.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

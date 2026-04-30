@@ -4,7 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Trash, Plus, Eye, Calculator, BarChart } from "@phosphor-icons/react";
+import { Trash, Plus, Eye, Calculator } from "@phosphor-icons/react";
+import { BarChart } from "lucide-react";
 import type { Funnel, FunnelStep, ResultFormula, MetricCard, ResultCtaConfig, CtaAction } from "@/types/funnel";
 import { evaluateFormulas, generateSampleContext, interpolate, formatNumber, collectVariables } from "@/lib/resultsEngine";
 

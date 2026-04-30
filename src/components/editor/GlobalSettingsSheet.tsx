@@ -8,7 +8,8 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFunnelStore } from "@/store/funnelStore";
 import { LANGUAGE_LABELS } from "@/lib/i18n";
-import { Copy, Check, CaretDown, Globe, Activity } from "@phosphor-icons/react";
+import { Copy, Check, CaretDown, Globe } from "@phosphor-icons/react";
+import { Activity } from "lucide-react";
 import type { Language } from "@/lib/i18n";
 import type { Funnel, FunnelSettings } from "@/types/funnel";
 

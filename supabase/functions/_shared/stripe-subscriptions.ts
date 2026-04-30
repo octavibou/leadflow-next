@@ -2,8 +2,10 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import {
   type BillingInterval,
   PORTAL_PENDING_UPGRADE_TTL_MS,
+  STRIPE_CATALOG_NAMESPACE,
   type SupportedPlan,
   getOveragePriceKey,
+  getExpectedProductKeyForLfPriceKey,
   isSupportedPlan,
 } from "./stripe-plans.ts";
 
@@ -13,17 +15,64 @@ export type PendingPortalUpgrade = {
   startedAtMs: number | null;
 };
 
-export async function findPriceByKey(stripe: Stripe, key: string): Promise<Stripe.Price> {
+const STARTER_CANONICAL_PRODUCT_ID = "prod_ULdxdZCd3IOivd";
+
+export async function findPriceByKey(stripe: Stripe, key: string, currency?: string): Promise<Stripe.Price> {
+  const currencyFilter = currency ? ` AND currency:'${currency.toLowerCase()}'` : "";
+  // Pin ONLY starter base prices to the canonical Starter product.
+  // Overage prices live on the dedicated overage product.
+  const isStarterBasePriceKey = key.startsWith("starter_base_");
+  const starterProductFilter = isStarterBasePriceKey ? ` AND product:'${STARTER_CANONICAL_PRODUCT_ID}'` : "";
   const search = await stripe.prices.search({
-    query: `metadata['lf_price_key']:'${key}' AND active:'true'`,
-    limit: 1,
+    query: `metadata['lf_price_key']:'${key}'${currencyFilter}${starterProductFilter} AND active:'true'`,
+    limit: 20,
   });
 
   if (search.data.length === 0) {
+    if (isStarterBasePriceKey) {
+      throw new Error(
+        `Price ${key} not found on starter canonical product ${STARTER_CANONICAL_PRODUCT_ID}. ` +
+          `Desarchiva ese precio en ese producto para usar siempre el mismo checkout.`,
+      );
+    }
     throw new Error(`Price ${key} not found.`);
   }
 
-  return search.data[0];
+  if (isStarterBasePriceKey) {
+    return search.data[0];
+  }
+
+  const expectedProduct = getExpectedProductKeyForLfPriceKey(key);
+  if (!expectedProduct) {
+    return search.data[0];
+  }
+
+  const withProduct = await Promise.all(
+    search.data.map(async (p) => {
+      return await stripe.prices.retrieve(p.id, { expand: ["product"] });
+    }),
+  );
+
+  const catalogMatches = withProduct.filter((p) => {
+    const product = p.product as Stripe.Product;
+    const meta = product?.metadata ?? {};
+    return (
+      meta.lf_namespace === STRIPE_CATALOG_NAMESPACE &&
+      meta.lf_product === expectedProduct
+    );
+  });
+
+  if (catalogMatches.length > 0) {
+    return catalogMatches[0];
+  }
+
+  // Do not fall back to a duplicate product: that splits subscribers across products in Stripe
+  // and breaks checkout branding. Typical cause: the canonical price is archived on the real
+  // product while a stray duplicate `lf_price_key` stays active on another product — fix in Dashboard.
+  throw new Error(
+    `No active price for "${key}" on catalog product (lf_namespace=${STRIPE_CATALOG_NAMESPACE}, lf_product=${expectedProduct}). ` +
+      `Unarchive the price on the correct product, or remove duplicate active prices. Found ${search.data.length} price(s) with this lf_price_key, none on the catalog product.`,
+  );
 }
 
 export function getItemMetadata(item: Stripe.SubscriptionItem): Record<string, string> {
@@ -62,21 +111,36 @@ export async function ensureMeteredItemMatchesBasePlan(
   const baseItem = subscription.items?.data.find((item) => getItemMetadata(item).lf_kind === "plan_base");
   if (!baseItem) return subscription;
 
-  const desiredPlan = getItemMetadata(baseItem).lf_plan;
+  const baseMetadata = getItemMetadata(baseItem);
+  const desiredPlan = baseMetadata.lf_plan;
+  const desiredInterval: BillingInterval = baseMetadata.lf_interval === "yearly" ? "yearly" : "monthly";
   if (!desiredPlan || !isSupportedPlan(desiredPlan)) return subscription;
 
-  const desiredMeteredPrice = await findPriceByKey(stripe, getOveragePriceKey(desiredPlan));
-  const meteredItem = subscription.items?.data.find((item) => getItemMetadata(item).lf_kind === "plan_overage");
+  const desiredMeteredPrice = await findPriceByKey(stripe, getOveragePriceKey(desiredPlan, desiredInterval), "eur");
+  const overageItems = subscription.items?.data.filter((item) => getItemMetadata(item).lf_kind === "plan_overage") ?? [];
 
-  if (meteredItem?.price?.id === desiredMeteredPrice.id) {
-    return subscription;
+  // Keep exactly one overage item, always aligned with base plan+interval.
+  // If duplicates exist, remove extras to avoid charging two overage prices.
+  const matchingItem = overageItems.find((item) => item.price?.id === desiredMeteredPrice.id) ?? null;
+
+  if (matchingItem) {
+    const extras = overageItems.filter((item) => item.id !== matchingItem.id);
+    for (const extra of extras) {
+      await stripe.subscriptionItems.del(extra.id, { clear_usage: true });
+    }
+    return await stripe.subscriptions.retrieve(subscription.id);
   }
 
-  if (meteredItem) {
-    await stripe.subscriptionItems.update(meteredItem.id, {
+  if (overageItems.length > 0) {
+    // Reuse first overage slot by updating price, then remove leftovers.
+    const [primary, ...extras] = overageItems;
+    await stripe.subscriptionItems.update(primary.id, {
       price: desiredMeteredPrice.id,
       proration_behavior: "none",
     });
+    for (const extra of extras) {
+      await stripe.subscriptionItems.del(extra.id, { clear_usage: true });
+    }
   } else {
     await stripe.subscriptionItems.create({
       subscription: subscription.id,

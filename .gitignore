@@ -33,6 +33,13 @@ pnpm-debug.log*
 # Vercel
 .vercel
 
+# Supabase CLI (estado local del enlace al proyecto)
+supabase/.temp/
+
+# Herramientas locales (no versionar)
+.claude/
+.lovable/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

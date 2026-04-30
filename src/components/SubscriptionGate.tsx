@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { PricingConfigurator } from "@/components/PricingConfigurator";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Loader2 } from "lucide-react";
-import type { PlanName, BillingInterval, Currency, PriceBreakdown } from "@/lib/pricing";
+import type { PlanName, BillingInterval, PriceBreakdown } from "@/lib/pricing";
 
 type SubRecord = {
   status: string;
@@ -65,7 +65,6 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const handleCheckout = async (selection: {
     plan: PlanName;
     interval: BillingInterval;
-    currency: Currency;
     breakdown: PriceBreakdown;
   }) => {
     setLoading(true);
@@ -125,7 +124,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       )}
-      <PricingConfigurator onCheckout={handleCheckout} loading={loading} />
+      <PricingConfigurator onCheckout={handleCheckout} loading={loading} fixedPlan="starter" />
     </div>
   );
 }

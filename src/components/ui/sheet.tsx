@@ -50,14 +50,17 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  /** Clases extra para el overlay (p. ej. misma duración que el panel). */
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  overlayClassName?: string
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}
@@ -72,8 +75,8 @@ function SheetContent({
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-4 right-4"
-              size="icon-sm"
+              className="absolute top-4 right-4 h-8 w-8"
+              size="icon"
             >
               <XIcon
               />

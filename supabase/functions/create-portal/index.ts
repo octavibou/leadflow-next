@@ -11,6 +11,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const payload = await req.json().catch(() => ({}));
+    const userIdFromBody = payload?.user_id;
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -20,8 +23,16 @@ serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) throw new Error("User not authenticated");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    let userId: string | null = null;
+
+    if (token === serviceRoleKey && typeof userIdFromBody === "string" && userIdFromBody.length > 0) {
+      userId = userIdFromBody;
+    } else {
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+      if (userError || !user) throw new Error("User not authenticated");
+      userId = user.id;
+    }
 
     // Get stripe_customer_id from DB
     const supabaseAdmin = createClient(
@@ -32,18 +43,37 @@ serve(async (req) => {
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
       .select("stripe_customer_id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
-    if (!sub?.stripe_customer_id) throw new Error("No Stripe customer found");
+    if (!sub?.stripe_customer_id) {
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ status: "canceled", metered_subscription_item_id: null })
+        .eq("user_id", userId);
+      throw new Error("No Stripe customer found");
+    }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: "2023-10-16" });
+    try {
+      await stripe.customers.retrieve(sub.stripe_customer_id);
+    } catch {
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({ status: "canceled", metered_subscription_item_id: null })
+        .eq("user_id", userId);
+      throw new Error("Stripe customer no longer exists");
+    }
 
-    const origin = req.headers.get("origin") || "https://embeddable-quiz.lovable.app";
+    const headerOrigin = req.headers.get("x-app-origin")
+      || req.headers.get("origin")
+      || req.headers.get("referer")
+      || "http://localhost:3000";
+    const origin = headerOrigin.replace(/\/$/, "");
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: `${origin}/dashboard`,
+      return_url: `${origin}/profile`,
     });
 
     return new Response(JSON.stringify({ url: portalSession.url }), {

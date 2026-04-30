@@ -41,6 +41,55 @@ const OVERAGE_BY_PLAN: Record<string, number> = {
   expand: 0.20,
 };
 
+type PlanLimitsSnapshot = {
+  limits: PlanLimits;
+  planName: string;
+  usage: PlanUsage;
+};
+
+const planLimitsCache = new Map<string, PlanLimitsSnapshot>();
+const inFlightLoads = new Map<string, Promise<PlanLimitsSnapshot>>();
+
+async function fetchPlanLimitsSnapshot(userId: string): Promise<PlanLimitsSnapshot> {
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("plan_name, plan_limits, leads_used_current_period")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const rawLimits = (sub?.plan_limits as { funnels?: number; workspaces?: number; seats?: number; leads?: number } | null) ?? null;
+  const limits: PlanLimits = {
+    funnels: rawLimits?.funnels ?? DEFAULT_LIMITS.funnels,
+    workspaces: rawLimits?.workspaces ?? DEFAULT_LIMITS.workspaces,
+    seats: rawLimits?.seats ?? DEFAULT_LIMITS.seats,
+    leads: rawLimits?.leads ?? DEFAULT_LIMITS.leads,
+  };
+
+  const { count: funnelCount } = await supabase
+    .from("funnels")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  const { count: workspaceCount } = await supabase
+    .from("workspaces")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", userId);
+
+  const leadsThisPeriod = sub?.leads_used_current_period ?? 0;
+  const usage: PlanUsage = {
+    funnels: funnelCount ?? 0,
+    workspaces: workspaceCount ?? 0,
+    leadsThisPeriod,
+    leadsThisMonth: leadsThisPeriod,
+  };
+
+  return {
+    limits,
+    planName: sub?.plan_name ?? "starter",
+    usage,
+  };
+}
+
 export function usePlanLimits(): UsePlanLimitsResult {
   const { user } = useAuthReady();
   const [limits, setLimits] = useState<PlanLimits>(DEFAULT_LIMITS);
@@ -54,42 +103,35 @@ export function usePlanLimits(): UsePlanLimitsResult {
 
     const load = async () => {
       setLoading(true);
+      const cacheKey = user.id;
 
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("plan_name, plan_limits, leads_used_current_period")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      if (refreshKey === 0) {
+        const cached = planLimitsCache.get(cacheKey);
+        if (cached) {
+          setLimits(cached.limits);
+          setPlanName(cached.planName);
+          setUsage(cached.usage);
+          setLoading(false);
+          return;
+        }
+      }
 
-      const rawLimits = (sub?.plan_limits as { funnels?: number; workspaces?: number; seats?: number; leads?: number } | null) ?? null;
-      const planLimits: PlanLimits = {
-        funnels: rawLimits?.funnels ?? DEFAULT_LIMITS.funnels,
-        workspaces: rawLimits?.workspaces ?? DEFAULT_LIMITS.workspaces,
-        seats: rawLimits?.seats ?? DEFAULT_LIMITS.seats,
-        leads: rawLimits?.leads ?? DEFAULT_LIMITS.leads,
-      };
-      setLimits(planLimits);
-      setPlanName(sub?.plan_name ?? "starter");
+      let request = inFlightLoads.get(cacheKey);
+      if (!request) {
+        request = fetchPlanLimitsSnapshot(cacheKey);
+        inFlightLoads.set(cacheKey, request);
+      }
 
-      const { count: funnelCount } = await supabase
-        .from("funnels")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      const { count: workspaceCount } = await supabase
-        .from("workspaces")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id);
-
-      const leadsThisPeriod = sub?.leads_used_current_period ?? 0;
-
-      setUsage({
-        funnels: funnelCount ?? 0,
-        workspaces: workspaceCount ?? 0,
-        leadsThisPeriod,
-        leadsThisMonth: leadsThisPeriod,
-      });
-      setLoading(false);
+      try {
+        const snapshot = await request;
+        planLimitsCache.set(cacheKey, snapshot);
+        setLimits(snapshot.limits);
+        setPlanName(snapshot.planName);
+        setUsage(snapshot.usage);
+      } finally {
+        inFlightLoads.delete(cacheKey);
+        setLoading(false);
+      }
     };
 
     load();
@@ -110,6 +152,9 @@ export function usePlanLimits(): UsePlanLimitsResult {
     canGenerateLead: true,
     leadOveragePrice: overagePrice,
     overageAmount,
-    refresh: () => setRefreshKey((k) => k + 1),
+    refresh: () => {
+      if (user?.id) planLimitsCache.delete(user.id);
+      setRefreshKey((k) => k + 1);
+    },
   };
 }
