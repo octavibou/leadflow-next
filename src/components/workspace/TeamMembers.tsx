@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthReady } from "@/hooks/useAuthReady";
 import { toast } from "sonner";
 import type { WorkspaceRole } from "@/store/workspaceStore";
 
@@ -43,8 +44,13 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("editor");
   const [sending, setSending] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { canInviteMember, refresh: refreshPlanLimits } = usePlanLimits();
+  const { user, isReady: authReady } = useAuthReady();
+  const currentUserId = user?.id ?? null;
+  const {
+    canInviteMember,
+    inviteBlockedBySeats,
+    refresh: refreshPlanLimits,
+  } = usePlanLimits();
 
   const loadData = useCallback(async () => {
     const { data: membersData } = await supabase
@@ -77,11 +83,14 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
 
   useEffect(() => {
     loadData();
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
   }, [loadData]);
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
+    if (!authReady || !currentUserId) {
+      toast.error("Sesion no disponible. Recarga la pagina.");
+      return;
+    }
     if (!canInviteMember) {
       toast.error("Has alcanzado el número de asientos de tu plan");
       return;
@@ -162,7 +171,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   };
 
   const inviteDisabled =
-    sending || !inviteEmail.trim() || !canInviteMember || !currentUserId;
+    sending || !inviteEmail.trim() || !authReady || !canInviteMember || !currentUserId;
 
   const handleCancelInvitation = async (id: string) => {
     await supabase.from("workspace_invitations").delete().eq("id", id);
@@ -219,6 +228,12 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
             {sending ? "Enviando..." : "Invitar"}
           </Button>
         </div>
+        {inviteBlockedBySeats ? (
+          <p className="text-sm text-muted-foreground">
+            Has alcanzado el limite de asientos de tu plan para este workspace. Revisa tu suscripcion para
+            invitar mas personas.
+          </p>
+        ) : null}
 
         {/* Unified team list: members + pending invitations */}
         {(members.length > 0 || invitations.length > 0) && (

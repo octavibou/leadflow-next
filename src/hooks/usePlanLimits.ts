@@ -24,7 +24,10 @@ export interface UsePlanLimitsResult {
   planName: string;
   loading: boolean;
   canCreateFunnel: boolean;
+  /** Optimista mientras llega el RPC de asientos; tras error del RPC permite intentar (RLS sigue vigente). */
   canInviteMember: boolean;
+  inviteBlockedBySeats: boolean;
+  seatsInviteChecking: boolean;
   canCreateWorkspace: boolean;
   canGenerateLead: boolean;  // always true: leads now overage-billed, never blocked
   leadOveragePrice: number;
@@ -102,35 +105,41 @@ export function usePlanLimits(): UsePlanLimitsResult {
   const [refreshKey, setRefreshKey] = useState(0);
   const [seatInvite, setSeatInvite] = useState<{
     loading: boolean;
-    canInviteMember: boolean;
-  }>({ loading: true, canInviteMember: false });
+    allowed: boolean;
+    rpcFailed: boolean;
+  }>({ loading: true, allowed: true, rpcFailed: false });
 
   useEffect(() => {
     if (!currentWorkspaceId) {
-      setSeatInvite({ loading: false, canInviteMember: false });
+      setSeatInvite({ loading: false, allowed: true, rpcFailed: false });
       return;
     }
 
     let cancelled = false;
 
     const run = async () => {
-      setSeatInvite({ loading: true, canInviteMember: false });
+      setSeatInvite({ loading: true, allowed: true, rpcFailed: false });
       try {
         const { data: snap, error } = await supabase.rpc("workspace_seat_usage_snapshot", {
           _workspace_id: currentWorkspaceId,
         });
-        if (cancelled || error) {
-          if (!cancelled) setSeatInvite({ loading: false, canInviteMember: false });
+        if (cancelled) return;
+        if (error) {
+          console.warn("[usePlanLimits] workspace_seat_usage_snapshot", error);
+          setSeatInvite({ loading: false, allowed: true, rpcFailed: true });
           return;
         }
         const row = snap as { used?: number; seat_limit?: number } | null;
         const used = typeof row?.used === "number" ? row.used : 0;
         const seatLimit = typeof row?.seat_limit === "number" ? row.seat_limit : DEFAULT_LIMITS.seats;
-        if (!cancelled) {
-          setSeatInvite({ loading: false, canInviteMember: used < seatLimit });
-        }
-      } catch {
-        if (!cancelled) setSeatInvite({ loading: false, canInviteMember: false });
+        setSeatInvite({
+          loading: false,
+          allowed: used < seatLimit,
+          rpcFailed: false,
+        });
+      } catch (e) {
+        console.warn("[usePlanLimits] workspace_seat_usage_snapshot threw", e);
+        if (!cancelled) setSeatInvite({ loading: false, allowed: true, rpcFailed: true });
       }
     };
 
@@ -183,13 +192,19 @@ export function usePlanLimits(): UsePlanLimitsResult {
   const extraLeads = Math.max(0, usage.leadsThisPeriod - limits.leads);
   const overageAmount = Math.round(extraLeads * overagePrice * 100) / 100;
 
+  const seatsInviteChecking = seatInvite.loading;
+  const inviteBlockedBySeats = !seatInvite.loading && !seatInvite.allowed && !seatInvite.rpcFailed;
+  const canInviteMember = seatInvite.loading || seatInvite.allowed;
+
   return {
     limits,
     usage,
     planName,
     loading,
     canCreateFunnel: usage.funnels < limits.funnels,
-    canInviteMember: !seatInvite.loading && seatInvite.canInviteMember,
+    canInviteMember,
+    inviteBlockedBySeats,
+    seatsInviteChecking,
     canCreateWorkspace: usage.workspaces < limits.workspaces,
     canGenerateLead: true,
     leadOveragePrice: overagePrice,
