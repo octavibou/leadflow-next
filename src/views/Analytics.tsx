@@ -449,8 +449,6 @@ export default function Analytics() {
     [allFunnels]
   );
 
-  const funnelIds = useMemo(() => funnels.map((f) => f.id).join(","), [funnels]);
-
   useEffect(() => {
     fetchFunnels();
   }, [fetchFunnels]);
@@ -475,18 +473,13 @@ export default function Analytics() {
     };
 
     loadCampaigns();
-  }, [selectedFunnelId, funnelIds]);
-
-  const campaignIdsKey = useMemo(
-    () => campaigns.map((c) => c.id).join(","),
-    [campaigns]
-  );
+  }, [selectedFunnelId, funnels]);
 
   useEffect(() => {
     if (campaigns.length === 0) {
       setCampaignMetrics({});
     }
-  }, [campaignIdsKey]);
+  }, [campaigns]);
 
   // Fetch per-funnel conversion rates for dropdown ordering + badges
   // Conversion = leads / page_views (impressions)
@@ -510,7 +503,7 @@ export default function Analytics() {
       setFunnelConversions(cvrs);
     };
     fetchConversions();
-  }, [funnelIds]);
+  }, [funnels]);
 
   useEffect(() => {
     const load = async () => {
@@ -567,10 +560,17 @@ export default function Analytics() {
       setLoading(false);
     };
     load();
-  }, [selectedFunnelId, dateRange, funnelIds, campaignIdsKey]);
+  }, [selectedFunnelId, dateRange, funnels, campaigns]);
 
-  const selectedFunnel = selectedFunnelId === "all" ? null : funnels.find((f) => f.id === selectedFunnelId);
-  const steps = (selectedFunnel?.steps as FunnelStep[]) || [];
+  const selectedFunnel = useMemo(
+    () => (selectedFunnelId === "all" ? null : funnels.find((f) => f.id === selectedFunnelId) ?? null),
+    [funnels, selectedFunnelId]
+  );
+
+  const steps = useMemo((): FunnelStep[] => {
+    const raw = selectedFunnel?.steps;
+    return Array.isArray(raw) ? (raw as FunnelStep[]) : [];
+  }, [selectedFunnel]);
 
   const stats = useMemo(() => {
     const uniqueSessions = (rows: any[]): Set<string> => {

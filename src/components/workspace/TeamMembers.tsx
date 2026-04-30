@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Trash, Envelope, Clock, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,22 +46,14 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("editor");
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
 
-  useEffect(() => {
-    loadData();
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
-  }, [workspaceId]);
-
-  const loadData = async () => {
-    // Load members
+  const loadData = useCallback(async () => {
     const { data: membersData } = await supabase
       .from("workspace_members")
       .select("*")
       .eq("workspace_id", workspaceId);
 
     if (membersData) {
-      // Get emails for members
       const membersList: Member[] = [];
       for (const m of membersData) {
         membersList.push({
@@ -73,7 +65,6 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
       setMembers(membersList);
     }
 
-    // Load pending invitations
     const { data: invData } = await supabase
       .from("workspace_invitations")
       .select("*")
@@ -83,7 +74,12 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
     if (invData) {
       setInvitations(invData as Invitation[]);
     }
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    loadData();
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+  }, [loadData]);
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
