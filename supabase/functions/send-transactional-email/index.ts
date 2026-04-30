@@ -5,10 +5,10 @@ import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
 // Remitente transaccional: nombre + dominio. Verifica el dominio en Resend y usa la misma
 // dirección (o RESEND_FROM en process-email-queue) para evitar rechazos.
-const SITE_NAME = "embeddable-quiz"
-// Metadato en cola; Resend solo usa el campo `from` del payload.
-const SENDER_DOMAIN = "notify.leadflow.es"
-const FROM_DOMAIN = "leadflow.es"
+const SITE_NAME = "Leadflow"
+// Metadato en cola; Resend usa el `from` del payload (debe ser @send.leadflow.es).
+const SENDER_DOMAIN = "send.leadflow.es"
+const FROM_DOMAIN = "send.leadflow.es"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
