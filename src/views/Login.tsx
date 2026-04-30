@@ -49,11 +49,13 @@ export default function Login({
     }
   };
 
+  const oauthRedirect = `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback`;
+
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: oauthRedirect,
       },
     });
     if (error) {
@@ -63,9 +65,9 @@ export default function Login({
 
   const handleAppleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
+      provider: "apple",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: oauthRedirect,
       },
     });
     if (error) {

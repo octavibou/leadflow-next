@@ -31,14 +31,21 @@ export default function Signup({
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
+  const authCallbackUrl = () =>
+    typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      toast.error("No hay cliente de autenticación configurado.");
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: authCallbackUrl() },
       });
       if (error) {
         toast.error(error.message);
@@ -53,10 +60,14 @@ export default function Signup({
   };
 
   const handleGoogleSignup = async () => {
+    if (!supabase) {
+      toast.error("No hay cliente de autenticación configurado.");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: authCallbackUrl(),
       },
     });
     if (error) {
@@ -65,10 +76,14 @@ export default function Signup({
   };
 
   const handleAppleSignup = async () => {
+    if (!supabase) {
+      toast.error("No hay cliente de autenticación configurado.");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
+      provider: "apple",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: authCallbackUrl(),
       },
     });
     if (error) {
@@ -82,16 +97,17 @@ export default function Signup({
         <div className="flex w-full max-w-sm flex-col gap-6">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">Check your email</CardTitle>
+              <CardTitle className="text-xl">Revisa tu correo</CardTitle>
               <CardDescription>
-                We have sent a confirmation link to <strong>{email}</strong>
+                Te hemos enviado un enlace de confirmación a <strong>{email}</strong>. Ábrelo para
+                activar tu cuenta.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <FieldGroup>
                 <Field>
                   <Button variant="outline" className="w-full" asChild>
-                    <Link href="/login">Back to login</Link>
+                    <Link href="/login">Volver al inicio de sesión</Link>
                   </Button>
                 </Field>
               </FieldGroup>
