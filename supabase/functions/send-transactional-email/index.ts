@@ -74,10 +74,17 @@ Deno.serve(async (req) => {
   let idempotencyKey: string
   let messageId: string
   let templateData: Record<string, any> = {}
+  let invitationId: string | undefined
   try {
     const body = await req.json()
     templateName = body.templateName || body.template_name
     recipientEmail = body.recipientEmail || body.recipient_email
+    invitationId =
+      typeof body.invitationId === 'string'
+        ? body.invitationId
+        : typeof body.invitation_id === 'string'
+          ? body.invitation_id
+          : undefined
     messageId = crypto.randomUUID()
     idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
     if (body.templateData && typeof body.templateData === 'object') {
@@ -119,10 +126,110 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Resolve effective recipient: template-level `to` takes precedence over
-  // the caller-provided recipientEmail. This allows notification templates
-  // to always send to a fixed address (e.g., site owner from env var).
-  const effectiveRecipient = template.to || recipientEmail
+  const jwtSub =
+    typeof (claimsData.claims as { sub?: unknown }).sub === 'string'
+      ? (claimsData.claims as { sub: string }).sub
+      : ''
+
+  // Service role early for workspace-invitation authorization and recipient sourcing
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+  // Resolve effective recipient: template-level `to` takes precedence over the body.
+  let effectiveRecipient = template.to || recipientEmail
+  let renderTemplateData: Record<string, any> = { ...templateData }
+
+  // workspace-invitation: require invitation row, caller must own the invite flow (invited_by) and be owner/admin on workspace; recipient cannot be spoofed.
+  if (templateName === 'workspace-invitation') {
+    const invRowId = invitationId?.trim()
+    if (!invRowId || !jwtSub) {
+      return new Response(
+        JSON.stringify({ error: 'invitationId is required for workspace-invitation' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    const { data: invRow, error: invSelErr } = await supabaseAdmin
+      .from('workspace_invitations')
+      .select('id, email, workspace_id, status, invited_by, token, role')
+      .eq('id', invRowId)
+      .maybeSingle()
+
+    if (invSelErr || !invRow || invRow.status !== 'pending') {
+      return new Response(
+        JSON.stringify({ error: 'Invitation not found or not pending' }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    if (invRow.invited_by !== jwtSub) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { data: callerMember } = await supabaseAdmin
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', invRow.workspace_id)
+      .eq('user_id', jwtSub)
+      .maybeSingle()
+
+    const callerRole = callerMember?.role
+    if (callerRole !== 'owner' && callerRole !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { data: wsRow } = await supabaseAdmin
+      .from('workspaces')
+      .select('name')
+      .eq('id', invRow.workspace_id)
+      .maybeSingle()
+
+    effectiveRecipient = invRow.email
+
+    const ROLE_ES: Record<string, string> = {
+      owner: 'Dueño',
+      admin: 'Administrador',
+      editor: 'Editor',
+      viewer: 'Solo lectura',
+    }
+
+    let acceptUrl =
+      typeof templateData.acceptUrl === 'string' && /^https?:\/\//i.test(templateData.acceptUrl)
+        ? templateData.acceptUrl
+        : ''
+
+    const appBaseRaw =
+      Deno.env.get('NEXT_PUBLIC_APP_URL') ||
+      Deno.env.get('PUBLIC_APP_URL') ||
+      Deno.env.get('SITE_URL') ||
+      ''
+    const appBase = appBaseRaw.replace(/\/$/, '')
+    if (!acceptUrl && appBase) {
+      acceptUrl = `${appBase}/invite?t=${encodeURIComponent(invRow.token)}`
+    }
+
+    renderTemplateData = {
+      ...templateData,
+      workspaceName:
+        wsRow?.name ??
+        templateData.workspaceName ??
+        'Workspace',
+      role: ROLE_ES[String(invRow.role)] ?? invRow.role,
+      acceptUrl: acceptUrl || templateData.acceptUrl,
+      inviterEmail: templateData.inviterEmail,
+    }
+  }
 
   if (!effectiveRecipient) {
     return new Response(
@@ -136,8 +243,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Create Supabase client with service role (bypasses RLS)
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const supabase = supabaseAdmin
 
   // 2. Check suppression list (fail-closed: if we can't verify, don't send)
   const { data: suppressed, error: suppressionError } = await supabase
@@ -298,17 +404,17 @@ Deno.serve(async (req) => {
 
   // 4. Render React Email template to HTML and plain text
   const html = await renderAsync(
-    React.createElement(template.component, templateData)
+    React.createElement(template.component, renderTemplateData),
   )
   const plainText = await renderAsync(
-    React.createElement(template.component, templateData),
-    { plainText: true }
+    React.createElement(template.component, renderTemplateData),
+    { plainText: true },
   )
 
   // Resolve subject — supports static string or dynamic function
   const resolvedSubject =
     typeof template.subject === 'function'
-      ? template.subject(templateData)
+      ? template.subject(renderTemplateData)
       : template.subject
 
   // 5. Enqueue the pre-rendered email for async processing by the dispatcher.

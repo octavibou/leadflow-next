@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeAppPath } from "@/lib/safeRedirectPath";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,13 +29,20 @@ export default function Signup({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeAppPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const authCallbackUrl = () =>
-    typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
+  const authCallbackUrl = () => {
+    const base =
+      typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
+    if (!base) return undefined;
+    if (!nextPath || nextPath === "/dashboard") return base;
+    return `${base}?next=${encodeURIComponent(nextPath)}`;
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +71,7 @@ export default function Signup({
       // Confirmación por email desactivada en el proyecto: sesión inmediata.
       if (data.session) {
         toast.success("Cuenta creada. Ya puedes usar la app.");
-        router.push("/dashboard");
+        router.push(nextPath);
         return;
       }
 
@@ -198,7 +206,10 @@ export default function Signup({
                     {loading ? "Creating account..." : "Create account"}
                   </Button>
                   <FieldDescription className="text-center">
-                    Already have an account? <Link href="/login">Login</Link>
+                    Already have an account?{" "}
+                    <Link href={nextPath && nextPath !== "/dashboard" ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}>
+                      Login
+                    </Link>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

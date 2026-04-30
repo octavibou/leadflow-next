@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import { safeAppPath } from "@/lib/safeRedirectPath";
 
 /**
  * Tras confirmar el email, Supabase redirige aquí con ?code= (PKCE) o tokens en el hash.
@@ -26,11 +27,16 @@ export default function AuthCallbackPage() {
     const run = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
+      const safeNextPath = safeAppPath(url.searchParams.get("next"));
+      const afterAuthPath =
+        safeNextPath && safeNextPath !== "/dashboard"
+          ? `/auth/confirmed?next=${encodeURIComponent(safeNextPath)}`
+          : "/auth/confirmed";
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!cancelled && !error) {
-          finish("/dashboard");
+          finish(afterAuthPath);
           return;
         }
         if (!cancelled && error) {
@@ -41,14 +47,14 @@ export default function AuthCallbackPage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        finish("/dashboard");
+        finish(afterAuthPath);
         return;
       }
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
         if (nextSession && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
           subscription.unsubscribe();
-          finish("/dashboard");
+          finish(afterAuthPath);
         }
       });
 
@@ -56,7 +62,7 @@ export default function AuthCallbackPage() {
         subscription.unsubscribe();
         if (cancelled) return;
         void supabase.auth.getSession().then(({ data: { session: s } }) => {
-          if (s) finish("/dashboard");
+          if (s) finish(afterAuthPath);
           else finish("/login?error=auth_callback");
         });
       }, 3000);

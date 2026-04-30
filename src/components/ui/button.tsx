@@ -89,7 +89,7 @@ function getPlasticStyle(variant: NonNullable<ButtonProps["variant"]>): PlasticS
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     const v = variant ?? "default"
     const plastic = !asChild ? getPlasticStyle(v) : null
@@ -122,10 +122,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         {plastic ? (
           <span className={cn("relative z-20 flex items-center gap-2 transition-colors duration-500 ease-out", plastic.textClass, plastic.hoverTextClass)}>
-            {props.children}
+            {children}
           </span>
         ) : (
-          props.children
+          children
         )}
       </Comp>
     )

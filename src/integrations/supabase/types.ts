@@ -477,6 +477,21 @@ export type Database = {
         Args: { invitation_id: string }
         Returns: undefined
       }
+      peek_workspace_invitation_by_token: {
+        Args: { _token: string }
+        Returns: {
+          workspace_name: string
+          role: Database["public"]["Enums"]["workspace_role"]
+        }[]
+      }
+      resolve_workspace_invitation_id_for_token: {
+        Args: { _token: string }
+        Returns: string
+      }
+      workspace_seat_usage_snapshot: {
+        Args: { _workspace_id: string }
+        Returns: Json
+      }
       create_workspace_with_owner: {
         Args: { ws_name: string }
         Returns: string

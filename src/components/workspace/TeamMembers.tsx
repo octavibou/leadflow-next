@@ -16,6 +16,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { WorkspaceRole } from "@/store/workspaceStore";
 
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import {
+  INVITE_COLLABORATOR_HELPER,
+  WORKSPACE_ROLE_LABELS_ES,
+} from "@/lib/workspaceRoles";
 
 interface Member {
   id: string;
@@ -32,13 +37,6 @@ interface Invitation {
   created_at: string;
 }
 
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer",
-};
-
 export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -46,6 +44,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>("editor");
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { canInviteMember, refresh: refreshPlanLimits } = usePlanLimits();
 
   const loadData = useCallback(async () => {
     const { data: membersData } = await supabase
@@ -83,6 +82,10 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
+    if (!canInviteMember) {
+      toast.error("Has alcanzado el número de asientos de tu plan");
+      return;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail.trim())) {
       toast.error("Email no valido");
@@ -99,7 +102,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
         role: inviteRole,
         invited_by: currentUserId!,
       })
-      .select("id")
+      .select("id, token")
       .single();
 
     if (error) {
@@ -108,7 +111,17 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
       } else {
         toast.error("Error al enviar la invitacion");
       }
-    } else {
+      setSending(false);
+      return;
+    }
+
+    if (!inserted?.id || !inserted?.token) {
+      toast.error("Error al enviar la invitacion");
+      setSending(false);
+      return;
+    }
+
+    try {
       // Send invitation email
       const { data: ws } = await supabase
         .from("workspaces")
@@ -118,37 +131,51 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
 
       const inviterEmail = (await supabase.auth.getUser()).data.user?.email;
 
-      await supabase.functions.invoke("send-transactional-email", {
+      const inviteUrl = `${window.location.origin}/invite?t=${encodeURIComponent(inserted.token)}`;
+
+      const { error: invokeError } = await supabase.functions.invoke("send-transactional-email", {
         body: {
           templateName: "workspace-invitation",
-          recipientEmail: trimmedEmail,
+          invitationId: inserted.id,
           idempotencyKey: `ws-invite-${inserted.id}`,
           templateData: {
             workspaceName: ws?.name || "Workspace",
-            role: ROLE_LABELS[inviteRole],
+            role: WORKSPACE_ROLE_LABELS_ES[inviteRole],
             inviterEmail: inviterEmail || undefined,
-            acceptUrl: `${window.location.origin}/dashboard`,
+            acceptUrl: inviteUrl,
           },
         },
       });
 
-      toast.success(`Invitacion enviada a ${trimmedEmail}`);
+      if (invokeError) {
+        toast.error("Invitacion creada pero el correo no se pudo encolar");
+      } else {
+        toast.success(`Invitacion enviada a ${trimmedEmail}`);
+      }
+      refreshPlanLimits();
       setInviteEmail("");
       loadData();
+    } catch {
+      toast.error("Error al enviar la invitacion");
     }
     setSending(false);
   };
+
+  const inviteDisabled =
+    sending || !inviteEmail.trim() || !canInviteMember || !currentUserId;
 
   const handleCancelInvitation = async (id: string) => {
     await supabase.from("workspace_invitations").delete().eq("id", id);
     setInvitations((prev) => prev.filter((i) => i.id !== id));
     toast.success("Invitacion cancelada");
+    refreshPlanLimits();
   };
 
   const handleRemoveMember = async (memberId: string) => {
     await supabase.from("workspace_members").delete().eq("id", memberId);
     setMembers((prev) => prev.filter((m) => m.id !== memberId));
     toast.success("Miembro eliminado");
+    refreshPlanLimits();
   };
 
   return (
@@ -157,7 +184,9 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" weight="bold" /> Equipo
         </CardTitle>
-        <CardDescription>Invita miembros a este workspace para colaborar</CardDescription>
+        <CardDescription>
+          Invita miembros a este workspace para colaborar. {INVITE_COLLABORATOR_HELPER}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Invite form */}
@@ -179,13 +208,13 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
                 <SelectItem value="editor">Editor</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="viewer">Solo lectura</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleInvite} disabled={sending || !inviteEmail.trim()}>
+          <Button onClick={handleInvite} disabled={inviteDisabled}>
             <Envelope className="h-4 w-4 mr-2" weight="bold" />
             {sending ? "Enviando..." : "Invitar"}
           </Button>
@@ -206,7 +235,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{ROLE_LABELS[m.role]}</Badge>
+                  <Badge variant="secondary">{WORKSPACE_ROLE_LABELS_ES[m.role]}</Badge>
                   {m.role !== "owner" && m.user_id !== currentUserId && (
                     <Button
                       variant="ghost"
@@ -232,7 +261,7 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
                   <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
                     Invitacion enviada
                   </Badge>
-                  <Badge variant="secondary">{ROLE_LABELS[inv.role]}</Badge>
+                  <Badge variant="secondary">{WORKSPACE_ROLE_LABELS_ES[inv.role]}</Badge>
                   <Button
                     variant="ghost"
                     size="icon"

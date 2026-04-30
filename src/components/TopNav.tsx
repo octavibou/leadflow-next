@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAppAssistant } from "@/contexts/AppAssistantContext";
+import { useWorkspaceMemberRole } from "@/hooks/useWorkspaceMemberRole";
+import { canAccessWorkspaceTeamSettings } from "@/lib/workspaceRoles";
 
 const tabs = [
   { label: "Funnels", path: "/dashboard", icon: Lightning },
@@ -63,6 +65,10 @@ export function TopNav() {
   }, []);
 
   const currentWorkspace = getCurrentWorkspace();
+  const { role: wsNavRole, loading: wsNavRoleLoading } = useWorkspaceMemberRole(currentWorkspaceId);
+  const canOpenWorkspaceSettings =
+    !!currentWorkspaceId && !wsNavRoleLoading && canAccessWorkspaceTeamSettings(wsNavRole);
+
   const initials = (userName || userEmail || "QF")
     .split(/[\s@.]+/)
     .filter(Boolean)
@@ -184,9 +190,11 @@ export function TopNav() {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setDropdownOpen(false); router.push("/workspace-settings"); }}>
-                <Gear className="h-4 w-4 mr-2" weight="bold" /> Configuracion
-              </DropdownMenuItem>
+              {canOpenWorkspaceSettings && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); router.push("/workspace-settings"); }}>
+                  <Gear className="h-4 w-4 mr-2" weight="bold" /> Configuracion
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => { setDropdownOpen(false); setCreateDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" weight="bold" /> Nuevo Workspace
               </DropdownMenuItem>
@@ -279,10 +287,12 @@ export function TopNav() {
               <User className="h-4 w-4 mr-2" weight="bold" />
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/workspace-settings")}>
-              <Globe className="h-4 w-4 mr-2" weight="bold" />
-              Workspace
-            </DropdownMenuItem>
+            {canOpenWorkspaceSettings ? (
+              <DropdownMenuItem onClick={() => router.push("/workspace-settings")}>
+                <Globe className="h-4 w-4 mr-2" weight="bold" />
+                Workspace
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onClick={() => window.open("mailto:soporte@leadflow.es", "_blank")}>
               <ChatCircle className="h-4 w-4 mr-2" weight="bold" />
               Contact Support

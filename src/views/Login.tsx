@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeAppPath } from "@/lib/safeRedirectPath";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ export default function Login({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeAppPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,7 +43,7 @@ export default function Login({
       if (error) {
         toast.error(error.message);
       } else {
-        router.push("/dashboard");
+        router.push(nextPath);
       }
     } catch {
       toast.error("Error de conexion. Verifica tu conexion a internet.");
@@ -49,13 +52,17 @@ export default function Login({
     }
   };
 
-  const oauthRedirect = `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback`;
+  const oauthRedirect = () => {
+    const base = `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback`;
+    if (!nextPath || nextPath === "/dashboard") return base;
+    return `${base}?next=${encodeURIComponent(nextPath)}`;
+  };
 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: oauthRedirect,
+        redirectTo: oauthRedirect(),
       },
     });
     if (error) {
@@ -67,7 +74,7 @@ export default function Login({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: oauthRedirect,
+        redirectTo: oauthRedirect(),
       },
     });
     if (error) {
@@ -145,7 +152,10 @@ export default function Login({
                     {loading ? "Logging in..." : "Login"}
                   </Button>
                   <FieldDescription className="text-center">
-                    Don&apos;t have an account? <Link href="/signup">Sign up</Link>
+                    Don&apos;t have an account?{" "}
+                    <Link href={nextPath && nextPath !== "/dashboard" ? `/signup?next=${encodeURIComponent(nextPath)}` : "/signup"}>
+                      Sign up
+                    </Link>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

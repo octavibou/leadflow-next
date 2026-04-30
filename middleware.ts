@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  "/auth/confirmed",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -46,15 +47,25 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  /** Invitaciones por correo enlazan aquí antes de tener sesión. */
+  const isPublicInviteFlow = pathname === "/invite" || pathname.startsWith("/invite/");
   const isPublicFunnel = pathname.startsWith("/f/");
   const isOnboarding = pathname.startsWith("/onboarding/");
   const isUnsubscribe = pathname === "/unsubscribe";
 
-  if (!session && !isPublicPath && !isPublicFunnel && !isOnboarding && !isUnsubscribe) {
+  if (
+    !session &&
+    !isPublicPath &&
+    !isPublicInviteFlow &&
+    !isPublicFunnel &&
+    !isOnboarding &&
+    !isUnsubscribe
+  ) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (session && isPublicPath) {
+  // Tras verificar el email debe poder verse el mensaje de éxito aunque ya haya sesión.
+  if (session && isPublicPath && pathname !== "/auth/confirmed") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

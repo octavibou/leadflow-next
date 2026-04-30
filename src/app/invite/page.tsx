@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import Signup from "@/views/Signup";
+import Invite from "@/views/Invite";
 
-export default function SignupPage() {
+export default function InvitePage() {
   return (
     <Suspense
       fallback={
@@ -10,7 +10,7 @@ export default function SignupPage() {
         </div>
       }
     >
-      <Signup />
+      <Invite />
     </Suspense>
   );
 }

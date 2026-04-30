@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthReady } from "@/hooks/useAuthReady";
 
+import { useWorkspaceStore } from "@/store/workspaceStore";
+
 export interface PlanLimits {
   funnels: number;
   workspaces: number;
@@ -92,11 +94,51 @@ async function fetchPlanLimitsSnapshot(userId: string): Promise<PlanLimitsSnapsh
 
 export function usePlanLimits(): UsePlanLimitsResult {
   const { user } = useAuthReady();
+  const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const [limits, setLimits] = useState<PlanLimits>(DEFAULT_LIMITS);
   const [planName, setPlanName] = useState("starter");
   const [usage, setUsage] = useState<PlanUsage>({ funnels: 0, workspaces: 0, leadsThisPeriod: 0, leadsThisMonth: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [seatInvite, setSeatInvite] = useState<{
+    loading: boolean;
+    canInviteMember: boolean;
+  }>({ loading: true, canInviteMember: false });
+
+  useEffect(() => {
+    if (!currentWorkspaceId) {
+      setSeatInvite({ loading: false, canInviteMember: false });
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      setSeatInvite({ loading: true, canInviteMember: false });
+      try {
+        const { data: snap, error } = await supabase.rpc("workspace_seat_usage_snapshot", {
+          _workspace_id: currentWorkspaceId,
+        });
+        if (cancelled || error) {
+          if (!cancelled) setSeatInvite({ loading: false, canInviteMember: false });
+          return;
+        }
+        const row = snap as { used?: number; seat_limit?: number } | null;
+        const used = typeof row?.used === "number" ? row.used : 0;
+        const seatLimit = typeof row?.seat_limit === "number" ? row.seat_limit : DEFAULT_LIMITS.seats;
+        if (!cancelled) {
+          setSeatInvite({ loading: false, canInviteMember: used < seatLimit });
+        }
+      } catch {
+        if (!cancelled) setSeatInvite({ loading: false, canInviteMember: false });
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWorkspaceId, refreshKey]);
 
   useEffect(() => {
     if (!user) return;
@@ -147,7 +189,7 @@ export function usePlanLimits(): UsePlanLimitsResult {
     planName,
     loading,
     canCreateFunnel: usage.funnels < limits.funnels,
-    canInviteMember: true,
+    canInviteMember: !seatInvite.loading && seatInvite.canInviteMember,
     canCreateWorkspace: usage.workspaces < limits.workspaces,
     canGenerateLead: true,
     leadOveragePrice: overagePrice,

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { toast } from "sonner";
+import { formatWorkspaceRoleEs } from "@/lib/workspaceRoles";
 
 interface Invitation {
   id: string;
@@ -93,7 +94,7 @@ export function PendingInvitations() {
                   Te han invitado a <span className="font-semibold">{inv.workspace_name}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Rol: {inv.role}
+                  Rol: {formatWorkspaceRoleEs(inv.role)}
                 </p>
               </div>
             </div>

@@ -23,6 +23,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TeamMembers } from "@/components/workspace/TeamMembers";
 import { cn } from "@/lib/utils";
+import { useWorkspaceMemberRole } from "@/hooks/useWorkspaceMemberRole";
+import {
+  canAccessWorkspaceTeamSettings,
+  canManageWorkspaceAppearanceAndDanger,
+} from "@/lib/workspaceRoles";
 
 export default function WorkspaceSettings() {
   const router = useRouter();
@@ -36,6 +41,34 @@ export default function WorkspaceSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSection, setActiveSection] = useState<"general" | "team" | "danger">("general");
   const [navQuery, setNavQuery] = useState("");
+
+  const SECTIONS = [
+    { id: "general" as const, label: "General", description: "Nombre e imagen del workspace", icon: null },
+    { id: "team" as const, label: "Usuarios", description: "Miembros y permisos", icon: Users },
+    { id: "danger" as const, label: "Zona de peligro", description: "Acciones irreversibles", icon: Trash },
+  ];
+
+  const { role: memberRole, loading: roleLoading } = useWorkspaceMemberRole(workspace?.id);
+
+  useEffect(() => {
+    if (!workspace || roleLoading) return;
+    if (memberRole === "editor" || memberRole === "viewer") {
+      toast.error("No tienes permiso para la configuracion del workspace.");
+      router.replace("/dashboard");
+    }
+  }, [workspace, roleLoading, memberRole, router]);
+
+  useEffect(() => {
+    if (roleLoading || !workspace || !memberRole) return;
+    const allowed: Array<typeof activeSection> = [];
+    if (canManageWorkspaceAppearanceAndDanger(memberRole)) {
+      allowed.push("general", "danger");
+    }
+    if (canAccessWorkspaceTeamSettings(memberRole)) {
+      allowed.push("team");
+    }
+    if (!allowed.includes(activeSection) && allowed[0]) setActiveSection(allowed[0]);
+  }, [roleLoading, memberRole, activeSection, workspace]);
 
   useEffect(() => {
     if (workspace) {
@@ -109,25 +142,28 @@ export default function WorkspaceSettings() {
 
   if (!workspace) return null;
 
-  const sections: Array<{
-    id: "general" | "team" | "danger";
-    label: string;
-    description: string;
-    icon: any;
-  }> = [
-    { id: "general", label: "General", description: "Nombre e imagen del workspace", icon: null },
-    { id: "team", label: "Usuarios", description: "Miembros y permisos", icon: Users },
-    { id: "danger", label: "Zona de peligro", description: "Acciones irreversibles", icon: Trash },
-  ];
+  if (roleLoading || memberRole === "editor" || memberRole === "viewer") {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center p-12">
+        <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
-  const filteredSections = sections.filter((s) => {
+  const pageSubtitle = workspace.name;
+
+  const navigableSections = SECTIONS.filter((s) => {
+    if (s.id === "team") return canAccessWorkspaceTeamSettings(memberRole);
+    return canManageWorkspaceAppearanceAndDanger(memberRole);
+  });
+
+  const filteredSections = navigableSections.filter((s) => {
     const q = navQuery.trim().toLowerCase();
     if (!q) return true;
     return `${s.label} ${s.description}`.toLowerCase().includes(q);
   });
 
   const pageTitle = "Configuración";
-  const pageSubtitle = workspace.name;
 
   return (
     <div className="mx-auto w-full max-w-6xl p-6">

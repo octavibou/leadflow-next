@@ -4,7 +4,7 @@ import {
 } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
-const SITE_NAME = "QuizzFlow"
+const SITE_NAME = "Leadflow"
 
 interface WorkspaceInvitationProps {
   workspaceName?: string
@@ -30,6 +30,8 @@ const WorkspaceInvitationEmail = ({
         <Text style={text}>
           {inviterEmail ? `${inviterEmail} te` : 'Te'} ha invitado a unirte al workspace{' '}
           <strong>{workspaceName}</strong> en {SITE_NAME} con el rol de <strong>{role}</strong>.
+          Usa la misma dirección de correo para registrarte o iniciar sesión; si aún no tienes cuenta,
+          crea una y luego acepta desde el panel.
         </Text>
         {acceptUrl && (
           <Button style={button} href={acceptUrl}>
@@ -59,7 +61,7 @@ export const template = {
     workspaceName: 'Mi Agencia',
     role: 'Editor',
     inviterEmail: 'admin@empresa.com',
-    acceptUrl: 'https://embeddable-quiz.lovable.app/dashboard',
+    acceptUrl: 'https://app.leadflow.es/invite?t=preview',
   },
 } satisfies TemplateEntry
 
