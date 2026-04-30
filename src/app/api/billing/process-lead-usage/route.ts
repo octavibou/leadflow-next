@@ -5,7 +5,7 @@ import { processLeadUsageQueueBatch } from "@/lib/stripe/processLeadUsageQueue";
  * Única vía de procesamiento: `lead_usage_queue` → registros de uso en Stripe vía `processLeadUsageQueueBatch`.
  * Requiere `STRIPE_SECRET_KEY` y `SUPABASE_SERVICE_ROLE_KEY` + URL en el servidor (p. ej. Vercel).
  *
- * Cron (Vercel): `GET` cada 6 h (`vercel.json`). En producción, `CRON_SECRET` y el `Authorization: Bearer` que envía Vercel.
+ * Cron (Vercel): `GET` 1×/día UTC (`0 0 * * *` en `vercel.json`; plan Hobby). Con Pro puedes usar p. ej. cada 6 h.
  * `POST`: disparo tras guardar lead (`tracking.ts`) sin auth adicional.
  */
 
@@ -34,7 +34,7 @@ async function runProcessLeadUsage(): Promise<NextResponse> {
   }
 }
 
-/** Cron de Vercel (GET): ver `vercel.json`. Producción → `CRON_SECRET` obligatorio para este endpoint. */
+/** Cron de Vercel (GET): ver `vercel.json` (diario en Hobby). Producción → `CRON_SECRET` obligatorio. */
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === "production") {
     if (!process.env.CRON_SECRET?.trim()) {
