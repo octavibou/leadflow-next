@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Monitor, Smartphone, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
-import type { FunnelStep } from "@/types/funnel";
+import type { FunnelStep, IntroConfig } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 
 function getEmbedUrl(url: string): string | null {
@@ -51,7 +51,11 @@ const CampaignLandingEditor = () => {
 
   // Find the intro step in campaign steps
   const introStep = campaign?.steps?.find((s: any) => s.type === "intro") as FunnelStep | undefined;
-  const ic = introStep?.introConfig || { headline: "", description: "", cta: "", showVideo: false };
+  const defaultIntroConfig: IntroConfig = useMemo(
+    () => ({ headline: "", description: "", cta: "", showVideo: false }),
+    [],
+  );
+  const ic = introStep?.introConfig || defaultIntroConfig;
 
   const handleUpdate = useCallback((key: string, value: any) => {
     if (!campaign || !introStep) return;

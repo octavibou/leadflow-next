@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Plus, Copy, Trash, Link, DotsThree, Megaphone, Pencil, X, Monitor, DeviceMobile, Gear } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCampaignStore, type Campaign } from "@/store/campaignStore";
-import type { Funnel, FunnelStep } from "@/types/funnel";
+import type { Funnel, FunnelStep, IntroConfig } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 
 function getEmbedUrl(url: string): string | null {
@@ -162,7 +162,11 @@ function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignL
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
 
   const introStep = campaign.steps?.find((s: any) => s.type === "intro") as FunnelStep | undefined;
-  const ic = introStep?.introConfig || { headline: "", description: "", cta: "", showVideo: false };
+  const defaultIntroConfig: IntroConfig = useMemo(
+    () => ({ headline: "", description: "", cta: "", showVideo: false }),
+    [],
+  );
+  const ic = introStep?.introConfig || defaultIntroConfig;
 
   const handleUpdate = useCallback((key: string, value: any) => {
     if (!introStep) return;
