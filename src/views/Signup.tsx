@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function Signup({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,16 +44,30 @@ export default function Signup({
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: authCallbackUrl() },
       });
       if (error) {
         toast.error(error.message);
-      } else {
-        setSent(true);
+        return;
       }
+
+      // Email ya registrado: Supabase devuelve user sin identidades (anti-enumeración).
+      if (data.user?.identities && data.user.identities.length === 0) {
+        toast.error("Este email ya está registrado. Prueba a iniciar sesión.");
+        return;
+      }
+
+      // Confirmación por email desactivada en el proyecto: sesión inmediata.
+      if (data.session) {
+        toast.success("Cuenta creada. Ya puedes usar la app.");
+        router.push("/dashboard");
+        return;
+      }
+
+      setSent(true);
     } catch {
       toast.error("Error de conexion. Verifica tu conexion a internet.");
     } finally {
