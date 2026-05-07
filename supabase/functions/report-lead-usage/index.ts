@@ -59,6 +59,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth guard: this function uses service role and must not be public.
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+    const secret = (Deno.env.get("REPORT_LEAD_USAGE_SECRET") ?? "").trim();
+    const ok = Boolean(token) && (token === serviceRoleKey || (secret && token === secret));
+    if (!ok) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", { apiVersion: STRIPE_API_VERSION });
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
