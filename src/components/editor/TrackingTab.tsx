@@ -19,6 +19,8 @@ const TEST_EVENTS = [
 export function TrackingTab({ funnel }: { funnel: Funnel }) {
   const updateFunnel = useFunnelStore((s) => s.updateFunnel);
   const [settings, setSettings] = useState<FunnelSettings>(funnel.settings);
+  const [metaToken, setMetaToken] = useState("");
+  const [savingToken, setSavingToken] = useState(false);
 
   // Test event state
   const [testEvent, setTestEvent] = useState("PageView");
@@ -38,11 +40,10 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
   };
 
   const hasPixel = !!settings.metaPixelId;
-  const hasToken = !!settings.metaAccessToken;
-  const isConfigured = hasPixel && hasToken;
+  const isConfigured = hasPixel;
 
   const handleSendTestEvent = async () => {
-    if (!settings.metaPixelId || !settings.metaAccessToken) return;
+    if (!settings.metaPixelId) return;
     setTestSending(true);
     setTestResult(null);
 
@@ -58,8 +59,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
           apikey: apiKey,
         },
         body: JSON.stringify({
-          pixelId: settings.metaPixelId,
-          accessToken: settings.metaAccessToken,
+          funnelId: funnel.id,
           testEventCode: settings.metaTestEventCode || undefined,
           events: [
             {
@@ -69,7 +69,6 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
               action_source: "website",
               event_id: eventId,
               user_data: {
-                client_ip_address: "0.0.0.0",
                 client_user_agent: navigator.userAgent,
               },
             },
@@ -142,13 +141,35 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
             <Input
               className="h-10 text-sm"
               type="password"
-              value={settings.metaAccessToken || ""}
-              onChange={(e) => set("metaAccessToken", e.target.value)}
+              value={metaToken}
+              onChange={(e) => setMetaToken(e.target.value)}
               placeholder="EAAxxxxxxx..."
             />
             <p className="text-[10px] text-muted-foreground mt-1">
               Genera el token en Meta Events Manager - Settings - Conversions API.
             </p>
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!metaToken || savingToken}
+                onClick={async () => {
+                  setSavingToken(true);
+                  try {
+                    const { supabase } = await import("@/integrations/supabase/client");
+                    const { error } = await supabase
+                      .from("funnel_secrets")
+                      .upsert({ funnel_id: funnel.id, meta_access_token: metaToken });
+                    if (!error) setMetaToken("");
+                  } finally {
+                    setSavingToken(false);
+                  }
+                }}
+              >
+                {savingToken ? "Guardando..." : "Guardar token"}
+              </Button>
+              <span className="text-[10px] text-muted-foreground">Por seguridad, no se volverá a mostrar.</span>
+            </div>
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Test Event Code (opcional)</Label>
@@ -203,7 +224,7 @@ export function TrackingTab({ funnel }: { funnel: Funnel }) {
         {!isConfigured && (
           <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
             <Warning className="h-4 w-4 shrink-0 mt-0.5" weight="bold" />
-            <p>Configura el Pixel ID y el Access Token arriba para poder enviar eventos de prueba.</p>
+            <p>Configura el Pixel ID arriba para poder enviar eventos de prueba.</p>
           </div>
         )}
 
