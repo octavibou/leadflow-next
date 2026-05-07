@@ -38,6 +38,28 @@ interface Invitation {
   created_at: string;
 }
 
+async function formatFunctionsInvokeError(invokeError: {
+  message?: string;
+  context?: unknown;
+}): Promise<string> {
+  let detail = invokeError?.message ?? "Error al llamar a la funcion";
+  try {
+    const ctx = invokeError?.context;
+    if (ctx && typeof ctx === "object" && "clone" in ctx && typeof (ctx as Response).clone === "function") {
+      const body = (await (ctx as Response).clone().json()) as Record<string, unknown>;
+      const parts: string[] = [];
+      if (typeof body.error === "string") parts.push(body.error);
+      if (typeof body.message === "string") parts.push(body.message);
+      if (typeof body.detail === "string") parts.push(body.detail);
+      if (typeof body.hint === "string") parts.push(body.hint);
+      if (parts.length) detail = `${detail}. ${parts.join(" — ")}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return detail;
+}
+
 export function TeamMembers({ workspaceId }: { workspaceId: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -157,7 +179,8 @@ export function TeamMembers({ workspaceId }: { workspaceId: string }) {
       });
 
       if (invokeError) {
-        toast.error("Invitacion creada pero el correo no se pudo encolar");
+        const detail = await formatFunctionsInvokeError(invokeError);
+        toast.error(`Invitacion creada pero el correo no se pudo encolar (${detail})`);
       } else {
         toast.success(`Invitacion enviada a ${trimmedEmail}`);
       }

@@ -39,6 +39,7 @@ function makeContactStep(funnelId: string, order: number, cta: string): FunnelSt
 
 export function createTemplateSteps(funnelId: string, type: FunnelType): FunnelStep[] {
   switch (type) {
+    case "blank": return createBlankSteps(funnelId);
     case "appointment": return createAppointmentSteps(funnelId);
     case "strategy_call": return createStrategyCallSteps(funnelId);
     case "vsl": return createVslSteps(funnelId);
@@ -46,6 +47,28 @@ export function createTemplateSteps(funnelId: string, type: FunnelType): FunnelS
     case "recruiting": return createRecruitingSteps(funnelId);
     case "ai_secretary": return createAiSecretarySteps(funnelId);
   }
+}
+
+/** Intro mínima + una pregunta esqueleto; el editor permite añadir más pasos. */
+function createBlankSteps(fId: string): FunnelStep[] {
+  return [
+    {
+      id: genId(),
+      funnel_id: fId,
+      order: 0,
+      type: "intro",
+      introConfig: {
+        headline: "Título",
+        description: "Descripción",
+        cta: "Empezar",
+        showVideo: false,
+      },
+    },
+    makeQuestionStep(fId, 1, "Nueva pregunta", "opts-col", [
+      ["👍", "Opción 1", true, 0],
+      ["👎", "Opción 2", false, 0],
+    ]),
+  ];
 }
 
 function createAppointmentSteps(fId: string): FunnelStep[] {

@@ -37,6 +37,9 @@ export interface UsePlanLimitsResult {
 
 const DEFAULT_LIMITS: PlanLimits = { funnels: 2, workspaces: 1, seats: 1, leads: 200 };
 
+const WORKSPACE_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const OVERAGE_BY_PLAN: Record<string, number> = {
   starter: 0.50,
   grow: 0.35,
@@ -98,6 +101,8 @@ async function fetchPlanLimitsSnapshot(userId: string): Promise<PlanLimitsSnapsh
 export function usePlanLimits(): UsePlanLimitsResult {
   const { user } = useAuthReady();
   const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const workspacesLoaded = useWorkspaceStore((s) => s.loaded);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
   const [limits, setLimits] = useState<PlanLimits>(DEFAULT_LIMITS);
   const [planName, setPlanName] = useState("starter");
   const [usage, setUsage] = useState<PlanUsage>({ funnels: 0, workspaces: 0, leadsThisPeriod: 0, leadsThisMonth: 0 });
@@ -111,6 +116,22 @@ export function usePlanLimits(): UsePlanLimitsResult {
 
   useEffect(() => {
     if (!currentWorkspaceId) {
+      setSeatInvite({ loading: false, allowed: true, rpcFailed: false });
+      return;
+    }
+
+    if (!WORKSPACE_UUID_RE.test(currentWorkspaceId)) {
+      console.warn("[usePlanLimits] currentWorkspaceId no es un UUID válido", currentWorkspaceId);
+      setSeatInvite({ loading: false, allowed: true, rpcFailed: true });
+      return;
+    }
+
+    if (!workspacesLoaded) {
+      setSeatInvite({ loading: true, allowed: true, rpcFailed: false });
+      return;
+    }
+
+    if (!workspaces.some((w) => w.id === currentWorkspaceId)) {
       setSeatInvite({ loading: false, allowed: true, rpcFailed: false });
       return;
     }
@@ -147,7 +168,7 @@ export function usePlanLimits(): UsePlanLimitsResult {
     return () => {
       cancelled = true;
     };
-  }, [currentWorkspaceId, refreshKey]);
+  }, [currentWorkspaceId, refreshKey, workspacesLoaded, workspaces]);
 
   useEffect(() => {
     if (!user) return;

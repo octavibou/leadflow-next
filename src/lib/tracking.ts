@@ -137,13 +137,12 @@ export function fireExternalEvent(
 
 // ---- Meta Conversions API (server-side) ----
 export function fireMetaCapi(
-  pixelId: string,
-  accessToken: string,
+  funnelId: string,
   eventName: string,
   sourceUrl: string,
   userData: Record<string, unknown> = {},
   customData: Record<string, unknown> = {},
-  testEventCode?: string
+  // testEventCode is resolved server-side from funnel settings
 ) {
   const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
   const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -162,9 +161,8 @@ export function fireMetaCapi(
       apikey: apiKey,
     },
     body: JSON.stringify({
-      pixelId,
-      accessToken,
-      testEventCode: testEventCode || undefined,
+      funnelId,
+      metaCookies: getMetaCookies(),
       events: [
         {
           event_name: eventName,
@@ -173,7 +171,6 @@ export function fireMetaCapi(
           action_source: "website",
           event_id: eventId,
           user_data: {
-            client_ip_address: "0.0.0.0",
             client_user_agent: navigator.userAgent,
             ...userData,
           },
@@ -182,6 +179,35 @@ export function fireMetaCapi(
       ],
     }),
   }).catch(() => {});
+}
+
+function getCookieValue(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const raw = document.cookie || "";
+  if (!raw) return undefined;
+  const parts = raw.split("; ");
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq <= 0) continue;
+    const k = p.slice(0, eq);
+    if (k !== name) continue;
+    const v = p.slice(eq + 1);
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      return v;
+    }
+  }
+  return undefined;
+}
+
+export function getMetaCookies(): { fbp?: string; fbc?: string } {
+  const fbp = getCookieValue("_fbp");
+  const fbc = getCookieValue("_fbc");
+  return {
+    ...(fbp ? { fbp } : {}),
+    ...(fbc ? { fbc } : {}),
+  };
 }
 
 // ---- Extract UTMs from URL ----

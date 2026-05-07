@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { House, Gear, FloppyDisk, Monitor, DeviceMobile, Eye, Lightning, ChartBar, ArrowsClockwise, Pulse, Rocket, Flask } from "@phosphor-icons/react";
+import { House, Gear, FloppyDisk, Eye, Lightning, ChartBar, ArrowsClockwise, Pulse, Rocket, Layout } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,21 +12,21 @@ import { useFunnelStore } from "@/store/funnelStore";
 import { cn } from "@/lib/utils";
 
 const editorTabs = [
+  { id: "landing" as const, label: "Landing" },
   { id: "funnel" as const, label: "Funnel" },
   { id: "webhook" as const, label: "Webhook" },
   { id: "tracking" as const, label: "Tracking" },
   { id: "publish" as const, label: "Publish" },
-  { id: "ab_test" as const, label: "A/B Test" },
   { id: "metrics" as const, label: "Metrics" },
 ];
 
 const getTabIcon = (tabId: string) => {
   switch (tabId) {
+    case "landing": return Layout;
     case "funnel": return Lightning;
     case "webhook": return ArrowsClockwise;
     case "tracking": return Pulse;
     case "publish": return Rocket;
-    case "ab_test": return Flask;
     case "metrics": return ChartBar;
     default: return null;
   }
@@ -35,14 +35,12 @@ const getTabIcon = (tabId: string) => {
 interface EditorTopBarProps {
   funnel: Funnel;
   onOpenSettings: () => void;
-  viewMode: "desktop" | "mobile";
-  onToggleView: () => void;
   campaignId?: string;
   activeTab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
 }
 
-export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, campaignId, activeTab, onTabChange }: EditorTopBarProps) {
+export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, onTabChange }: EditorTopBarProps) {
   const router = useRouter();
   const updateFunnel = useFunnelStore((s) => s.updateFunnel);
   const saveFunnel = useFunnelStore((s) => s.saveFunnel);
@@ -123,26 +121,6 @@ export function EditorTopBar({ funnel, onOpenSettings, viewMode, onToggleView, c
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* View mode toggle */}
-        <div className="flex items-center border rounded-lg p-0.5 gap-0.5">
-          <Button
-            variant={viewMode === "mobile" ? "default" : "ghost"}
-            size="icon"
-            className="h-7 w-7"
-            onClick={viewMode === "desktop" ? onToggleView : undefined}
-          >
-            <DeviceMobile className="h-3.5 w-3.5" weight={viewMode === "mobile" ? "fill" : "bold"} />
-          </Button>
-          <Button
-            variant={viewMode === "desktop" ? "default" : "ghost"}
-            size="icon"
-            className="h-7 w-7"
-            onClick={viewMode === "mobile" ? onToggleView : undefined}
-          >
-            <Monitor className="h-3.5 w-3.5" weight={viewMode === "desktop" ? "fill" : "bold"} />
-          </Button>
-        </div>
-
         {/* Preview */}
         <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview">
           <Eye className="h-4 w-4" weight="bold" />

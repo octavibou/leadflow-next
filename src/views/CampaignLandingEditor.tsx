@@ -14,8 +14,11 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
+import { VariationSettingsDialog } from "@/components/editor/VariationSettingsDialog";
 import type { FunnelStep, IntroConfig } from "@/types/funnel";
 import { cn } from "@/lib/utils";
+import { funnelContentFontFamily } from "@/lib/funnelTypography";
+import { FunnelGoogleFont } from "@/components/funnel/FunnelGoogleFont";
 
 function getEmbedUrl(url: string): string | null {
   try {
@@ -41,6 +44,7 @@ const CampaignLandingEditor = () => {
   const { campaigns, fetchCampaigns, updateCampaign } = useCampaignStore();
   const campaign = campaigns.find((c) => c.id === campaignId);
 
+  const [editingMeta, setEditingMeta] = useState(false);
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("mobile");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
 
@@ -63,7 +67,9 @@ const CampaignLandingEditor = () => {
     const newSteps = campaign.steps.map((s: any) =>
       s.id === introStep.id ? { ...s, introConfig: updatedIntro } : s
     );
-    updateCampaign(campaign.id, { steps: newSteps });
+    void updateCampaign(campaign.id, { steps: newSteps }).catch(() =>
+      toast.error("No se pudo guardar los cambios"),
+    );
   }, [campaign, introStep, ic, updateCampaign]);
 
   if (!funnel || !campaign) {
@@ -79,7 +85,7 @@ const CampaignLandingEditor = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Esta variación no tiene landing</h2>
-          <button className="text-primary underline" onClick={() => router.push(`/editor/${funnelId}?tab=ab_test`)}>Volver a campañas</button>
+          <button className="text-primary underline" onClick={() => router.push(`/editor/${funnelId}?tab=landing`)}>Volver a campañas</button>
         </div>
       </div>
     );
@@ -108,13 +114,23 @@ const CampaignLandingEditor = () => {
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Top bar */}
       <header className="border-b bg-background shrink-0">
-        <div className="bg-primary/10 border-b border-primary/20 px-4 py-1.5 flex items-center gap-2 text-sm">
+        <div className="bg-primary/10 border-b border-primary/20 px-4 py-1.5 flex items-center gap-2 text-sm flex-wrap">
           <Badge variant="secondary" className="text-xs">Variación</Badge>
           <span className="font-medium">{campaign.name}</span>
-          <span className="text-muted-foreground">— Editando solo la landing de esta variación</span>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingMeta(true)}>
+            Editar nombre y enlace
+          </Button>
+          <span className="text-muted-foreground">— Solo la landing de esta variación</span>
+          <VariationSettingsDialog
+            open={editingMeta}
+            onOpenChange={setEditingMeta}
+            funnelId={funnel.id}
+            campaign={campaign}
+            campaigns={campaigns}
+          />
         </div>
         <div className="flex items-center gap-3 h-12 px-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/editor/${funnelId}?tab=ab_test`)}>
+          <Button variant="ghost" size="icon" onClick={() => router.push(`/editor/${funnelId}?tab=landing`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <span className="font-semibold text-sm">{funnel.name}</span>
@@ -138,11 +154,15 @@ const CampaignLandingEditor = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Preview */}
-        <div className="flex-1 bg-muted/30 overflow-auto flex justify-center items-start py-8">
-          <div className={cn(
-            "bg-white rounded-xl shadow-lg overflow-hidden",
-            isMobile ? "w-[375px]" : "w-[800px]"
-          )}>
+        <div className="flex flex-1 items-start justify-center overflow-hidden bg-muted/30 py-8">
+          <FunnelGoogleFont fontFamily={funnel.settings.fontFamily} />
+          <div
+            className={cn(
+              "bg-white rounded-xl shadow-lg overflow-hidden",
+              isMobile ? "w-[375px]" : "w-[800px]",
+            )}
+            style={{ fontFamily: funnelContentFontFamily(funnel.settings.fontFamily) }}
+          >
             <div className={cn("p-6", isMobile ? "px-5 py-6" : "px-10 py-8")}>
               <div className="text-center" style={{ gap: `${previewS}px`, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="font-bold leading-tight" style={{ fontSize: `${previewH}px` }}>

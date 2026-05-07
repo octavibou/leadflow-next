@@ -1,6 +1,28 @@
 import type { FunnelStep, FunnelSettings } from "@/types/funnel";
 import { cn } from "@/lib/utils";
 import { interpolate, formatNumber } from "@/lib/resultsEngine";
+import { useLandingBuilderOptional } from "@/components/editor/landing/LandingBuilderContext";
+import {
+  isLandingHeroTemplateId,
+  type LandingBuilderComponentId,
+} from "@/components/editor/landing/landingBuilderTypes";
+import { FunnelIntroScrollShell } from "@/components/funnel/FunnelIntroScrollShell";
+import {
+  introHeroMetrics,
+  LandingIntroHeroColumn,
+  landingIntroCtaButtonClasses,
+  landingIntroCtaButtonStyle,
+} from "@/components/funnel/LandingIntroHeroColumn";
+import { FunnelBrandingFooter } from "@/components/funnel/FunnelBrandingFooter";
+import { FunnelGoogleFont } from "@/components/funnel/FunnelGoogleFont";
+import { LandingCanvasIntroLayout } from "@/components/funnel/LandingCanvasIntroLayout";
+import { LandingIntroBodyBlocks } from "@/components/funnel/LandingIntroBodyBlocks";
+import { LandingIntroBodyBlocksEditorRegion } from "@/components/editor/landing/LandingIntroBodyBlocksEditorRegion";
+import { funnelContentFontFamily } from "@/lib/funnelTypography";
+
+/** Transición unificada móvil ↔ escritorio: ancho del marco + paddings (contenido y pie) en paralelo. */
+const viewModeTransitionClass =
+  "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:!transition-none motion-reduce:!duration-0";
 
 function getEmbedUrl(url: string): string | null {
   try {
@@ -36,7 +58,64 @@ function VideoEmbed({ url }: { url: string }) {
   );
 }
 
-export function EditorCanvas({ step, steps, settings, viewMode }: { step: FunnelStep; steps: FunnelStep[]; settings: FunnelSettings; viewMode: "desktop" | "mobile" }) {
+/** En modo constructor de landing, zona clic que abre el panel lateral del bloque correspondiente. */
+function LandingPickZone({
+  blockId,
+  enabled,
+  className,
+  children,
+  matchActive,
+}: {
+  blockId: LandingBuilderComponentId;
+  enabled: boolean;
+  className?: string;
+  children: React.ReactNode;
+  matchActive?: (id: LandingBuilderComponentId | null) => boolean;
+}) {
+  const ctx = useLandingBuilderOptional();
+  if (!enabled || !ctx) return <div className={className}>{children}</div>;
+  const selected =
+    (matchActive ? matchActive(ctx.activeComponent) : ctx.activeComponent === blockId) && ctx.sheetOpen;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        "rounded-xl outline-none transition-shadow",
+        "cursor-pointer hover:ring-2 hover:ring-primary/35 focus-visible:ring-2 focus-visible:ring-ring",
+        selected && "ring-2 ring-primary",
+        className,
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        ctx.openComponent(blockId);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          ctx.openComponent(blockId);
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function EditorCanvas({
+  step,
+  steps,
+  settings,
+  viewMode,
+  landingConstructorPick,
+}: {
+  step: FunnelStep;
+  steps: FunnelStep[];
+  settings: FunnelSettings;
+  viewMode: "desktop" | "mobile";
+  /** Solo en la pestaña Landing → Constructor: la vista previa divide la intro en bloques clicables (Hero / Producto / CTA). */
+  landingConstructorPick?: boolean;
+}) {
   const primary = settings.primaryColor || "#1877F2";
   const isMobile = viewMode === "mobile";
 
@@ -45,54 +124,224 @@ export function EditorCanvas({ step, steps, settings, viewMode }: { step: Funnel
   const currentQuestionIndex = questionSteps.findIndex((s) => s.id === step.id);
   const isQuestion = step.type === "question";
   const progress = totalQuestions > 1 && currentQuestionIndex >= 0 ? (currentQuestionIndex / (totalQuestions - 1)) * 100 : isQuestion ? 0 : 100;
+  const introLayout = step.type === "intro";
+  const landingChrome = useLandingBuilderOptional();
+
+  const showSidebarPrimitiveOverlay =
+    introLayout &&
+    Boolean(landingConstructorPick) &&
+    Boolean(landingChrome?.sidebarPrimitiveDragActive) &&
+    Boolean(landingChrome?.bodyCanvasActionsConfigured);
 
   return (
-    <div className="flex-1 bg-white overflow-auto flex justify-center">
-      <div className={cn(
-        "w-full bg-white flex flex-col",
-        isMobile ? "max-w-[375px] border-x border-gray-100" : "max-w-[900px]"
-      )}>
-        <div className={cn("mx-auto w-full flex-1", isMobile ? "px-5 py-6" : "px-10 py-8")}>
-          <StepContent step={step} primary={primary} isMobile={isMobile} />
-        </div>
-        {/* Step counter + progress bar — only for questions */}
-        {isQuestion && totalQuestions > 0 && (
-          <div className={cn("w-full pb-4", isMobile ? "px-5" : "px-10")}>
-            <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
-              <span>Pregunta {currentQuestionIndex + 1} de {totalQuestions}</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
-            </div>
-          </div>
+    <div className="flex-1 overflow-hidden bg-[#f2f2f2]">
+      <FunnelGoogleFont fontFamily={settings.fontFamily} />
+      <div
+        className={cn(
+          "flex min-h-full w-full justify-center p-6 md:p-8 md:py-10",
+          "items-stretch",
         )}
+      >
+        <div
+          className={cn(
+            "relative flex w-full flex-col bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.06]",
+            "rounded-2xl",
+            "transition-[max-width]",
+            viewModeTransitionClass,
+            isMobile ? "max-w-[375px]" : "max-w-[900px]",
+            "min-h-0",
+            isMobile
+              ? "h-[min(812px,calc(100dvh-8rem))] max-h-[min(812px,calc(100dvh-8rem))]"
+              : "h-[min(900px,calc(100dvh-8rem))] max-h-[min(900px,calc(100dvh-8rem))]",
+          )}
+          style={{ fontFamily: funnelContentFontFamily(settings.fontFamily) }}
+        >
+          {introLayout ? (
+            <FunnelIntroScrollShell
+              className="min-h-0 flex-1"
+              showEditorChrome={Boolean(landingConstructorPick)}
+            >
+              <StepContent
+                step={step}
+                primary={primary}
+                isMobile={isMobile}
+                landingConstructorPick={landingConstructorPick}
+                logoUrl={settings.logoUrl}
+              />
+            </FunnelIntroScrollShell>
+          ) : (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <div
+                className={cn(
+                  "mx-auto w-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden transition-[padding]",
+                  viewModeTransitionClass,
+                  isMobile ? "px-5 py-6" : "px-10 py-8",
+                )}
+              >
+                <StepContent
+                  step={step}
+                  primary={primary}
+                  isMobile={isMobile}
+                  landingConstructorPick={landingConstructorPick}
+                  logoUrl={settings.logoUrl}
+                />
+                {isQuestion && totalQuestions > 0 && (
+                  <div
+                    className={cn(
+                      "w-full shrink-0 border-t border-gray-100 pt-4 mt-6 transition-[padding]",
+                      viewModeTransitionClass,
+                    )}
+                  >
+                    <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+                      <span>Pregunta {currentQuestionIndex + 1} de {totalQuestions}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
+                    </div>
+                  </div>
+                )}
+                <FunnelBrandingFooter
+                  className={cn(
+                    "mt-8 shrink-0 transition-[padding]",
+                    viewModeTransitionClass,
+                    isMobile ? "mx-auto w-full pb-2" : "mx-auto w-full pb-4",
+                  )}
+                />
+              </div>
+            </div>
+          )}
+          {showSidebarPrimitiveOverlay ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center overflow-hidden rounded-2xl"
+              aria-hidden
+            >
+              <div className="absolute inset-0 bg-background/45 backdrop-blur-[8px]" />
+              <div className="relative z-[1] mx-5 max-w-[min(100%,22rem)] rounded-2xl border border-dashed border-muted-foreground/40 bg-background/95 px-5 py-6 text-center shadow-sm ring-1 ring-black/[0.05]">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Suéltalo aquí: arrastra un bloque desde «Bloques básicos» en el Constructor.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
 }
 
-function StepContent({ step, primary, isMobile }: { step: FunnelStep; primary: string; isMobile: boolean }) {
+function StepContent({
+  step,
+  primary,
+  isMobile,
+  landingConstructorPick,
+  logoUrl,
+}: {
+  step: FunnelStep;
+  primary: string;
+  isMobile: boolean;
+  landingConstructorPick?: boolean;
+  logoUrl?: string;
+}) {
+  const landingCtx = useLandingBuilderOptional();
+  const introPick = Boolean(landingConstructorPick && landingCtx && step.type === "intro");
+
+  const activeLanding = landingCtx?.activeComponent ?? null;
+  const selectedBodyRowId = landingCtx?.selectedBodyRowId ?? null;
+  const mainBlockSelected =
+    introPick &&
+    !landingCtx?.introLayoutChromeSection &&
+    !selectedBodyRowId &&
+    Boolean(landingCtx?.sheetOpen) &&
+    activeLanding !== null &&
+    (isLandingHeroTemplateId(activeLanding) ||
+      activeLanding === "media_video" ||
+      activeLanding === "core_text" ||
+      activeLanding === "core_button");
+
   return (
     <>
       {step.type === "intro" && (() => {
         const ic = step.introConfig;
-        const hSize = isMobile ? (ic?.mobileHeadlineFontSize || 20) : (ic?.headlineFontSize || 30);
-        const dSize = isMobile ? (ic?.mobileDescriptionFontSize || 14) : (ic?.descriptionFontSize || 18);
-        const cSize = isMobile ? (ic?.mobileCtaFontSize || 14) : (ic?.ctaFontSize || 16);
-        const spacing = isMobile ? (ic?.mobileElementSpacing || 12) : (ic?.elementSpacing || 16);
+        const { cSize } = introHeroMetrics(ic, isMobile);
         return (
-          <div className="animate-fade-in text-center" style={{ gap: `${spacing}px`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <h1 className="font-bold leading-tight" style={{ fontSize: `${hSize}px` }}>{ic?.headline || "Título"}</h1>
-            {ic?.showVideo && ic?.videoUrl && (
-              <div className={cn("rounded-xl overflow-hidden aspect-video w-full", isMobile ? "max-w-full" : "max-w-[640px]")}>
-                <VideoEmbed url={ic.videoUrl} />
-              </div>
-            )}
-            <p className={cn("text-gray-500 leading-relaxed", isMobile ? "max-w-full" : "max-w-[600px]")} style={{ fontSize: `${dSize}px` }}>{ic?.description || "Descripción"}</p>
-            <button className="px-8 py-4 rounded-xl font-semibold" style={{ background: primary, color: "#fff", fontSize: `${cSize}px` }}>
-              {ic?.cta || "Empezar"}
-            </button>
-          </div>
+          <LandingCanvasIntroLayout
+            logoUrl={logoUrl?.trim() ? logoUrl : undefined}
+            showEditorChrome={introPick}
+            showLandingDivider={ic?.showLandingDivider === true}
+            mainSelected={mainBlockSelected}
+            renderBrandingFooterInside={false}
+          >
+            <>
+              <LandingIntroHeroColumn
+                ic={ic}
+                primary={primary}
+                isMobile={isMobile}
+                renderHeadline={(n) => (
+                  <LandingPickZone
+                    blockId="hero_tpl_center_logos"
+                    matchActive={(id) => isLandingHeroTemplateId(id)}
+                    enabled={introPick}
+                    className="w-full"
+                  >
+                    {n}
+                  </LandingPickZone>
+                )}
+                renderVideo={(el) =>
+                  el ? (
+                    <LandingPickZone
+                      blockId="media_video"
+                      matchActive={(id) => id === "media_video"}
+                      enabled={introPick}
+                      className={cn(
+                        /* self-stretch: en columna flex con align-items:center el pick zone ocupaba menos ancho y el vídeo quedaba a la izquierda. */
+                        "relative shrink-0 self-stretch w-full",
+                        introPick && "[&_iframe]:pointer-events-none",
+                      )}
+                    >
+                      {el}
+                    </LandingPickZone>
+                  ) : null
+                }
+                renderDescription={(n) => (
+                  <LandingPickZone
+                    blockId="core_text"
+                    matchActive={(id) => id === "core_text"}
+                    enabled={introPick}
+                    className={cn("w-full", isMobile ? "max-w-full" : "max-w-[600px]")}
+                  >
+                    {n}
+                  </LandingPickZone>
+                )}
+                ctaSlot={
+                  <LandingPickZone
+                    blockId="core_button"
+                    matchActive={(id) => id === "core_button"}
+                    enabled={introPick}
+                    className="w-full"
+                  >
+                    <span
+                      className={cn(
+                        landingIntroCtaButtonClasses(isMobile),
+                        introPick ? "cursor-pointer" : "cursor-default",
+                      )}
+                      style={landingIntroCtaButtonStyle(primary, cSize)}
+                    >
+                      {ic?.cta || "Empezar"}
+                    </span>
+                  </LandingPickZone>
+                }
+              />
+              {introPick ? (
+                <LandingIntroBodyBlocksEditorRegion introConfig={ic} primary={primary} isMobile={isMobile} />
+              ) : (
+                <LandingIntroBodyBlocks
+                  blocks={ic?.landingBodyBlocks}
+                  primary={primary}
+                  isMobile={isMobile}
+                />
+              )}
+            </>
+          </LandingCanvasIntroLayout>
         );
       })()}
 

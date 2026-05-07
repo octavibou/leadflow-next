@@ -1,6 +1,7 @@
 import type { Funnel, FunnelStep } from "@/types/funnel";
 import { t } from "@/lib/i18n";
 import type { Language } from "@/lib/i18n";
+import { funnelContentFontFamily, funnelGoogleFontsStylesheetHref, funnelLoadsGoogleFont } from "@/lib/funnelTypography";
 
 function getEmbedUrlExport(url: string): string {
   try {
@@ -41,7 +42,11 @@ export function exportFunnelToHtml(funnel: Funnel): string {
   const { settings, steps } = funnel;
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
   const primaryColor = settings.primaryColor || "#1877F2";
-  const fontFamily = settings.fontFamily || "Inter";
+  const fontCss = funnelContentFontFamily(settings.fontFamily);
+  const googleFontLink =
+    funnelLoadsGoogleFont(settings.fontFamily) && settings.fontFamily?.trim()
+      ? `<link href="${funnelGoogleFontsStylesheetHref(settings.fontFamily.trim())}" rel="stylesheet">`
+      : "";
   const lang = (settings.language || "es") as Language;
 
   const optionMap: Record<string, boolean> = {};
@@ -67,10 +72,10 @@ export function exportFunnelToHtml(funnel: Funnel): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escHtml(funnel.name)}</title>
-<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;500;600;700&display=swap" rel="stylesheet">
+${googleFontLink}
 <style>
 *{margin:0!important;padding:0!important;box-sizing:border-box}
-html,body{margin:0!important;padding:0!important;width:100%;min-height:0;background:#fff;font-family:'${fontFamily}',system-ui,sans-serif;color:#0d0d0d;-webkit-font-smoothing:antialiased;display:block!important;align-items:unset!important;justify-content:unset!important}
+html,body{margin:0!important;padding:0!important;width:100%;min-height:0;background:#fff;font-family:${fontCss};color:#0d0d0d;-webkit-font-smoothing:antialiased;display:block!important;align-items:unset!important;justify-content:unset!important}
 .qf-root{position:relative;width:100%;margin:0!important;padding:0!important;background:#fff}
 .step{display:none;position:absolute;top:0;left:0;right:0}
 .step.active{display:block;animation:stepIn .38s cubic-bezier(.4,0,.2,1) both}

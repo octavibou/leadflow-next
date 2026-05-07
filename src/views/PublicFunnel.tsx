@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import type { Funnel, FunnelStep, FunnelType } from "@/types/funnel";
@@ -9,6 +10,19 @@ import {
   trackEvent, saveLead, injectMetaPixel, injectGoogleTag,
   fireExternalEvent, extractUtms, fireMetaCapi, getOrCreateFunnelSessionId,
 } from "@/lib/tracking";
+import { funnelPublicFooterInnerClass } from "@/components/funnel/FunnelIntroScrollShell";
+import { FunnelBrandingFooter } from "@/components/funnel/FunnelBrandingFooter";
+import { FunnelGoogleFont } from "@/components/funnel/FunnelGoogleFont";
+import {
+  introHeroMetrics,
+  LandingIntroHeroColumn,
+  landingIntroCtaButtonClasses,
+  landingIntroCtaButtonStyle,
+} from "@/components/funnel/LandingIntroHeroColumn";
+import { LandingCanvasIntroLayout } from "@/components/funnel/LandingCanvasIntroLayout";
+import { LandingIntroBodyBlocks } from "@/components/funnel/LandingIntroBodyBlocks";
+import { funnelContentFontFamily } from "@/lib/funnelTypography";
+import { CookieBanner } from "@/components/CookieBanner";
 
 interface CampaignSettings {
   metaPixelId?: string;
@@ -57,16 +71,52 @@ const PublicFunnel = () => {
   const [consentChecked, setConsentChecked] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaignSettings, setCampaignSettings] = useState<CampaignSettings>({});
+  const [cookieConsent, setCookieConsent] = useState<"accepted" | "rejected" | null>(null);
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
   const utmsRef = useRef<Record<string, string>>({});
   const trackedPageView = useRef(false);
   const sessionIdRef = useRef<string>("");
   const qualificationTrackedRef = useRef(false);
   const searchParams = useSearchParams();
+  const cSlug = searchParams.get("c");
+  const [campaignGate, setCampaignGate] = useState<"pending" | "ok" | "fail">(() =>
+    cSlug ? "pending" : "ok",
+  );
 
   // Extract UTMs once
   useEffect(() => {
     utmsRef.current = extractUtms();
     sessionIdRef.current = getOrCreateFunnelSessionId();
+  }, []);
+
+  // Read cookie consent once on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("cookie_consent");
+    if (stored === "accepted" || stored === "rejected") {
+      setCookieConsent(stored);
+    } else {
+      setCookieConsent(null);
+    }
+  }, []);
+
+  const handleCookieAccept = useCallback(() => {
+    if (!funnel) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("cookie_consent", "accepted");
+    }
+    setCookieConsent("accepted");
+    setShowCookieBanner(false);
+    const pid = funnel.settings.metaPixelId;
+    if (pid) injectMetaPixel(pid);
+  }, [funnel]);
+
+  const handleCookieReject = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("cookie_consent", "rejected");
+    }
+    setCookieConsent("rejected");
+    setShowCookieBanner(false);
   }, []);
 
   // Load funnel
@@ -85,14 +135,27 @@ const PublicFunnel = () => {
             setLoading(false);
             return;
           }
+          const steps = (data.steps as any) || [];
+          const settings = data.settings as any;
+          const sorted = [...steps].sort((a: FunnelStep, b: FunnelStep) => a.order - b.order);
+          const forceNoLanding =
+            typeof window !== "undefined" &&
+            new URLSearchParams(window.location.search).get("landing") === "0";
+          const skipIntro = forceNoLanding || settings?.useLanding === false;
+          if (skipIntro) {
+            const idx = sorted.findIndex((s) => s.type !== "intro");
+            setCurrentStepIndex(idx >= 0 ? idx : 0);
+          } else {
+            setCurrentStepIndex(0);
+          }
           setFunnel({
             id: data.id,
             user_id: data.user_id,
             name: data.name,
             slug: data.slug,
             type: data.type as FunnelType,
-            settings: data.settings as any,
-            steps: (data.steps as any) || [],
+            settings: settings,
+            steps,
             created_at: data.created_at,
             updated_at: data.updated_at,
             saved_at: data.saved_at || data.updated_at,
@@ -102,53 +165,91 @@ const PublicFunnel = () => {
       });
   }, [funnelId]);
 
-  // Load campaign from ?c= param
+  // Load campaign from ?c= (solo variantes publicadas)
   useEffect(() => {
     if (!funnelId) return;
-    const campaignSlug = searchParams.get("c");
-    if (!campaignSlug) return;
+    if (!cSlug) {
+      setCampaignGate("ok");
+      setCampaignId(null);
+      setCampaignSettings({});
+      return;
+    }
+    setCampaignGate("pending");
+    let cancelled = false;
     supabase
       .from("campaigns")
       .select("*")
       .eq("funnel_id", funnelId)
-      .eq("slug", campaignSlug)
-      .single()
+      .eq("slug", cSlug)
+      .maybeSingle()
       .then(({ data, error }) => {
-        if (data && !error) {
-          setCampaignId(data.id);
-          const s = (data.settings || {}) as CampaignSettings;
-          setCampaignSettings(s);
-          // Campaign-level Google Tag (kept for backwards compat)
-          if (s.trackingEnabled && s.googleTagId) injectGoogleTag(s.googleTagId);
-          const campaignSteps = (data.steps as any[]) || [];
-          if (campaignSteps.length > 0) {
-            setFunnel((prev) => prev ? { ...prev, steps: campaignSteps } : prev);
-          }
+        if (cancelled) return;
+        if (error || !data?.published_at) {
+          setCampaignGate("fail");
+          setCampaignId(null);
+          setCampaignSettings({});
+          return;
+        }
+        const updatedAfterPublish =
+          new Date(data.updated_at).getTime() > new Date(data.published_at).getTime();
+        if (updatedAfterPublish) {
+          setCampaignGate("fail");
+          setCampaignId(null);
+          setCampaignSettings({});
+          return;
+        }
+        setCampaignGate("ok");
+        setCampaignId(data.id);
+        const s = (data.settings || {}) as CampaignSettings;
+        setCampaignSettings(s);
+        if (s.trackingEnabled && s.googleTagId) injectGoogleTag(s.googleTagId);
+        const campaignSteps = (data.steps as any[]) || [];
+        if (campaignSteps.length > 0) {
+          setFunnel((prev) => (prev ? { ...prev, steps: campaignSteps } : prev));
         }
       });
-  }, [funnelId, searchParams]);
+    return () => {
+      cancelled = true;
+    };
+  }, [funnelId, cSlug]);
 
-  // Inject funnel-level Meta Pixel
+  // Inject funnel-level Meta Pixel only if cookies accepted
   useEffect(() => {
     if (!funnel) return;
+    if (cookieConsent !== "accepted") return;
     const pid = funnel.settings.metaPixelId;
     if (pid) injectMetaPixel(pid);
-  }, [funnel]);
+  }, [funnel, cookieConsent]);
+
+  // Show cookie banner when user reaches second question and has not decided yet
+  useEffect(() => {
+    if (!funnel) return;
+    if (cookieConsent !== null) {
+      setShowCookieBanner(false);
+      return;
+    }
+    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
+    const current = sorted[currentStepIndex];
+    if (current && current.type === "question" && currentStepIndex === 1) {
+      setShowCookieBanner(true);
+    }
+  }, [funnel, currentStepIndex, cookieConsent]);
 
   // Helper to fire Meta CAPI for this funnel
   const fireCapiEvent = useCallback(
     (eventName: string, userData: Record<string, unknown> = {}, customData: Record<string, unknown> = {}) => {
       if (!funnel) return;
-      const { metaPixelId, metaAccessToken, metaTestEventCode } = funnel.settings;
-      if (!metaPixelId || !metaAccessToken) return;
-      fireMetaCapi(metaPixelId, metaAccessToken, eventName, window.location.href, userData, customData, metaTestEventCode || undefined);
+      const { metaPixelId } = funnel.settings;
+      if (!metaPixelId) return;
+      fireMetaCapi(funnel.id, eventName, window.location.href, userData, customData);
     },
     [funnel]
   );
 
-  // Track page_view once
+  // Track page_view once (esperar variante ?c= si aplica)
   useEffect(() => {
     if (!funnel || trackedPageView.current) return;
+    if (cSlug && campaignGate !== "ok") return;
     trackedPageView.current = true;
     const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
     const params = { funnel_id: funnelId, campaign_id: campaignId, session_id: sessionId, ...utmsRef.current };
@@ -160,7 +261,7 @@ const PublicFunnel = () => {
     if (campaignSettings.trackingEnabled) {
       fireExternalEvent("page_view", params);
     }
-  }, [funnel, funnelId, campaignId, campaignSettings, fireCapiEvent]);
+  }, [funnel, funnelId, campaignId, campaignSettings, fireCapiEvent, cSlug, campaignGate]);
 
   useEffect(() => {
     if (!funnel || qualificationTrackedRef.current) return;
@@ -178,6 +279,35 @@ const PublicFunnel = () => {
     qualificationTrackedRef.current = true;
   }, [answers, qualified, funnel, campaignId]);
 
+  const stepsSignature = useMemo(
+    () => (funnel?.steps ? JSON.stringify(funnel.steps.map((s) => s.id)) : ""),
+    [funnel?.steps],
+  );
+
+  /** Saltar la landing: ajuste global `useLanding === false`, o URL `?landing=0` (p. ej. enlace de Publicar «Solo funnel»). */
+  const hideIntro = useMemo(() => {
+    if (!funnel) return false;
+    const forceNoLanding = searchParams.get("landing") === "0";
+    return forceNoLanding || funnel.settings.useLanding === false;
+  }, [funnel, searchParams]);
+
+  const stepResetKey = `${stepsSignature}|${String(funnel?.settings?.useLanding)}|${searchParams.get("landing") ?? ""}`;
+  const prevStepResetKey = useRef<string>("");
+
+  /** Antes del pintado: evita un frame con la landing cuando `hideIntro` (quiz directo). */
+  useLayoutEffect(() => {
+    if (!funnel || !stepsSignature) return;
+    if (prevStepResetKey.current === stepResetKey) return;
+    prevStepResetKey.current = stepResetKey;
+    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
+    if (hideIntro) {
+      const idx = sorted.findIndex((s) => s.type !== "intro");
+      setCurrentStepIndex(idx >= 0 ? idx : 0);
+    } else {
+      setCurrentStepIndex(0);
+    }
+  }, [funnel, stepsSignature, stepResetKey, hideIntro]);
+
   const goNext = useCallback(() => {
     if (!funnel) return;
     setCurrentStepIndex((prev) => {
@@ -189,20 +319,34 @@ const PublicFunnel = () => {
         // If disqualifiedRoute is set, go there; otherwise just skip to next
         if (nextStep.disqualifiedRoute !== undefined) {
           const idx = sorted.findIndex((s) => s.order === nextStep.disqualifiedRoute);
-          return idx >= 0 ? idx : Math.min(next + 1, sorted.length - 1);
+          next = idx >= 0 ? idx : Math.min(next + 1, sorted.length - 1);
+        } else {
+          next = Math.min(next + 1, sorted.length - 1);
         }
-        next = Math.min(next + 1, sorted.length - 1);
+      }
+      if (hideIntro) {
+        while (next < sorted.length && sorted[next]?.type === "intro") {
+          next++;
+        }
+        next = Math.min(next, sorted.length - 1);
       }
       return next;
     });
-  }, [funnel, qualified]);
+  }, [funnel, qualified, hideIntro]);
 
   const goToStep = useCallback((order: number) => {
     if (!funnel) return;
-    const idx = funnel.steps.findIndex((s) => s.order === order);
+    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
+    const target = sorted.find((s) => s.order === order);
+    if (hideIntro && target?.type === "intro") {
+      const fi = sorted.findIndex((s) => s.type !== "intro");
+      setCurrentStepIndex(fi >= 0 ? fi : 0);
+      return;
+    }
+    const idx = sorted.findIndex((s) => s.order === order);
     if (idx >= 0) setCurrentStepIndex(idx);
-    else setCurrentStepIndex((prev) => Math.min(prev + 1, funnel.steps.length - 1));
-  }, [funnel]);
+    else setCurrentStepIndex((prev) => Math.min(prev + 1, sorted.length - 1));
+  }, [funnel, hideIntro]);
 
   if (loading) {
     return (
@@ -223,10 +367,30 @@ const PublicFunnel = () => {
     );
   }
 
+  if (cSlug && campaignGate === "pending") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (cSlug && campaignGate === "fail") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="text-center space-y-2 max-w-md">
+          <h2 className="text-xl font-semibold">Variante no disponible</h2>
+          <p className="text-gray-500">
+            Esta variante no está publicada, el enlace no es válido o tiene cambios sin publicar. Revisa la URL o vuelve a publicar en el editor.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const sortedSteps = [...funnel.steps].sort((a, b) => a.order - b.order);
   const currentStep = sortedSteps[currentStepIndex];
   const primary = funnel.settings.primaryColor || "#1877F2";
-  const font = funnel.settings.fontFamily || "Inter";
   const questionSteps = sortedSteps.filter((s) => s.type === "question");
   const totalQuestions = questionSteps.length;
   const currentQuestionIndex = questionSteps.findIndex((s) => s.id === currentStep?.id);
@@ -395,7 +559,18 @@ const PublicFunnel = () => {
   };
 
   return (
-    <div className="h-[100dvh] bg-white flex flex-col overflow-hidden" style={{ fontFamily: font }}>
+    <div
+      className="h-[100dvh] bg-white flex flex-col overflow-hidden"
+      style={{ fontFamily: funnel ? funnelContentFontFamily(funnel.settings.fontFamily) : undefined }}
+    >
+      {funnel ? <FunnelGoogleFont fontFamily={funnel.settings.fontFamily} /> : null}
+      {showCookieBanner && (
+        <CookieBanner
+          primaryColor={primary}
+          onAccept={handleCookieAccept}
+          onReject={handleCookieReject}
+        />
+      )}
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center space-y-4">
@@ -412,42 +587,56 @@ const PublicFunnel = () => {
         </div>
       ) : (
         <>
-      {/* Logo */}
-      {funnel.settings.logoUrl && (
+      {/* Logo (fuera del scroll salvo landing: ahí va en la cabecera del canvas) */}
+      {funnel.settings.logoUrl && currentStep?.type !== "intro" && (
         <div className="flex justify-center pt-4 pb-0 shrink-0">
           <img src={funnel.settings.logoUrl} alt="Logo" className="h-8 object-contain" />
         </div>
       )}
 
-      {/* Content - scrollable area */}
-      <div className="flex-1 overflow-y-auto flex justify-center">
-        <div className="w-full max-w-[900px] px-5 py-6 md:px-10 md:py-8">
+      {/* Un solo scroll: contenido, barra de quiz y pie de marca al final de la página */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+          <div
+            className={cn(
+              "flex w-full max-w-[900px] flex-col mx-auto",
+              currentStep.type === "intro" ? "px-0 pt-0 pb-0" : "px-5 py-6 md:px-10 md:py-8",
+            )}
+          >
 
           {/* Landing */}
           {currentStep.type === "intro" && (() => {
             const ic = currentStep.introConfig;
-            const isMob = window.innerWidth < 768;
-            const hSize = isMob ? (ic?.mobileHeadlineFontSize || 20) : (ic?.headlineFontSize || 30);
-            const dSize = isMob ? (ic?.mobileDescriptionFontSize || 14) : (ic?.descriptionFontSize || 18);
-            const cSize = isMob ? (ic?.mobileCtaFontSize || 14) : (ic?.ctaFontSize || 16);
-            const spacing = isMob ? (ic?.mobileElementSpacing || 12) : (ic?.elementSpacing || 16);
+            const isMob = typeof window !== "undefined" && window.innerWidth < 768;
+            const { cSize } = introHeroMetrics(ic, isMob);
+            const logo = funnel.settings.logoUrl?.trim() ? funnel.settings.logoUrl : undefined;
             return (
-              <div className="animate-fade-in text-center" style={{ gap: `${spacing}px`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <h1 className="font-bold leading-tight" style={{ fontSize: `${hSize}px` }}>{ic?.headline || "Título"}</h1>
-                {ic?.showVideo && ic?.videoUrl && (
-                  <div className="rounded-xl overflow-hidden aspect-video w-full md:max-w-[640px]">
-                    <VideoEmbed url={ic.videoUrl} />
-                  </div>
-                )}
-                <p className="text-gray-500 leading-relaxed mx-auto md:max-w-[600px]" style={{ fontSize: `${dSize}px` }}>{ic?.description || "Descripción"}</p>
-                <button
-                  onClick={goNext}
-                  className="px-8 py-4 rounded-xl font-semibold cursor-pointer hover:opacity-90 transition-opacity w-full md:w-auto"
-                  style={{ background: primary, color: "#fff", fontSize: `${cSize}px` }}
-                >
-                  {ic?.cta || "Empezar"}
-                </button>
-              </div>
+              <LandingCanvasIntroLayout
+                logoUrl={logo}
+                showEditorChrome={false}
+                showLandingDivider={ic?.showLandingDivider === true}
+                renderBrandingFooterInside={false}
+              >
+                <LandingIntroHeroColumn
+                  ic={ic}
+                  primary={primary}
+                  isMobile={isMob}
+                  renderHeadline={(n) => n}
+                  renderDescription={(n) => n}
+                  renderVideo={(n) => n}
+                  ctaSlot={
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className={landingIntroCtaButtonClasses(isMob)}
+                      style={landingIntroCtaButtonStyle(primary, cSize)}
+                    >
+                      {ic?.cta || "Empezar"}
+                    </button>
+                  }
+                />
+                <LandingIntroBodyBlocks blocks={ic?.landingBodyBlocks} primary={primary} isMobile={isMob} />
+              </LandingCanvasIntroLayout>
             );
           })()}
 
@@ -611,20 +800,24 @@ const PublicFunnel = () => {
               )}
             </div>
           )}
+          {isQuestion && totalQuestions > 0 && (
+            <div className="w-full shrink-0 border-t border-gray-100 pt-4 mt-8">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+                <span>Pregunta {currentQuestionIndex + 1} de {totalQuestions}</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
+              </div>
+            </div>
+          )}
+          </div>
+          <div className="shrink-0 w-full bg-white border-t border-gray-100/90">
+            <div className={funnelPublicFooterInnerClass}>
+              <FunnelBrandingFooter />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Step counter + progress bar at bottom — only for questions */}
-      {isQuestion && totalQuestions > 0 && (
-        <div className="w-full max-w-[900px] mx-auto px-5 md:px-10 py-4 shrink-0">
-          <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
-            <span>Pregunta {currentQuestionIndex + 1} de {totalQuestions}</span>
-          </div>
-          <div className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
-          </div>
-        </div>
-      )}
         </>
       )}
     </div>

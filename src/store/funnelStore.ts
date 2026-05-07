@@ -10,7 +10,12 @@ interface FunnelStore {
   loaded: boolean;
   currentWorkspaceId: string | null;
   fetchFunnels: (workspaceId?: string) => Promise<void>;
-  createFunnel: (name: string, type: FunnelType, workspaceId?: string) => Promise<Funnel | null>;
+  createFunnel: (
+    name: string,
+    type: FunnelType,
+    workspaceId?: string,
+    options?: { useLanding?: boolean },
+  ) => Promise<Funnel | null>;
   updateFunnel: (id: string, updates: Partial<Funnel>) => void;
   saveFunnel: (id: string) => Promise<void>;
   unpublishFunnel: (id: string) => Promise<void>;
@@ -64,13 +69,16 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
     set({ loading: false });
   },
 
-  createFunnel: async (name, type, workspaceId) => {
+  createFunnel: async (name, type, workspaceId, options) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     const id = genId();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const steps = createTemplateSteps(id, type);
-    const settings = { ...DEFAULT_SETTINGS };
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      ...(options?.useLanding !== undefined ? { useLanding: options.useLanding } : {}),
+    };
 
     const insertData: any = {
       id,

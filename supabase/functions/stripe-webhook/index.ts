@@ -99,11 +99,11 @@ serve(async (req) => {
 
   let event: Stripe.Event;
   try {
-    if (webhookSecret && signature) {
-      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-    } else {
-      event = JSON.parse(body) as Stripe.Event;
+    // In production, always require signature verification.
+    if (!webhookSecret || !signature) {
+      return new Response(JSON.stringify({ error: "Missing webhook secret/signature" }), { status: 400 });
     }
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
   } catch (err: any) {
     console.error("Webhook signature verification failed:", err.message);
     return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });

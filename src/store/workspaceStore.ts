@@ -48,16 +48,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   fetchWorkspaces: async () => {
     if (get().loaded) return;
     set({ loading: true });
-    const { data, error } = await supabase
-      .from("workspaces")
-      .select("*")
-      .order("created_at", { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-    if (!error && data) {
-      const workspaces = data as Workspace[];
+      const workspaces = (!error && data ? data : []) as Workspace[];
       set({ workspaces, loaded: true });
 
-      // Auto-select first workspace if none selected
       const currentId = get().currentWorkspaceId;
       if (!currentId || !workspaces.find((w) => w.id === currentId)) {
         const first = workspaces[0];
@@ -66,8 +65,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
           localStorage.setItem(STORAGE_KEY, first.id);
         }
       }
+    } finally {
+      set({ loading: false });
     }
-    set({ loading: false });
   },
 
   setCurrentWorkspace: (id) => {
