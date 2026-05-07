@@ -1,32 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
+/**
+ * Disabled in production: previously this route used the Supabase service role
+ * key and returned leads across all users, which is unsafe to expose.
+ */
 export async function GET() {
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      total: data?.length || 0,
-      leads: data,
-      message: data && data.length > 0 ? 'Leads encontrados' : 'No hay leads en la base de datos',
-    });
-  } catch (err) {
-    return NextResponse.json({ 
-      error: err instanceof Error ? err.message : 'Error desconocido',
-      logs: '[v0] Error fetching leads from Supabase'
-    }, { status: 500 });
-  }
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
 }
