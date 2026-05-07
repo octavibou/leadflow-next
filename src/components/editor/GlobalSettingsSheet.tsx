@@ -62,7 +62,7 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
-        hideOverlay
+        overlayClassName="hidden"
         side="right"
         className="flex max-h-full w-full max-w-80 flex-col gap-0 overflow-hidden border-l bg-background p-0 sm:max-w-80"
       >

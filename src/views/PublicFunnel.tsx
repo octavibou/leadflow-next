@@ -139,9 +139,9 @@ const PublicFunnel = () => {
   const fireCapiEvent = useCallback(
     (eventName: string, userData: Record<string, unknown> = {}, customData: Record<string, unknown> = {}) => {
       if (!funnel) return;
-      const { metaPixelId, metaAccessToken, metaTestEventCode } = funnel.settings;
-      if (!metaPixelId || !metaAccessToken) return;
-      fireMetaCapi(metaPixelId, metaAccessToken, eventName, window.location.href, userData, customData, metaTestEventCode || undefined);
+      const { metaPixelId } = funnel.settings;
+      if (!metaPixelId) return;
+      fireMetaCapi(funnel.id, eventName, window.location.href, userData, customData);
     },
     [funnel]
   );

@@ -27,6 +27,8 @@ export interface FunnelSettings {
   metaPixelId: string;
   metaAccessToken: string;
   metaTestEventCode: string;
+  /** Si es false, la vista pública empieza en la primera pregunta y oculta el paso intro. undefined = true (compatibilidad). */
+  useLanding?: boolean;
 }
 
 export interface QuestionOption {
