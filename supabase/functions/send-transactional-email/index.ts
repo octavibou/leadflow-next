@@ -25,7 +25,46 @@ function generateToken(): string {
     .join('')
 }
 
+function corsJson(status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+/** Despierta el dispatcher: sin pg_cron los mails quedan en PGMQ y Resend no ve nada. */
+async function kickProcessEmailQueue(
+  baseUrl: string,
+  serviceRoleKey: string,
+  anonKey: string,
+): Promise<void> {
+  const origin = baseUrl.replace(/\/$/, '')
+  const ctrl = new AbortController()
+  const tid = setTimeout(() => ctrl.abort(), 25_000)
+  try {
+    const res = await fetch(`${origin}/functions/v1/process-email-queue`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+      signal: ctrl.signal,
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      console.warn('process-email-queue kick HTTP', res.status, t.slice(0, 400))
+    }
+  } catch (e) {
+    console.warn('process-email-queue kick failed', e)
+  } finally {
+    clearTimeout(tid)
+  }
+}
+
 Deno.serve(async (req) => {
+  try {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -42,13 +81,16 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   })
-  const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(
-    authHeader.replace('Bearer ', '')
-  )
-  if (claimsError || !claimsData?.claims) {
+  // getUser(jwt) valida el access token en Auth; getClaims en Edge/Deno falla a menudo (JWKS/runtime).
+  const {
+    data: { user: authUser },
+    error: authUserError,
+  } = await userClient.auth.getUser(accessToken)
+  if (authUserError || !authUser?.id) {
     return new Response(JSON.stringify({ error: 'Invalid token' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -126,10 +168,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  const jwtSub =
-    typeof (claimsData.claims as { sub?: unknown }).sub === 'string'
-      ? (claimsData.claims as { sub: string }).sub
-      : ''
+  const jwtSub = authUser.id
 
   // Service role early for workspace-invitation authorization and recipient sourcing
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
@@ -138,7 +177,7 @@ Deno.serve(async (req) => {
   let effectiveRecipient = template.to || recipientEmail
   let renderTemplateData: Record<string, any> = { ...templateData }
 
-  // workspace-invitation: require invitation row, caller must own the invite flow (invited_by) and be owner/admin on workspace; recipient cannot be spoofed.
+  // workspace-invitation: fila pendiente + llamante owner/admin (recipiente desde BD).
   if (templateName === 'workspace-invitation') {
     const invRowId = invitationId?.trim()
     if (!invRowId || !jwtSub) {
@@ -167,13 +206,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    if (invRow.invited_by !== jwtSub) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const { data: callerMember } = await supabaseAdmin
       .from('workspace_members')
       .select('role')
@@ -186,6 +218,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const invitedByMatches =
+      String(invRow.invited_by).toLowerCase() === String(jwtSub).toLowerCase()
+    if (!invitedByMatches) {
+      console.warn('workspace-invitation send: caller differs from invited_by', {
+        invitationId: invRowId,
+        jwtSub,
+        invited_by: invRow.invited_by,
       })
     }
 
@@ -403,19 +445,47 @@ Deno.serve(async (req) => {
   }
 
   // 4. Render React Email template to HTML and plain text
-  const html = await renderAsync(
-    React.createElement(template.component, renderTemplateData),
-  )
-  const plainText = await renderAsync(
-    React.createElement(template.component, renderTemplateData),
-    { plainText: true },
-  )
+  let html: string
+  let plainText: string
+  try {
+    html = await renderAsync(
+      React.createElement(template.component, renderTemplateData),
+    )
+    try {
+      plainText = await renderAsync(
+        React.createElement(template.component, renderTemplateData),
+        { plainText: true },
+      )
+    } catch {
+      plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 12_000)
+    }
+  } catch (renderErr) {
+    console.error('template render failed', renderErr)
+    const msg =
+      renderErr instanceof Error ? renderErr.message : String(renderErr)
+    return corsJson(500, {
+      error: 'Failed to render email template',
+      detail: msg,
+      templateName,
+    })
+  }
 
   // Resolve subject — supports static string or dynamic function
-  const resolvedSubject =
-    typeof template.subject === 'function'
-      ? template.subject(renderTemplateData)
-      : template.subject
+  let resolvedSubject: string
+  try {
+    resolvedSubject =
+      typeof template.subject === 'function'
+        ? template.subject(renderTemplateData)
+        : template.subject
+  } catch (subjectErr) {
+    console.error('template subject failed', subjectErr)
+    return corsJson(500, {
+      error: 'Failed to resolve email subject',
+      detail:
+        subjectErr instanceof Error ? subjectErr.message : String(subjectErr),
+      templateName,
+    })
+  }
 
   // 5. Enqueue the pre-rendered email for async processing by the dispatcher.
   // The dispatcher (process-email-queue) handles sending, retries, and rate-limit backoff.
@@ -458,16 +528,22 @@ Deno.serve(async (req) => {
       template_name: templateName,
       recipient_email: effectiveRecipient,
       status: 'failed',
-      error_message: 'Failed to enqueue email',
+      error_message: `Failed to enqueue email: ${enqueueError.message ?? 'unknown'}`,
     })
 
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return corsJson(500, {
+      error: 'Failed to enqueue email',
+      hint:
+        'Revisa migracion pgmq, cola transactional_emails y RPC enqueue_email en la base.',
+      message: enqueueError.message,
+      code: enqueueError.code,
+      details: enqueueError.details,
     })
   }
 
   console.log('Transactional email enqueued', { templateName, effectiveRecipient })
+
+  await kickProcessEmailQueue(supabaseUrl, supabaseServiceKey, anonKey)
 
   return new Response(
     JSON.stringify({ success: true, queued: true }),
@@ -476,4 +552,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     }
   )
+  } catch (unexpected) {
+    console.error('send-transactional-email unhandled', unexpected)
+    const msg =
+      unexpected instanceof Error ? unexpected.message : String(unexpected)
+    return corsJson(500, { error: 'Internal error', detail: msg })
+  }
 })

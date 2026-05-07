@@ -340,7 +340,7 @@ const Dashboard = () => {
               dateRange={dateRange}
               metrics={funnelMetrics[f.id]}
               onEdit={() => router.push(`/editor/${f.id}`)}
-              onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
+              onCampaigns={() => router.push(`/editor/${f.id}?tab=landing`)}
               onDuplicate={() => duplicateFunnel(f.id)}
               onExport={() => handleExport(f.id)}
               onDelete={() => deleteFunnel(f.id)}
@@ -358,7 +358,7 @@ const Dashboard = () => {
               key={f.id}
               funnel={f}
               onEdit={() => router.push(`/editor/${f.id}`)}
-              onCampaigns={() => router.push(`/editor/${f.id}?tab=ab_test`)}
+              onCampaigns={() => router.push(`/editor/${f.id}?tab=landing`)}
               onDuplicate={() => duplicateFunnel(f.id)}
               onExport={() => handleExport(f.id)}
               onDelete={() => deleteFunnel(f.id)}

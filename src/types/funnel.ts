@@ -1,4 +1,4 @@
-export type FunnelType = "appointment" | "strategy_call" | "vsl" | "lead_magnet" | "recruiting" | "ai_secretary";
+export type FunnelType = "blank" | "appointment" | "strategy_call" | "vsl" | "lead_magnet" | "recruiting" | "ai_secretary";
 
 export type StepType = "intro" | "question" | "contact" | "results" | "booking" | "vsl" | "delivery" | "thankyou";
 
@@ -27,6 +27,8 @@ export interface FunnelSettings {
   metaPixelId: string;
   metaAccessToken: string;
   metaTestEventCode: string;
+  /** Si es false, la vista pública empieza en la primera pregunta y oculta el paso intro. undefined = true (compatibilidad). */
+  useLanding?: boolean;
 }
 
 export interface QuestionOption {
@@ -74,6 +76,23 @@ export interface IntroConfig {
   mobileDescriptionFontSize?: number;
   mobileCtaFontSize?: number;
   mobileElementSpacing?: number;
+  /** Línea entre logo y contenido en vista previa y público. En constructor la zona divisor sigue disponible. */
+  showLandingDivider?: boolean;
+  /**
+   * Bloques colocados desde “Bloques básicos” (arrastrados al lienzo).
+   * `kind` coincide con los primitivos del constructor (text, button, divider, …).
+   */
+  landingBodyBlocks?: LandingIntroBodyBlock[];
+}
+
+/** Contenido persistido por fila para bloques arrastrados al canvas de la landing. */
+export interface LandingIntroBodyBlock {
+  id: string;
+  kind: string;
+  title?: string;
+  subtitle?: string;
+  body?: string;
+  ctaLabel?: string;
 }
 
 export interface MetricCard {
@@ -188,6 +207,7 @@ export interface Funnel {
 }
 
 export const FUNNEL_TYPE_LABELS: Record<FunnelType, string> = {
+  blank: "Funnel en blanco",
   appointment: "Cita",
   strategy_call: "Llamada estratégica",
   vsl: "VSL",
@@ -197,6 +217,7 @@ export const FUNNEL_TYPE_LABELS: Record<FunnelType, string> = {
 };
 
 export const FUNNEL_TYPE_TAGS: Record<FunnelType, string> = {
+  blank: "Desde cero",
   appointment: "Agendar llamadas",
   strategy_call: "Agendar llamadas",
   vsl: "Ver video",
@@ -206,6 +227,7 @@ export const FUNNEL_TYPE_TAGS: Record<FunnelType, string> = {
 };
 
 export const FUNNEL_TYPE_DESCRIPTIONS: Record<FunnelType, string> = {
+  blank: "Empieza sin contenido predefinido: una landing mínima y una pregunta; tú añades el resto.",
   appointment: "Califica leads y envíalos directo a tu calendario.",
   strategy_call: "Califica prospectos con preguntas diagnósticas antes de una sesión estratégica.",
   vsl: "Califica leads y envíalos a ver tu video de ventas.",
@@ -231,4 +253,5 @@ export const DEFAULT_SETTINGS: FunnelSettings = {
   metaPixelId: "",
   metaAccessToken: "",
   metaTestEventCode: "",
+  useLanding: true,
 };

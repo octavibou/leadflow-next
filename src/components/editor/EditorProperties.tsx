@@ -23,11 +23,11 @@ export function EditorProperties({ step, funnel, onUpdateStep }: Props) {
   const update = (updates: Partial<FunnelStep>) => onUpdateStep(step.id, updates);
 
   return (
-    <div className="w-80 border-l bg-background flex flex-col shrink-0">
-      <div className="px-4 py-3 border-b">
+    <div className="flex min-h-0 min-w-0 w-80 shrink-0 flex-col border-l bg-background">
+      <div className="shrink-0 border-b px-4 py-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Propiedades</span>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-4 space-y-4">
           {step.type === "intro" && <IntroProps step={step} update={update} />}
           {step.type === "question" && <QuestionProps step={step} update={update} />}
@@ -67,7 +67,7 @@ function TextArea({ label, value, onChange, placeholder }: { label: string; valu
   );
 }
 
-function IntroProps({ step, update }: { step: FunnelStep; update: (u: Partial<FunnelStep>) => void }) {
+export function IntroProps({ step, update }: { step: FunnelStep; update: (u: Partial<FunnelStep>) => void }) {
   const c = step.introConfig || { headline: "", description: "", cta: "", showVideo: false };
   const set = (k: string, v: any) => update({ introConfig: { ...c, [k]: v } });
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
@@ -93,6 +93,10 @@ function IntroProps({ step, update }: { step: FunnelStep; update: (u: Partial<Fu
         <Switch checked={c.showVideo} onCheckedChange={(v) => set("showVideo", v)} />
       </div>
       {c.showVideo && <Field label="URL del video" value={c.videoUrl || ""} onChange={(v) => set("videoUrl", v)} />}
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">Mostrar línea divisoria (logo / contenido)</Label>
+        <Switch checked={Boolean(c.showLandingDivider)} onCheckedChange={(v) => set("showLandingDivider", v)} />
+      </div>
       <Separator />
       <div className="flex items-center justify-between">
         <Label className="text-xs font-semibold">Tamaño y espaciado</Label>

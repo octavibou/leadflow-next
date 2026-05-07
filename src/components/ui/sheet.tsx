@@ -50,17 +50,20 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  /** Oculta la capa oscura (p. ej. paneles tipo columna del editor al estilo `EditorProperties`). */
+  hideOverlay = false,
   /** Clases extra para el overlay (p. ej. misma duración que el panel). */
   overlayClassName,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  hideOverlay?: boolean
   overlayClassName?: string
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay className={overlayClassName} />
+      {!hideOverlay && <SheetOverlay className={overlayClassName} />}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}

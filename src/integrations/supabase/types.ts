@@ -16,6 +16,7 @@ export type Database = {
           id: string
           is_default: boolean
           name: string
+          published_at: string | null
           settings: Json
           slug: string
           steps: Json
@@ -27,6 +28,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name: string
+          published_at?: string | null
           settings?: Json
           slug: string
           steps?: Json
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name?: string
+          published_at?: string | null
           settings?: Json
           slug?: string
           steps?: Json
@@ -141,6 +144,35 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_secrets: {
+        Row: {
+          created_at: string
+          funnel_id: string
+          meta_access_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          funnel_id: string
+          meta_access_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          funnel_id?: string
+          meta_access_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_secrets_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: true
+            referencedRelation: "funnels"
             referencedColumns: ["id"]
           },
         ]

@@ -1,44 +1,52 @@
-import { useState, useCallback, useMemo } from "react";
-import { Plus, Copy, Trash, Link, DotsThree, Megaphone, Pencil, X, Monitor, DeviceMobile, Gear } from "@phosphor-icons/react";
+import { useState, useCallback } from "react";
+import { Plus, Copy, Trash, Link, DotsThree, TextAlignLeft, Megaphone, CaretDown, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useCampaignStore, type Campaign } from "@/store/campaignStore";
-import type { Funnel, FunnelStep, IntroConfig } from "@/types/funnel";
+import type { Funnel } from "@/types/funnel";
 import { cn } from "@/lib/utils";
+import { VariationSettingsDialog } from "@/components/editor/VariationSettingsDialog";
 
-function getEmbedUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    const ytMatch = u.hostname.includes("youtube.com") ? u.searchParams.get("v") : u.hostname === "youtu.be" ? u.pathname.slice(1) : null;
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch}`;
-    const vimeoMatch = u.hostname.includes("vimeo.com") && u.pathname.match(/\/(\d+)/);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-    if (u.hostname.includes("loom.com")) return `https://www.loom.com/embed/${u.pathname.split("/").pop()}`;
-    return url;
-  } catch {
-    return null;
-  }
-}
+export type LandingSelection = "default" | string;
 
-interface CampaignsTabProps {
+interface LandingVariationsSidebarProps {
   funnel: Funnel;
+  selectedKey: LandingSelection;
+  onSelect: (key: LandingSelection) => void;
+  disabled?: boolean;
+  /** Alineación del menú del selector (útil si el trigger está a la izquierda del canvas). */
+  menuAlign?: "start" | "end";
+  /** Dentro de otro contenedor (tabs): sin ancho fijo ni borde exterior. */
+  embedded?: boolean;
 }
 
-export function CampaignsTab({ funnel }: CampaignsTabProps) {
-  const { campaigns, loading, createCampaign, updateCampaign, deleteCampaign, duplicateCampaign } = useCampaignStore();
+/** Barra superior: elegir variación, acciones y crear nueva (sustituye el listado en tab lateral). */
+export function LandingVariationToolbar({
+  funnel,
+  selectedKey,
+  onSelect,
+  disabled = false,
+  menuAlign = "end",
+}: LandingVariationsSidebarProps) {
+  const { campaigns, loading, createCampaign, deleteCampaign, duplicateCampaign } = useCampaignStore();
   const [creating, setCreating] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
+  const selectedCampaign = selectedKey === "default" ? null : campaigns.find((c) => c.id === selectedKey) ?? null;
+
   const handleCreateVariation = async () => {
+    if (disabled) return;
     setCreating(true);
     const count = campaigns.length + 1;
     const name = `Variacion ${count}`;
@@ -48,288 +56,320 @@ export function CampaignsTab({ funnel }: CampaignsTabProps) {
     }));
     const c = await createCampaign(funnel.id, name, steps);
     if (c) {
-      toast.success("Variacion creada");
-      setEditingCampaign(c);
+      toast.success("Variación creada");
+      onSelect(c.id);
     }
     setCreating(false);
   };
 
-  const handleCopyUrl = (campaign: Campaign) => {
-    const url = `${window.location.origin}/f/${funnel.id}?c=${campaign.slug}`;
-    navigator.clipboard.writeText(url).then(() => toast.success("URL copiada"));
-  };
+  const handleCopyUrl = useCallback(
+    (campaign: Campaign) => {
+      const url = `${window.location.origin}/f/${funnel.id}?c=${campaign.slug}`;
+      navigator.clipboard.writeText(url).then(() => toast.success("URL copiada"));
+    },
+    [funnel.id],
+  );
 
-  // If editing a campaign, show the inline landing editor
-  if (editingCampaign) {
-    return (
-      <CampaignLandingInline
-        funnel={funnel}
-        campaign={editingCampaign}
-        onBack={() => setEditingCampaign(null)}
-        onUpdate={(updates) => {
-          updateCampaign(editingCampaign.id, updates);
-          setEditingCampaign({ ...editingCampaign, ...updates });
-        }}
-      />
-    );
-  }
+  const currentLabel =
+    selectedKey === "default" ? "Por defecto" : selectedCampaign?.name ?? "Variación";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-primary" weight="fill" />
-            A/B Test - Landing
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Crea variaciones de tu landing para optimizar la conversion. Solo cambia la intro, el resto del funnel permanece igual.
-          </p>
-        </div>
-        <Button size="sm" onClick={handleCreateVariation} disabled={creating}>
-          <Plus className="h-4 w-4 mr-2" weight="bold" /> Crear variacion
-        </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 min-w-[200px] max-w-[min(280px,78vw)] justify-between gap-2 px-3 font-normal"
+            disabled={disabled}
+            aria-label="Elegir variación de landing"
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              {selectedKey === "default" ? (
+                <TextAlignLeft className="h-4 w-4 shrink-0 text-muted-foreground" weight="bold" />
+              ) : (
+                <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" weight="bold" />
+              )}
+              <span className="truncate">{loading ? "Cargando…" : currentLabel}</span>
+            </span>
+            <CaretDown className="h-4 w-4 shrink-0 opacity-50" weight="bold" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={menuAlign}
+          className="min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-80 overflow-y-auto"
+        >
+          <DropdownMenuRadioGroup
+            value={selectedKey}
+            onValueChange={(v) => onSelect(v as LandingSelection)}
+            className="space-y-0.5 p-1"
+          >
+            <DropdownMenuRadioItem value="default" className="gap-2 text-sm">
+              <TextAlignLeft className="h-4 w-4 shrink-0" weight="bold" />
+              <span>Por defecto</span>
+            </DropdownMenuRadioItem>
+            {campaigns.map((c) => (
+              <DropdownMenuRadioItem key={c.id} value={c.id} className="gap-2 text-sm">
+                <Megaphone className="h-4 w-4 shrink-0" weight="bold" />
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {c.is_default ? (
+                  <Badge variant="secondary" className="ml-auto shrink-0 py-0 px-1.5 text-[10px]">
+                    Default
+                  </Badge>
+                ) : null}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="gap-2 text-sm"
+            onClick={(e) => {
+              e.preventDefault();
+              void handleCreateVariation();
+            }}
+            disabled={creating || disabled}
+          >
+            <Plus className="h-4 w-4" weight="bold" />
+            Nueva variación
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <VariationSettingsDialog
+        open={!!editingCampaign}
+        onOpenChange={(o) => {
+          if (!o) setEditingCampaign(null);
+        }}
+        funnelId={funnel.id}
+        campaign={editingCampaign}
+        campaigns={campaigns}
+      />
+
+      {selectedCampaign && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              aria-label="Acciones de la variación"
+            >
+              <DotsThree className="h-4 w-4" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setEditingCampaign(selectedCampaign)}>
+              <PencilSimple className="mr-2 h-4 w-4" weight="bold" /> Editar nombre y enlace
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => duplicateCampaign(selectedCampaign.id).then(() => toast.success("Variación duplicada"))}
+            >
+              <Copy className="mr-2 h-4 w-4" weight="bold" /> Duplicar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleCopyUrl(selectedCampaign)}>
+              <Link className="mr-2 h-4 w-4" weight="bold" /> Copiar URL
+            </DropdownMenuItem>
+            {!selectedCampaign.is_default && (
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => {
+                  deleteCampaign(selectedCampaign.id).then(() => {
+                    toast.success("Variación eliminada");
+                    if (selectedKey === selectedCampaign.id) onSelect("default");
+                  });
+                }}
+              >
+                <Trash className="mr-2 h-4 w-4" weight="bold" /> Eliminar
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+/** Selector de variación sobre el preview del constructor (esquina superior izquierda). */
+export function LandingVariationFloatingToolbar(
+  props: Pick<LandingVariationsSidebarProps, "funnel" | "selectedKey" | "onSelect" | "disabled">,
+) {
+  return (
+    <div
+      className={cn(
+        "pointer-events-auto absolute left-4 top-4 z-[19] rounded-2xl border border-border/80 bg-background/95 p-1 shadow-md backdrop-blur-sm",
+        "sm:left-6 sm:top-6",
+      )}
+      role="toolbar"
+      aria-label="Variación de landing"
+    >
+      <LandingVariationToolbar {...props} menuAlign="start" />
+    </div>
+  );
+}
+
+/**
+ * Lista vertical izquierda (estilo pasos del funnel): landing por defecto + variaciones.
+ */
+export function LandingVariationsSidebar({
+  funnel,
+  selectedKey,
+  onSelect,
+  disabled = false,
+  embedded = false,
+}: LandingVariationsSidebarProps) {
+  const { campaigns, loading, createCampaign, deleteCampaign, duplicateCampaign } = useCampaignStore();
+  const [creating, setCreating] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+
+  const handleCreateVariation = async () => {
+    if (disabled) return;
+    setCreating(true);
+    const count = campaigns.length + 1;
+    const name = `Variacion ${count}`;
+    const steps = funnel.steps.map((s) => ({
+      ...JSON.parse(JSON.stringify(s)),
+      id: crypto.randomUUID(),
+    }));
+    const c = await createCampaign(funnel.id, name, steps);
+    if (c) {
+      toast.success("Variación creada");
+      onSelect(c.id);
+    }
+    setCreating(false);
+  };
+
+  const handleCopyUrl = useCallback(
+    (campaign: Campaign) => {
+      const url = `${window.location.origin}/f/${funnel.id}?c=${campaign.slug}`;
+      navigator.clipboard.writeText(url).then(() => toast.success("URL copiada"));
+    },
+    [funnel.id],
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 flex-col",
+        embedded ? "flex min-h-0 min-w-0 flex-1 flex-col bg-muted/20" : "w-80 shrink-0 border-r bg-muted/30",
+      )}
+    >
+      <div className="px-4 py-3 border-b">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Variaciones</span>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      ) : campaigns.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Megaphone className="h-10 w-10 mx-auto mb-3 opacity-50" weight="bold" />
-            <p className="mb-1 font-medium">No hay variaciones aun</p>
-            <p className="text-sm">Crea tu primera variacion para hacer A/B testing en la landing.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {campaigns.map((c) => (
-            <Card key={c.id}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{c.name}</span>
-                    {c.is_default && <Badge variant="secondary" className="text-xs">Default</Badge>}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-0.5 truncate">/f/{funnel.id}?c={c.slug}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setEditingCampaign(c)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" weight="bold" /> Editar
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleCopyUrl(c)} title="Copiar URL">
-                  <Link className="h-4 w-4" weight="bold" />
-                </Button>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-0.5 p-2 pr-3">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect("default")}
+            className={cn(
+              "relative flex w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-lg py-2.5 pl-3 pr-3 text-sm text-left transition-colors",
+              selectedKey === "default"
+                ? "bg-primary/10 text-primary font-medium"
+                : "hover:bg-muted",
+              disabled && "opacity-50 pointer-events-none",
+            )}
+          >
+            <span className="shrink-0 text-muted-foreground">
+              <TextAlignLeft className="h-4 w-4" weight="bold" />
+            </span>
+            <span className="min-w-0 flex-1 truncate">Por defecto</span>
+          </button>
+
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            campaigns.map((c) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "relative flex w-full min-w-0 items-center gap-1 rounded-lg py-2 pl-3 pr-10 text-sm transition-colors group",
+                  selectedKey === c.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted",
+                )}
+              >
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onSelect(c.id)}
+                  className={cn(
+                    "flex flex-1 min-w-0 items-center gap-2.5 text-left",
+                    disabled && "opacity-50 pointer-events-none",
+                  )}
+                >
+                  <span className="shrink-0 text-muted-foreground">
+                    <Megaphone className="h-4 w-4" weight="bold" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  {c.is_default && (
+                    <Badge variant="secondary" className="text-[10px] shrink-0 py-0 px-1.5">
+                      Default
+                    </Badge>
+                  )}
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon"><DotsThree className="h-4 w-4" weight="bold" /></Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DotsThree className="h-4 w-4" weight="bold" />
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => duplicateCampaign(c.id).then(() => toast.success("Variacion duplicada"))}>
+                    <DropdownMenuItem onClick={() => setEditingCampaign(c)}>
+                      <PencilSimple className="h-4 w-4 mr-2" weight="bold" /> Editar nombre y enlace
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => duplicateCampaign(c.id).then(() => toast.success("Variación duplicada"))}
+                    >
                       <Copy className="h-4 w-4 mr-2" weight="bold" /> Duplicar
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleCopyUrl(c)}>
                       <Link className="h-4 w-4 mr-2" weight="bold" /> Copiar URL
                     </DropdownMenuItem>
                     {!c.is_default && (
-                      <DropdownMenuItem className="text-destructive" onClick={() => deleteCampaign(c.id).then(() => toast.success("Variacion eliminada"))}>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => {
+                          deleteCampaign(c.id).then(() => {
+                            toast.success("Variación eliminada");
+                            if (selectedKey === c.id) onSelect("default");
+                          });
+                        }}
+                      >
                         <Trash className="h-4 w-4 mr-2" weight="bold" /> Eliminar
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* -- Inline campaign landing editor -- */
-
-interface CampaignLandingInlineProps {
-  funnel: Funnel;
-  campaign: Campaign;
-  onBack: () => void;
-  onUpdate: (updates: Partial<Campaign>) => void;
-}
-
-function CampaignLandingInline({ funnel, campaign, onBack, onUpdate }: CampaignLandingInlineProps) {
-  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("mobile");
-  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
-
-  const introStep = campaign.steps?.find((s: any) => s.type === "intro") as FunnelStep | undefined;
-  const defaultIntroConfig: IntroConfig = useMemo(
-    () => ({ headline: "", description: "", cta: "", showVideo: false }),
-    [],
-  );
-  const ic = introStep?.introConfig || defaultIntroConfig;
-
-  const handleUpdate = useCallback((key: string, value: any) => {
-    if (!introStep) return;
-    const updatedIntro = { ...ic, [key]: value };
-    const newSteps = campaign.steps.map((s: any) =>
-      s.id === introStep.id ? { ...s, introConfig: updatedIntro } : s
-    );
-    onUpdate({ steps: newSteps });
-  }, [campaign, introStep, ic, onUpdate]);
-
-  if (!introStep) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground mb-4">Esta variacion no tiene landing.</p>
-        <Button variant="outline" onClick={onBack}>Volver</Button>
-      </div>
-    );
-  }
-
-  const primary = funnel.settings.primaryColor || "#1877F2";
-  const isMobile = viewMode === "mobile";
-
-  const prefix = device === "mobile" ? "mobile" : "";
-  const hKey = prefix ? "mobileHeadlineFontSize" : "headlineFontSize";
-  const dKey = prefix ? "mobileDescriptionFontSize" : "descriptionFontSize";
-  const cKey = prefix ? "mobileCtaFontSize" : "ctaFontSize";
-  const sKey = prefix ? "mobileElementSpacing" : "elementSpacing";
-  const hDefault = device === "mobile" ? 20 : 30;
-  const dDefault = device === "mobile" ? 14 : 18;
-  const cDefault = device === "mobile" ? 14 : 16;
-  const sDefault = device === "mobile" ? 12 : 16;
-
-  const previewH = isMobile ? (ic.mobileHeadlineFontSize || 20) : (ic.headlineFontSize || 30);
-  const previewD = isMobile ? (ic.mobileDescriptionFontSize || 14) : (ic.descriptionFontSize || 18);
-  const previewC = isMobile ? (ic.mobileCtaFontSize || 14) : (ic.ctaFontSize || 16);
-  const previewS = isMobile ? (ic.mobileElementSpacing || 12) : (ic.elementSpacing || 16);
-
-  return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Preview */}
-      <div className="flex-1 bg-muted/30 overflow-auto flex flex-col">
-        <div className="flex items-center gap-3 px-4 py-2 border-b bg-background">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <X className="h-4 w-4 mr-1.5" weight="bold" /> Volver a variaciones
-          </Button>
-          <Badge variant="secondary" className="text-xs">{campaign.name}</Badge>
-          <div className="flex-1" />
-          <div className="flex gap-1 border rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode("mobile")}
-              className={cn("p-1.5 rounded-md transition-colors", viewMode === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <DeviceMobile className="h-3.5 w-3.5" weight="bold" />
-            </button>
-            <button
-              onClick={() => setViewMode("desktop")}
-              className={cn("p-1.5 rounded-md transition-colors", viewMode === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <Monitor className="h-3.5 w-3.5" weight="bold" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 flex justify-center items-start py-8">
-          <div className={cn("bg-white rounded-xl shadow-lg overflow-hidden", isMobile ? "w-[375px]" : "w-[800px]")}>
-            <div className={cn("p-6", isMobile ? "px-5 py-6" : "px-10 py-8")}>
-              <div className="text-center" style={{ gap: `${previewS}px`, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <h1 className="font-bold leading-tight" style={{ fontSize: `${previewH}px` }}>
-                  {ic.headline || "Titulo de la landing"}
-                </h1>
-                {ic.showVideo && ic.videoUrl && (
-                  <div className="rounded-xl overflow-hidden aspect-video w-full">
-                    {(() => {
-                      const embedUrl = getEmbedUrl(ic.videoUrl);
-                      return embedUrl ? (
-                        <iframe src={embedUrl} className="w-full h-full border-0" allowFullScreen />
-                      ) : (
-                        <div className="bg-muted w-full h-full flex items-center justify-center text-muted-foreground text-sm">URL no valida</div>
-                      );
-                    })()}
-                  </div>
-                )}
-                <p className="text-muted-foreground leading-relaxed" style={{ fontSize: `${previewD}px` }}>
-                  {ic.description || "Descripcion de la landing"}
-                </p>
-                <button
-                  className="px-8 py-4 rounded-xl font-semibold w-full cursor-default"
-                  style={{ background: primary, color: "#fff", fontSize: `${previewC}px` }}
-                >
-                  {ic.cta || "Empezar"}
-                </button>
               </div>
-            </div>
-          </div>
+            ))
+          )}
         </div>
+      </ScrollArea>
+
+      <div className="p-3 border-t shrink-0">
+        <Button variant="outline" size="sm" className="w-full" onClick={handleCreateVariation} disabled={creating || disabled}>
+          <Plus className="h-4 w-4 mr-2" weight="bold" /> Crear variación
+        </Button>
       </div>
 
-      {/* Properties panel */}
-      <div className="w-80 border-l bg-background flex flex-col shrink-0">
-        <div className="px-4 py-3 border-b">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Landing de la variacion</span>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
-            <div>
-              <Label className="text-xs mb-1.5 block">Titulo</Label>
-              <Input value={ic.headline || ""} onChange={(e) => handleUpdate("headline", e.target.value)} className="h-9 text-sm" />
-            </div>
-            <div>
-              <Label className="text-xs mb-1.5 block">Descripcion</Label>
-              <textarea
-                className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                rows={3}
-                value={ic.description || ""}
-                onChange={(e) => handleUpdate("description", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs mb-1.5 block">Texto del boton</Label>
-              <Input value={ic.cta || ""} onChange={(e) => handleUpdate("cta", e.target.value)} className="h-9 text-sm" />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Mostrar video</Label>
-              <Switch checked={ic.showVideo || false} onCheckedChange={(v) => handleUpdate("showVideo", v)} />
-            </div>
-            {ic.showVideo && (
-              <div>
-                <Label className="text-xs mb-1.5 block">URL del video</Label>
-                <Input value={ic.videoUrl || ""} onChange={(e) => handleUpdate("videoUrl", e.target.value)} placeholder="https://youtube.com/..." className="h-9 text-sm" />
-              </div>
-            )}
-            <Separator />
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Tamano y espaciado</Label>
-              <div className="flex gap-1 border rounded-lg p-0.5">
-                <button onClick={() => setDevice("desktop")} className={cn("p-1.5 rounded-md transition-colors", device === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  <Monitor className="h-3.5 w-3.5" weight="bold" />
-                </button>
-                <button onClick={() => setDevice("mobile")} className={cn("p-1.5 rounded-md transition-colors", device === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  <DeviceMobile className="h-3.5 w-3.5" weight="bold" />
-                </button>
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Titulo - {(ic as any)[hKey] || hDefault}px</Label>
-              <Slider min={12} max={60} step={1} value={[(ic as any)[hKey] || hDefault]} onValueChange={([v]) => handleUpdate(hKey, v)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Descripcion - {(ic as any)[dKey] || dDefault}px</Label>
-              <Slider min={10} max={32} step={1} value={[(ic as any)[dKey] || dDefault]} onValueChange={([v]) => handleUpdate(dKey, v)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Boton - {(ic as any)[cKey] || cDefault}px</Label>
-              <Slider min={10} max={28} step={1} value={[(ic as any)[cKey] || cDefault]} onValueChange={([v]) => handleUpdate(cKey, v)} className="mt-1" />
-            </div>
-            <Separator />
-            <div>
-              <Label className="text-xs text-muted-foreground">Espacio entre elementos - {(ic as any)[sKey] || sDefault}px</Label>
-              <Slider min={4} max={48} step={2} value={[(ic as any)[sKey] || sDefault]} onValueChange={([v]) => handleUpdate(sKey, v)} className="mt-1" />
-            </div>
-          </div>
-        </ScrollArea>
-      </div>
+      <VariationSettingsDialog
+        open={!!editingCampaign}
+        onOpenChange={(o) => {
+          if (!o) setEditingCampaign(null);
+        }}
+        funnelId={funnel.id}
+        campaign={editingCampaign}
+        campaigns={campaigns}
+      />
     </div>
   );
 }

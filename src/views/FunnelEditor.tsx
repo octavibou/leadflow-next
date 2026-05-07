@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useFunnelStore } from "@/store/funnelStore";
@@ -9,14 +9,23 @@ import { EditorSidebar } from "@/components/editor/EditorSidebar";
 import { EditorCanvas } from "@/components/editor/EditorCanvas";
 import { EditorProperties } from "@/components/editor/EditorProperties";
 import { EditorTopBar } from "@/components/editor/EditorTopBar";
-
+import { EditorViewModeFloatingToggle } from "@/components/editor/EditorViewModeFloatingToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DeviceMobile } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FunnelStep, StepType } from "@/types/funnel";
 
-export type EditorTab = "funnel" | "ab_test" | "webhook" | "tracking" | "publish" | "metrics";
+export type EditorTab = "landing" | "funnel" | "webhook" | "tracking" | "publish" | "metrics";
+
+const VALID_TABS: EditorTab[] = ["landing", "funnel", "webhook", "tracking", "publish", "metrics"];
+
+function parseEditorTab(searchParams: URLSearchParams): EditorTab {
+  const raw = searchParams.get("tab");
+  const t = raw === "ab_test" ? "landing" : raw;
+  if (t && VALID_TABS.includes(t as EditorTab)) return t as EditorTab;
+  return "funnel";
+}
 
 const GlobalSettingsSheet = dynamic(
   () => import("@/components/editor/GlobalSettingsSheet").then((m) => m.GlobalSettingsSheet),
@@ -34,8 +43,8 @@ const PublishTab = dynamic(
   () => import("@/components/editor/PublishTab").then((m) => m.PublishTab),
   { ssr: false }
 );
-const CampaignsTab = dynamic(
-  () => import("@/components/editor/CampaignsTab").then((m) => m.CampaignsTab),
+const LandingTab = dynamic(
+  () => import("@/components/editor/LandingTab").then((m) => m.LandingTab),
   { ssr: false }
 );
 const FunnelMetricsTab = dynamic(
@@ -48,15 +57,14 @@ const FunnelEditor = () => {
   const funnelId = params?.funnelId as string | undefined;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") as EditorTab | undefined;
   const fetchFunnels = useFunnelStore((s) => s.fetchFunnels);
   const funnel = useFunnelStore((s) => s.getFunnel(funnelId || ""));
   const updateFunnel = useFunnelStore((s) => s.updateFunnel);
-  const { campaigns, fetchCampaigns } = useCampaignStore();
+  const { fetchCampaigns } = useCampaignStore();
   const [selectedStepIndex, setSelectedStepIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("mobile");
-  const [activeTab, setActiveTab] = useState<EditorTab>(initialTab || "funnel");
+  const [activeTab, setActiveTab] = useState<EditorTab>(() => parseEditorTab(searchParams));
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -71,11 +79,24 @@ const FunnelEditor = () => {
   }, [funnelId, funnel, fetchFunnels]);
 
   useEffect(() => {
-    // Campaign data is only needed in the A/B testing tab.
-    if (activeTab === "ab_test" && funnelId) {
+    if (activeTab === "landing" && funnelId) {
       fetchCampaigns(funnelId);
     }
   }, [activeTab, funnelId, fetchCampaigns]);
+
+  const quizSteps = useMemo(
+    () =>
+      funnel
+        ? [...funnel.steps].filter((s) => s.type !== "intro").sort((a, b) => a.order - b.order)
+        : [],
+    [funnel],
+  );
+
+  useEffect(() => {
+    if (activeTab !== "funnel" || quizSteps.length === 0) return;
+    const ok = quizSteps.some((s) => s.order === selectedStepIndex);
+    if (!ok) setSelectedStepIndex(quizSteps[0].order);
+  }, [activeTab, quizSteps, selectedStepIndex]);
 
   const handleUpdateStep = useCallback((stepId: string, updates: Partial<FunnelStep>) => {
     if (!funnel) return;
@@ -83,14 +104,19 @@ const FunnelEditor = () => {
     updateFunnel(funnel.id, { steps: newSteps });
   }, [funnel, updateFunnel]);
 
-  const handleReorderSteps = useCallback((newSteps: FunnelStep[]) => {
+  const handleReorderSteps = useCallback((newQuizSteps: FunnelStep[]) => {
     if (!funnel) return;
-    updateFunnel(funnel.id, { steps: newSteps });
+    const intro = funnel.steps.find((s) => s.type === "intro");
+    const merged = intro
+      ? [{ ...intro, order: 0 }, ...newQuizSteps.map((s, i) => ({ ...s, order: i + 1 }))]
+      : newQuizSteps.map((s, i) => ({ ...s, order: i }));
+    updateFunnel(funnel.id, { steps: merged });
   }, [funnel, updateFunnel]);
 
   const handleAddStep = useCallback((type: StepType) => {
     if (!funnel) return;
-    const maxOrder = Math.max(...funnel.steps.map((s) => s.order));
+    if (type === "intro" && funnel.steps.some((s) => s.type === "intro")) return;
+    const maxOrder = Math.max(...funnel.steps.map((s) => s.order), -1);
     const newStep: FunnelStep = {
       id: crypto.randomUUID(),
       funnel_id: funnel.id,
@@ -127,7 +153,14 @@ const FunnelEditor = () => {
     if (!funnel) return;
     const newSteps = funnel.steps.filter((s) => s.id !== stepId).map((s, i) => ({ ...s, order: i }));
     updateFunnel(funnel.id, { steps: newSteps });
-    setSelectedStepIndex((prev) => Math.max(0, prev - 1));
+    setSelectedStepIndex((prev) => {
+      const next = newSteps
+        .filter((s) => s.type !== "intro")
+        .sort((a, b) => a.order - b.order);
+      if (next.length === 0) return 0;
+      if (next.some((s) => s.order === prev)) return prev;
+      return next[0].order;
+    });
   }, [funnel, updateFunnel]);
 
   if (!funnel) {
@@ -154,62 +187,79 @@ const FunnelEditor = () => {
     );
   }
 
-  const selectedStep = funnel.steps.find((s) => s.order === selectedStepIndex) || funnel.steps[0];
+  const selectedStep =
+    quizSteps.find((s) => s.order === selectedStepIndex) ?? quizSteps[0];
+
+  const hasIntro = funnel.steps.some((s) => s.type === "intro");
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <EditorTopBar
         funnel={funnel}
         onOpenSettings={() => setShowSettings(true)}
-        viewMode={viewMode}
-        onToggleView={() => setViewMode((v) => v === "desktop" ? "mobile" : "desktop")}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
 
+      {activeTab === "landing" && (
+        <LandingTab
+          funnel={funnel}
+          viewMode={viewMode}
+          onToggleView={() => setViewMode((v) => (v === "desktop" ? "mobile" : "desktop"))}
+        />
+      )}
+
       {activeTab === "funnel" && (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <EditorSidebar
-            steps={funnel.steps}
+            steps={quizSteps}
             selectedIndex={selectedStepIndex}
             onSelect={setSelectedStepIndex}
             onReorder={handleReorderSteps}
             onAddStep={handleAddStep}
             onDeleteStep={handleDeleteStep}
+            excludeAddTypes={hasIntro ? ["intro"] : undefined}
           />
           {selectedStep && (
             <>
-              <EditorCanvas step={selectedStep} steps={funnel.steps} settings={funnel.settings} viewMode={viewMode} />
+              <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <EditorCanvas
+                  step={selectedStep}
+                  steps={funnel.steps}
+                  settings={funnel.settings}
+                  viewMode={viewMode}
+                />
+                <EditorViewModeFloatingToggle
+                  viewMode={viewMode}
+                  onToggleView={() => setViewMode((v) => (v === "desktop" ? "mobile" : "desktop"))}
+                />
+              </div>
               <EditorProperties step={selectedStep} funnel={funnel} onUpdateStep={handleUpdateStep} />
             </>
           )}
         </div>
       )}
 
-      {activeTab === "ab_test" && (
-        <CampaignsTab funnel={funnel} />
-      )}
-
       {activeTab === "webhook" && (
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <WebhookTab funnel={funnel} />
         </ScrollArea>
       )}
 
       {activeTab === "tracking" && (
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <TrackingTab funnel={funnel} />
         </ScrollArea>
       )}
 
       {activeTab === "publish" && (
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <PublishTab funnel={funnel} />
         </ScrollArea>
       )}
 
       {activeTab === "metrics" && (
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <FunnelMetricsTab funnel={funnel} />
         </ScrollArea>
       )}

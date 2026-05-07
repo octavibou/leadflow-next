@@ -32,15 +32,6 @@ const STEP_LABELS: Record<StepType, string> = {
 
 const ADD_TYPES: StepType[] = ["question", "intro", "contact", "results", "booking", "vsl", "delivery", "thankyou"];
 
-interface Props {
-  steps: FunnelStep[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  onReorder: (steps: FunnelStep[]) => void;
-  onAddStep: (type: StepType) => void;
-  onDeleteStep: (stepId: string) => void;
-}
-
 function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelStep; isSelected: boolean; onSelect: () => void; onDelete: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: step.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -49,46 +40,48 @@ function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelSt
     ? step.question.text
     : STEP_LABELS[step.type];
 
-  const label = fullLabel.length > 42 ? `${fullLabel.slice(0, 42)}…` : fullLabel;
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative flex w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-lg py-2.5 pl-3 pr-12 text-sm transition-colors group cursor-pointer",
+        "relative flex w-full min-w-0 items-start gap-2 rounded-lg py-2 pl-2.5 pr-10 text-sm leading-snug transition-colors group cursor-pointer",
         isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
       )}
       onClick={onSelect}
     >
-      <span {...attributes} {...listeners} className="shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
+      <span {...attributes} {...listeners} className="mt-0.5 shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
         <DotsSixVertical className="h-3.5 w-3.5" weight="bold" />
       </span>
-      <span className="shrink-0 text-muted-foreground">{STEP_ICONS[step.type]}</span>
-      <span className="min-w-0 flex-1 truncate pr-1" title={fullLabel}>{label}</span>
+      <span className="mt-0.5 shrink-0 text-muted-foreground">{STEP_ICONS[step.type]}</span>
+      <span className="min-w-0 flex-1 break-words text-left" title={fullLabel}>{fullLabel}</span>
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-destructive hover:bg-destructive/10"
+        className="absolute right-0.5 top-1/2 h-6 w-6 shrink-0 -translate-y-1/2 text-muted-foreground/35 hover:bg-destructive/10 hover:text-destructive/90"
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         aria-label={`Eliminar paso ${fullLabel}`}
       >
-        <Trash className="h-3.5 w-3.5" weight="bold" />
+        <Trash className="h-3 w-3" weight="regular" />
       </Button>
     </div>
   );
 }
 
-export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAddStep, onDeleteStep }: {
+export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAddStep, onDeleteStep, excludeAddTypes }: {
   steps: FunnelStep[];
   selectedIndex: number;
   onSelect: (index: number) => void;
   onReorder: (steps: FunnelStep[]) => void;
   onAddStep: (type: StepType) => void;
   onDeleteStep: (stepId: string) => void;
+  excludeAddTypes?: StepType[];
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const sorted = [...steps].sort((a, b) => a.order - b.order);
+  const addTypesMenu = excludeAddTypes?.length
+    ? ADD_TYPES.filter((t) => !excludeAddTypes.includes(t))
+    : ADD_TYPES;
 
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
@@ -100,8 +93,8 @@ export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAdd
   };
 
   return (
-    <div className="w-80 border-r bg-muted/30 flex flex-col shrink-0">
-      <div className="px-4 py-3 border-b">
+    <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/30">
+      <div className="shrink-0 border-b px-4 py-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pasos</span>
       </div>
       <ScrollArea className="min-h-0 flex-1">
@@ -121,7 +114,7 @@ export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAdd
           </DndContext>
         </div>
       </ScrollArea>
-      <div className="p-3 border-t">
+      <div className="shrink-0 border-t p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="w-full">
@@ -129,7 +122,7 @@ export function EditorSidebar({ steps, selectedIndex, onSelect, onReorder, onAdd
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {ADD_TYPES.map((type) => (
+            {addTypesMenu.map((type) => (
               <DropdownMenuItem key={type} onClick={() => onAddStep(type)}>
                 {STEP_ICONS[type]}
                 <span className="ml-2">{STEP_LABELS[type]}</span>

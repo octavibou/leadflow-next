@@ -1,10 +1,11 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { HexColorPicker } from "react-colorful";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFunnelStore } from "@/store/funnelStore";
 import { LANGUAGE_LABELS } from "@/lib/i18n";
@@ -19,8 +20,14 @@ const LANGUAGES = Object.keys(LANGUAGE_LABELS) as Language[];
 export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel; open: boolean; onClose: () => void }) {
   const updateFunnel = useFunnelStore((s) => s.updateFunnel);
   const [settings, setSettings] = useState<FunnelSettings>(funnel.settings);
+  const [metaToken, setMetaToken] = useState("");
+  const [savingMetaToken, setSavingMetaToken] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setSettings(funnel.settings);
+  }, [open, funnel.settings, funnel.id]);
 
   const set = (k: keyof FunnelSettings, v: string) => {
     const updated = { ...settings, [k]: v };
@@ -54,11 +61,18 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Configuración global</SheetTitle>
-        </SheetHeader>
-        <div className="space-y-5 mt-6">
+      <SheetContent
+        hideOverlay
+        side="right"
+        className="flex max-h-full w-full max-w-80 flex-col gap-0 overflow-hidden border-l bg-background p-0 sm:max-w-80"
+      >
+        <div className="shrink-0 border-b px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Configuración global
+          </span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="space-y-5 p-4">
           <div>
             <Label className="text-xs mb-1.5 block">Idioma del funnel</Label>
             <select className="w-full h-9 border rounded-md px-3 text-sm bg-background" value={settings.language || "es"} onChange={(e) => set("language", e.target.value)}>
@@ -92,6 +106,32 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
             <Label className="text-xs mb-1.5 block">URL del logo</Label>
             <Input className="h-9 text-sm" value={settings.logoUrl} onChange={(e) => set("logoUrl", e.target.value)} placeholder="https://..." />
           </div>
+
+          {funnel.steps.some((s) => s.type === "intro") && (
+            <>
+              <Separator />
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label htmlFor="use-landing-settings" className="text-xs">
+                    Mostrar landing antes del quiz
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground leading-snug">
+                    Si lo desactivas, el funnel público empieza en la primera pregunta.
+                  </p>
+                </div>
+                <Switch
+                  id="use-landing-settings"
+                  className="mt-0.5 shrink-0"
+                  checked={settings.useLanding !== false}
+                  onCheckedChange={(checked) => {
+                    const updated = { ...settings, useLanding: checked };
+                    setSettings(updated);
+                    updateFunnel(funnel.id, { settings: updated });
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -162,13 +202,36 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
                 <Input
                   className="h-9 text-sm"
                   type="password"
-                  value={settings.metaAccessToken || ""}
-                  onChange={(e) => set("metaAccessToken", e.target.value)}
+                  value={metaToken}
+                  onChange={(e) => setMetaToken(e.target.value)}
                   placeholder="EAAxxxxxxx..."
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Genera el token en Meta Events Manager → Settings → Conversions API.
                 </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!metaToken || savingMetaToken}
+                    onClick={async () => {
+                      setSavingMetaToken(true);
+                      try {
+                        const { supabase } = await import("@/integrations/supabase/client");
+                        const { error } = await supabase
+                          .from("funnel_secrets")
+                          .upsert({ funnel_id: funnel.id, meta_access_token: metaToken });
+                        if (!error) setMetaToken("");
+                      } finally {
+                        setSavingMetaToken(false);
+                      }
+                    }}
+                  >
+                    {savingMetaToken ? "Guardando..." : "Guardar token"}
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">Por seguridad, no se volverá a mostrar.</span>
+                </div>
               </div>
               <div>
                 <Label className="text-[11px] mb-1 block text-muted-foreground">Test Event Code (opcional)</Label>
@@ -324,6 +387,7 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
               </div>
             </>
           )}
+        </div>
         </div>
       </SheetContent>
     </Sheet>
