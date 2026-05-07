@@ -9,6 +9,7 @@ import {
   trackEvent, saveLead, injectMetaPixel, injectGoogleTag,
   fireExternalEvent, extractUtms, fireMetaCapi, getOrCreateFunnelSessionId,
 } from "@/lib/tracking";
+import { CookieBanner } from "@/components/CookieBanner";
 
 interface CampaignSettings {
   metaPixelId?: string;
@@ -57,6 +58,12 @@ const PublicFunnel = () => {
   const [consentChecked, setConsentChecked] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaignSettings, setCampaignSettings] = useState<CampaignSettings>({});
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
+  const [cookieConsent, setCookieConsent] = useState<"accepted" | "rejected" | null>(() => {
+    if (typeof window === "undefined") return null;
+    const v = window.localStorage.getItem("cookie_consent");
+    return v === "accepted" || v === "rejected" ? v : null;
+  });
   const utmsRef = useRef<Record<string, string>>({});
   const trackedPageView = useRef(false);
   const sessionIdRef = useRef<string>("");
@@ -131,9 +138,38 @@ const PublicFunnel = () => {
   // Inject funnel-level Meta Pixel
   useEffect(() => {
     if (!funnel) return;
+    if (cookieConsent !== "accepted") return;
+    const pid = funnel.settings.metaPixelId;
+    if (pid) injectMetaPixel(pid);
+  }, [funnel, cookieConsent]);
+
+  // Show cookie banner when user reaches second question (index 1) and has no prior choice
+  useEffect(() => {
+    if (!funnel) return;
+    if (cookieConsent !== null) {
+      if (showCookieBanner) setShowCookieBanner(false);
+      return;
+    }
+    if (currentStepIndex !== 1) return;
+    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
+    const step = sorted[currentStepIndex];
+    if (step?.type === "question") setShowCookieBanner(true);
+  }, [funnel, currentStepIndex, cookieConsent, showCookieBanner]);
+
+  const handleAcceptCookies = useCallback(() => {
+    if (!funnel) return;
+    window.localStorage.setItem("cookie_consent", "accepted");
+    setCookieConsent("accepted");
+    setShowCookieBanner(false);
     const pid = funnel.settings.metaPixelId;
     if (pid) injectMetaPixel(pid);
   }, [funnel]);
+
+  const handleRejectCookies = useCallback(() => {
+    window.localStorage.setItem("cookie_consent", "rejected");
+    setCookieConsent("rejected");
+    setShowCookieBanner(false);
+  }, []);
 
   // Helper to fire Meta CAPI for this funnel
   const fireCapiEvent = useCallback(
@@ -396,6 +432,13 @@ const PublicFunnel = () => {
 
   return (
     <div className="h-[100dvh] bg-white flex flex-col overflow-hidden" style={{ fontFamily: font }}>
+      {showCookieBanner && (
+        <CookieBanner
+          primaryColor={primary}
+          onAccept={handleAcceptCookies}
+          onReject={handleRejectCookies}
+        />
+      )}
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center space-y-4">
