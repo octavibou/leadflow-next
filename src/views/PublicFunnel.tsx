@@ -119,6 +119,14 @@ const PublicFunnel = () => {
     setShowCookieBanner(false);
   }, []);
 
+  const handleManageCookies = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("cookie_consent");
+    }
+    setCookieConsent(null);
+    setShowCookieBanner(true);
+  }, []);
+
   // Load funnel
   useEffect(() => {
     if (!funnelId) return;
@@ -446,6 +454,7 @@ const PublicFunnel = () => {
     const contactStep = sortedSteps.find((s) => s.type === "contact");
     const fields = contactStep?.contactFields || [];
     let firstName = "", lastName = "", email = "", phone = "";
+    const hasLastNameField = fields.some((f) => f.label.toLowerCase().includes("apellido"));
     fields.forEach((f) => {
       const val = formData[f.id] || "";
       const lowerLabel = f.label.toLowerCase();
@@ -454,6 +463,19 @@ const PublicFunnel = () => {
       else if (lowerLabel.includes("apellido")) { lastName = val; }
       else if (f.fieldType === "text") { firstName = val; }
     });
+    // Back-compat: funnels antiguos con un solo campo de nombre
+    if (!hasLastNameField) {
+      const virtualLast = (formData.__virtual_lastName || "").trim();
+      if (virtualLast) lastName = virtualLast;
+      const full = firstName.trim();
+      if (!lastName && full.includes(" ")) {
+        const parts = full.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+          firstName = parts.slice(0, -1).join(" ");
+          lastName = parts.slice(-1).join(" ");
+        }
+      }
+    }
     const namedAnswers: Record<string, string> = {};
     const answerOptionIds: Record<string, string> = {};
     for (const step of sortedSteps) {
@@ -560,7 +582,7 @@ const PublicFunnel = () => {
 
   return (
     <div
-      className="h-[100dvh] bg-white flex flex-col overflow-hidden"
+      className="min-h-[100dvh] bg-white flex flex-col"
       style={{ fontFamily: funnel ? funnelContentFontFamily(funnel.settings.fontFamily) : undefined }}
     >
       {funnel ? <FunnelGoogleFont fontFamily={funnel.settings.fontFamily} /> : null}
@@ -594,12 +616,13 @@ const PublicFunnel = () => {
         </div>
       )}
 
-      {/* Un solo scroll: contenido, barra de quiz y pie de marca al final de la página */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+      {/* Scroll natural del documento: footer siempre al final */}
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col">
           <div
             className={cn(
-              "flex w-full max-w-[900px] flex-col mx-auto",
+              // Extra bottom padding so content isn't covered by sticky footer/progress
+              "flex w-full max-w-[760px] flex-col mx-auto flex-1 pb-24",
               currentStep.type === "intro" ? "px-0 pt-0 pb-0" : "px-5 py-6 md:px-10 md:py-8",
             )}
           >
@@ -614,7 +637,7 @@ const PublicFunnel = () => {
               <LandingCanvasIntroLayout
                 logoUrl={logo}
                 showEditorChrome={false}
-                showLandingDivider={ic?.showLandingDivider === true}
+                showLandingDivider={false}
                 renderBrandingFooterInside={false}
               >
                 <LandingIntroHeroColumn
@@ -643,7 +666,17 @@ const PublicFunnel = () => {
           {/* Question */}
           {currentStep.type === "question" && currentStep.question && (
             <div className="animate-fade-in">
-              <h2 className="text-base md:text-2xl font-bold mb-6">{currentStep.question.text}</h2>
+              {totalQuestions > 0 && currentQuestionIndex >= 0 && (
+                <div
+                  className="hidden md:block text-center text-sm font-semibold mb-3"
+                  style={{ color: primary }}
+                >
+                  Pregunta {currentQuestionIndex + 1} de {totalQuestions}
+                </div>
+              )}
+              <h2 className="text-base md:text-5xl md:leading-[1.08] font-extrabold tracking-tight mb-6 text-center">
+                {currentStep.question.text}
+              </h2>
               <div className={currentStep.question.layout === "opts-2" ? "space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0" : "space-y-3"}>
                 {currentStep.question.options.map((opt) => {
                   const selected = answers[currentStep.id] === opt.value;
@@ -669,33 +702,58 @@ const PublicFunnel = () => {
           {/* Contact */}
           {currentStep.type === "contact" && (
             <div className="animate-fade-in">
-              <h2 className="text-base md:text-2xl font-bold mb-6">Tus datos</h2>
-              <div className="space-y-5">
-                {(currentStep.contactFields || []).map((f) => (
-                  <div key={f.id}>
-                    <label className="font-semibold text-xs md:text-sm block mb-2">{f.label}{f.required && " *"}</label>
-                    <input
-                      type={f.fieldType}
-                      name={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : undefined}
-                      autoComplete={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : "on"}
-                      placeholder={f.placeholder}
-                      value={formData[f.id] || ""}
-                      onChange={(e) => handleFormChange(f.id, e.target.value)}
-                      className="w-full border-2 border-gray-200 rounded-xl py-3 px-4 text-sm md:text-base outline-none focus:border-blue-400 transition-colors"
-                      required={f.required}
-                    />
-                  </div>
-                ))}
+              <div className="text-center">
+                <h2 className="text-base md:text-5xl md:leading-[1.08] font-extrabold tracking-tight mb-8">
+                  Tus datos
+                </h2>
+              </div>
+              <div className="mx-auto w-full max-w-md space-y-4">
+                {(() => {
+                  const rawFields = currentStep.contactFields || [];
+                  const hasLastName = rawFields.some((f) => f.label.toLowerCase().includes("apellido"));
+                  const firstText = rawFields.find((f) => f.fieldType === "text");
+                  const augmented =
+                    !hasLastName && firstText
+                      ? [
+                          ...rawFields,
+                          { id: "__virtual_lastName", step_id: currentStep.id, fieldType: "text" as const, label: "Apellidos", placeholder: "Tus apellidos", required: true },
+                        ]
+                      : rawFields;
+                  const order = ["Nombre", "Apellidos", "Email", "Teléfono"];
+                  const sorted = [...augmented].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+                  return sorted.map((f) => (
+                    <div key={f.id}>
+                      <label className="font-semibold text-xs md:sr-only block mb-2">
+                        {f.label}{f.required && " *"}
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          {f.fieldType === "email" ? "✉️" : f.fieldType === "tel" ? "📞" : "👤"}
+                        </span>
+                        <input
+                          type={f.fieldType}
+                          name={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : undefined}
+                          autoComplete={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : "on"}
+                          placeholder={f.placeholder}
+                          value={formData[f.id] || ""}
+                          onChange={(e) => handleFormChange(f.id, e.target.value)}
+                          className="w-full rounded-md border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm md:text-base outline-none focus:border-blue-400 transition-colors"
+                          required={f.required}
+                        />
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
               {currentStep.contactConsent && (
-                <label className="flex items-start gap-2 mt-6 text-xs text-gray-500 cursor-pointer">
+                <label className="mx-auto mt-6 flex max-w-md items-start justify-center gap-2 text-xs text-gray-500 cursor-pointer">
                   <input type="checkbox" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="mt-0.5" />
-                  <span>{currentStep.contactConsent}</span>
+                  <span className="text-left">{currentStep.contactConsent}</span>
                 </label>
               )}
               <button
                 onClick={handleContactSubmit}
-                className="mt-6 px-8 py-4 rounded-xl font-semibold w-full text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity"
+                className="mx-auto mt-6 block w-full max-w-md rounded-md px-8 py-4 font-semibold text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity"
                 style={{ background: primary, color: "#fff" }}
               >
                 {currentStep.contactCta || "Enviar"}
@@ -800,23 +858,24 @@ const PublicFunnel = () => {
               )}
             </div>
           )}
+        </div>
+        {/* Sticky bottom area: progress + footer (like competitor) */}
+        <div className="sticky bottom-0 z-10 shrink-0 w-full bg-white mt-auto">
+          <div className={funnelPublicFooterInnerClass}>
+            <FunnelBrandingFooter onManageCookies={handleManageCookies} />
+          </div>
           {isQuestion && totalQuestions > 0 && (
-            <div className="w-full shrink-0 border-t border-gray-100 pt-4 mt-8">
-              <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
-                <span>Pregunta {currentQuestionIndex + 1} de {totalQuestions}</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full w-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%`, background: primary }} />
+            <div className="w-full">
+              <div className="h-1 bg-gray-100 w-full overflow-hidden">
+                <div
+                  className="h-full transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%`, background: primary }}
+                />
               </div>
             </div>
           )}
-          </div>
-          <div className="shrink-0 w-full bg-white border-t border-gray-100/90">
-            <div className={funnelPublicFooterInnerClass}>
-              <FunnelBrandingFooter />
-            </div>
-          </div>
         </div>
+      </div>
       </div>
         </>
       )}

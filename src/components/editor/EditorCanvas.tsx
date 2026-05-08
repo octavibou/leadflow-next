@@ -167,6 +167,8 @@ export function EditorCanvas({
                 isMobile={isMobile}
                 landingConstructorPick={landingConstructorPick}
                 logoUrl={settings.logoUrl}
+                currentQuestionIndex={currentQuestionIndex}
+                totalQuestions={totalQuestions}
               />
             </FunnelIntroScrollShell>
           ) : (
@@ -184,6 +186,8 @@ export function EditorCanvas({
                   isMobile={isMobile}
                   landingConstructorPick={landingConstructorPick}
                   logoUrl={settings.logoUrl}
+                  currentQuestionIndex={currentQuestionIndex}
+                  totalQuestions={totalQuestions}
                 />
                 {isQuestion && totalQuestions > 0 && (
                   <div
@@ -235,12 +239,16 @@ function StepContent({
   isMobile,
   landingConstructorPick,
   logoUrl,
+  currentQuestionIndex,
+  totalQuestions,
 }: {
   step: FunnelStep;
   primary: string;
   isMobile: boolean;
   landingConstructorPick?: boolean;
   logoUrl?: string;
+  currentQuestionIndex: number;
+  totalQuestions: number;
 }) {
   const landingCtx = useLandingBuilderOptional();
   const introPick = Boolean(landingConstructorPick && landingCtx && step.type === "intro");
@@ -347,7 +355,19 @@ function StepContent({
 
       {step.type === "question" && step.question && (
         <div className="animate-fade-in">
-          <h2 className={cn("font-bold mb-6", isMobile ? "text-base" : "text-2xl")}>{step.question.text}</h2>
+          {!isMobile && totalQuestions > 0 && currentQuestionIndex >= 0 ? (
+            <div className="text-center text-sm font-semibold mb-3" style={{ color: primary }}>
+              Pregunta {currentQuestionIndex + 1} de {totalQuestions}
+            </div>
+          ) : null}
+          <h2
+            className={cn(
+              "font-extrabold tracking-tight mb-6 text-center",
+              isMobile ? "text-base" : "text-5xl leading-[1.08]",
+            )}
+          >
+            {step.question.text}
+          </h2>
           <div className={cn(
             step.question.layout === "opts-2" && !isMobile ? "grid grid-cols-2 gap-3" : "space-y-3"
           )}>
@@ -366,20 +386,46 @@ function StepContent({
 
       {step.type === "contact" && (
         <div className="animate-fade-in">
-          <h2 className={cn("font-bold mb-6", isMobile ? "text-base" : "text-2xl")}>Tus datos</h2>
-          <div className="space-y-5">
+          <div className={cn(!isMobile && "text-center")}>
+            <h2 className={cn(
+              "font-extrabold tracking-tight",
+              isMobile ? "text-base mb-6" : "text-5xl leading-[1.08] mb-8"
+            )}>
+              Tus datos
+            </h2>
+          </div>
+          <div className={cn("space-y-4", !isMobile && "mx-auto w-full max-w-md")}>
             {(step.contactFields || []).map((f) => (
               <div key={f.id}>
-                <label className={cn("font-semibold block mb-2", isMobile ? "text-xs" : "text-sm")}>{f.label}</label>
-                <div className={cn("border-2 border-gray-200 rounded-xl text-gray-400", isMobile ? "text-sm py-3 px-4" : "text-base py-3 px-4")}>{f.placeholder}</div>
+                <label className={cn("font-semibold block mb-2", isMobile ? "text-xs" : "sr-only")}>{f.label}</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {f.fieldType === "email" ? "✉️" : f.fieldType === "tel" ? "📞" : "👤"}
+                  </span>
+                  <div
+                    className={cn(
+                      "rounded-md border border-gray-200 bg-white text-gray-400",
+                      isMobile ? "text-sm py-3 pl-10 pr-4" : "text-base py-3 pl-10 pr-4",
+                    )}
+                  >
+                    {f.placeholder}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-          <div className="flex items-start gap-2 mt-6 text-xs text-gray-500">
+          <div className={cn("flex items-start gap-2 mt-6 text-xs text-gray-500", !isMobile && "mx-auto max-w-md justify-center")}>
             <div className="w-4 h-4 border-2 border-gray-300 rounded mt-0.5 shrink-0" />
             <span>{step.contactConsent || "Texto de consentimiento"}</span>
           </div>
-          <button className={cn("mt-6 px-8 py-4 rounded-xl font-semibold w-full", isMobile ? "text-sm" : "text-base")} style={{ background: primary, color: "#fff" }}>
+          <button
+            className={cn(
+              "mt-6 px-8 py-4 rounded-md font-semibold w-full",
+              !isMobile && "mx-auto block max-w-md",
+              isMobile ? "text-sm" : "text-base"
+            )}
+            style={{ background: primary, color: "#fff" }}
+          >
             {step.contactCta || "Enviar"}
           </button>
         </div>

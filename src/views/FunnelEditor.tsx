@@ -135,7 +135,9 @@ const FunnelEditor = () => {
       ...(type === "contact" && {
         contactFields: [
           { id: crypto.randomUUID(), step_id: "", fieldType: "text" as const, label: "Nombre", placeholder: "Tu nombre", required: true },
+          { id: crypto.randomUUID(), step_id: "", fieldType: "text" as const, label: "Apellidos", placeholder: "Tus apellidos", required: true },
           { id: crypto.randomUUID(), step_id: "", fieldType: "email" as const, label: "Email", placeholder: "tu@email.com", required: true },
+          { id: crypto.randomUUID(), step_id: "", fieldType: "tel" as const, label: "Teléfono", placeholder: "+34 600 000 000", required: true },
         ],
         contactCta: "Enviar", contactConsent: "Acepto los Términos de Uso.",
       }),

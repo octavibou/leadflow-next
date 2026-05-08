@@ -7,7 +7,7 @@ import { LandingCanvasSectionFrame } from "@/components/funnel/LandingCanvasIntr
 
 /** Misma clase de contenedor del pie que en `PublicFunnel` (/f/[id]). */
 export const funnelPublicFooterInnerClass =
-  "mx-auto flex w-full max-w-[900px] justify-center px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-10 md:pt-5 md:pb-[max(1.25rem,env(safe-area-inset-bottom))]";
+  "mx-auto flex w-full max-w-[760px] justify-center px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-10 md:pt-5 md:pb-[max(1.25rem,env(safe-area-inset-bottom))]";
 
 /**
  * Área tipo /f dentro del preview del editor: un solo scroll vertical; el pie va al final del contenido
@@ -49,7 +49,7 @@ export function FunnelIntroScrollShell({
   return (
     <div className={cn("flex min-h-0 w-full flex-1 flex-col", className)}>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        <div className={cn("flex w-full max-w-[900px] flex-col px-0 pb-0")}>{children}</div>
+        <div className={cn("flex w-full max-w-[760px] flex-col px-0 pb-0")}>{children}</div>
         {footerBlock}
       </div>
     </div>
