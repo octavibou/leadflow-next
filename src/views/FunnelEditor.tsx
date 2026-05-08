@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FunnelStep, StepType } from "@/types/funnel";
 
-export type EditorTab = "landing" | "funnel" | "webhook" | "tracking" | "publish" | "metrics";
+export type EditorTab = "landing" | "funnel" | "webhook" | "tracking" | "publish";
 
-const VALID_TABS: EditorTab[] = ["landing", "funnel", "webhook", "tracking", "publish", "metrics"];
+const VALID_TABS: EditorTab[] = ["landing", "funnel", "webhook", "tracking", "publish"];
 
 function parseEditorTab(searchParams: URLSearchParams): EditorTab {
   const raw = searchParams.get("tab");
@@ -47,11 +47,6 @@ const LandingTab = dynamic(
   () => import("@/components/editor/LandingTab").then((m) => m.LandingTab),
   { ssr: false }
 );
-const FunnelMetricsTab = dynamic(
-  () => import("@/components/editor/FunnelMetricsTab").then((m) => m.FunnelMetricsTab),
-  { ssr: false }
-);
-
 const FunnelEditor = () => {
   const params = useParams();
   const funnelId = params?.funnelId as string | undefined;
@@ -65,6 +60,7 @@ const FunnelEditor = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("mobile");
   const [activeTab, setActiveTab] = useState<EditorTab>(() => parseEditorTab(searchParams));
+  const [quizSidebarTab, setQuizSidebarTab] = useState<"steps" | "design">("steps");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -221,6 +217,10 @@ const FunnelEditor = () => {
             onAddStep={handleAddStep}
             onDeleteStep={handleDeleteStep}
             excludeAddTypes={hasIntro ? ["intro"] : undefined}
+            settings={funnel.settings}
+            sidebarTab={quizSidebarTab}
+            onSidebarTabChange={setQuizSidebarTab}
+            onUpdateSettings={(updates) => updateFunnel(funnel.id, { settings: { ...funnel.settings, ...updates } })}
           />
           {selectedStep && (
             <>
@@ -257,12 +257,6 @@ const FunnelEditor = () => {
       {activeTab === "publish" && (
         <ScrollArea className="min-h-0 flex-1">
           <PublishTab funnel={funnel} />
-        </ScrollArea>
-      )}
-
-      {activeTab === "metrics" && (
-        <ScrollArea className="min-h-0 flex-1">
-          <FunnelMetricsTab funnel={funnel} />
         </ScrollArea>
       )}
 

@@ -118,6 +118,13 @@ export function EditorCanvas({
 }) {
   const primary = settings.primaryColor || "#1877F2";
   const isMobile = viewMode === "mobile";
+  const questionFontSizeMobilePx = settings.questionFontSizeMobile ?? 16;
+  const questionFontSizeDesktopPx = settings.questionFontSizeDesktop ?? 48;
+  const questionOptionsSpacingMobilePx = settings.questionOptionsSpacingMobile ?? 24;
+  const questionOptionsSpacingDesktopPx = settings.questionOptionsSpacingDesktop ?? 24;
+  const questionTextAlign = settings.questionTextAlign ?? "center";
+  const questionTextAlignClass =
+    questionTextAlign === "left" ? "text-left" : questionTextAlign === "right" ? "text-right" : "text-center";
 
   const questionSteps = steps.filter((s) => s.type === "question");
   const totalQuestions = questionSteps.length;
@@ -167,8 +174,10 @@ export function EditorCanvas({
                 isMobile={isMobile}
                 landingConstructorPick={landingConstructorPick}
                 logoUrl={settings.logoUrl}
+                contentFontFamily={settings.fontFamily}
                 currentQuestionIndex={currentQuestionIndex}
                 totalQuestions={totalQuestions}
+                questionTextAlignClass={questionTextAlignClass}
               />
             </FunnelIntroScrollShell>
           ) : (
@@ -176,19 +185,30 @@ export function EditorCanvas({
               <div
                 className={cn(
                   "mx-auto w-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden transition-[padding]",
+                  "flex flex-col",
                   viewModeTransitionClass,
                   isMobile ? "px-5 py-6" : "px-10 py-8",
                 )}
+                style={{
+                  ["--question-font-size" as any]: `${questionFontSizeMobilePx}px`,
+                  ["--question-font-size-md" as any]: `${questionFontSizeDesktopPx}px`,
+                  ["--question-options-spacing" as any]: `${questionOptionsSpacingMobilePx}px`,
+                  ["--question-options-spacing-md" as any]: `${questionOptionsSpacingDesktopPx}px`,
+                }}
               >
-                <StepContent
-                  step={step}
-                  primary={primary}
-                  isMobile={isMobile}
-                  landingConstructorPick={landingConstructorPick}
-                  logoUrl={settings.logoUrl}
-                  currentQuestionIndex={currentQuestionIndex}
-                  totalQuestions={totalQuestions}
-                />
+                <div className="flex-1">
+                  <StepContent
+                    step={step}
+                    primary={primary}
+                    isMobile={isMobile}
+                    landingConstructorPick={landingConstructorPick}
+                    logoUrl={settings.logoUrl}
+                    contentFontFamily={settings.fontFamily}
+                    currentQuestionIndex={currentQuestionIndex}
+                    totalQuestions={totalQuestions}
+                    questionTextAlignClass={questionTextAlignClass}
+                  />
+                </div>
                 {isQuestion && totalQuestions > 0 && (
                   <div
                     className={cn(
@@ -206,7 +226,7 @@ export function EditorCanvas({
                 )}
                 <FunnelBrandingFooter
                   className={cn(
-                    "mt-8 shrink-0 transition-[padding]",
+                    "mt-auto pt-8 shrink-0 transition-[padding]",
                     viewModeTransitionClass,
                     isMobile ? "mx-auto w-full pb-2" : "mx-auto w-full pb-4",
                   )}
@@ -239,16 +259,21 @@ function StepContent({
   isMobile,
   landingConstructorPick,
   logoUrl,
+  contentFontFamily,
   currentQuestionIndex,
   totalQuestions,
+  questionTextAlignClass,
 }: {
   step: FunnelStep;
   primary: string;
   isMobile: boolean;
   landingConstructorPick?: boolean;
   logoUrl?: string;
+  /** Familia tipográfica del funnel (settings.fontFamily). */
+  contentFontFamily?: string;
   currentQuestionIndex: number;
   totalQuestions: number;
+  questionTextAlignClass: string;
 }) {
   const landingCtx = useLandingBuilderOptional();
   const introPick = Boolean(landingConstructorPick && landingCtx && step.type === "intro");
@@ -276,6 +301,7 @@ function StepContent({
             logoUrl={logoUrl?.trim() ? logoUrl : undefined}
             showEditorChrome={introPick}
             showLandingDivider={ic?.showLandingDivider === true}
+            fontFamily={funnelContentFontFamily(contentFontFamily)}
             mainSelected={mainBlockSelected}
             renderBrandingFooterInside={false}
           >
@@ -362,8 +388,11 @@ function StepContent({
           ) : null}
           <h2
             className={cn(
-              "font-extrabold tracking-tight mb-6 text-center",
-              isMobile ? "text-base" : "text-5xl leading-[1.08]",
+              "font-extrabold tracking-tight",
+              questionTextAlignClass,
+              isMobile ? "text-[length:var(--question-font-size)]" : "text-[length:var(--question-font-size-md)]",
+              isMobile ? "mb-[var(--question-options-spacing)]" : "mb-[var(--question-options-spacing-md)]",
+              !isMobile && "leading-[1.08]",
             )}
           >
             {step.question.text}

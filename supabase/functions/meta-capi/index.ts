@@ -45,6 +45,15 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[^\d]/g, "");
 }
 
+function normalizeNamePart(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+/** Meta `_fbc` cuando solo hay fbclid en URL (sin cookie). Formato: fb.1.{unix}.{fbclid} */
+function buildFbcFromFbclid(fbclid: string, eventTimeSec: number): string {
+  return `fb.1.${eventTimeSec}.${fbclid}`;
+}
+
 type FunnelSettingsRow = {
   saved_at: string | null;
   updated_at: string;
@@ -72,11 +81,14 @@ Deno.serve(async (req) => {
       funnelId,
       testEventCode,
       metaCookies,
+      fbclid: bodyFbclid,
       events,
     }: {
       funnelId: string;
       testEventCode?: string;
       metaCookies?: { fbp?: string; fbc?: string };
+      /** Fallback `_fbc` si no hay cookie pero el landing trajo fbclid */
+      fbclid?: string;
       events: CapiEvent[];
     } = body;
 
@@ -144,8 +156,13 @@ Deno.serve(async (req) => {
         // Gap 2: fbp/fbc from browser cookies (if provided)
         if (metaCookies?.fbp) ud.fbp = metaCookies.fbp;
         if (metaCookies?.fbc) ud.fbc = metaCookies.fbc;
+        // Fallback: construir fbc desde fbclid (p. ej. consentimiento tardío / sin cookie)
+        const fbclidRaw = typeof bodyFbclid === "string" ? bodyFbclid.trim() : "";
+        if (!ud.fbc && fbclidRaw) {
+          ud.fbc = buildFbcFromFbclid(fbclidRaw, e.event_time);
+        }
 
-        // Gap 3: normalize + hash PII (em/ph) if present and not already hashed
+        // Gap 3: normalize + hash PII (em/ph/fn/ln) if present and not already hashed
         if (typeof ud.em === "string") {
           const em = ud.em.trim();
           if (em && !isHexSha256(em)) {
@@ -161,6 +178,23 @@ Deno.serve(async (req) => {
             if (norm) ud.ph = await sha256Hex(norm);
           } else if (ph) {
             ud.ph = ph.toLowerCase();
+          }
+        }
+        for (const key of ["fn", "ln"] as const) {
+          if (typeof ud[key] === "string") {
+            const raw = ud[key].trim();
+            if (raw && !isHexSha256(raw)) {
+              ud[key] = await sha256Hex(normalizeNamePart(raw));
+            } else if (raw) {
+              ud[key] = raw.toLowerCase();
+            }
+          }
+        }
+        // external_id: Meta espera hash SHA-256 del id estable (p. ej. session_id)
+        if (typeof ud.external_id === "string") {
+          const ex = ud.external_id.trim();
+          if (ex && !isHexSha256(ex)) {
+            ud.external_id = await sha256Hex(ex);
           }
         }
 

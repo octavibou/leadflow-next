@@ -8,7 +8,7 @@ import TopNavLayout from "@/components/TopNavLayout";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
 const APP_PAGE_TITLES: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/dashboard": "Leadflow",
   "/analytics": "Analytics",
   "/routing": "Routing",
   "/profile": "Profile",
@@ -25,6 +25,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const pageTitle = APP_PAGE_TITLES[pathname];
     if (!pageTitle) return;
+
+    if (pathname === "/dashboard") {
+      document.title = "Leadflow";
+      return;
+    }
 
     if (currentWorkspaceName) {
       document.title = `${pageTitle}: (${currentWorkspaceName})`;

@@ -38,7 +38,7 @@ export function FunnelBrandingFooter({
 
   return (
     <footer className={cn("flex flex-col items-center gap-3", className)}>
-      <div className="flex items-center justify-center gap-4 text-center text-xs text-gray-500">
+      <div className="flex items-center justify-center gap-4 text-center text-xs text-gray-500 opacity-35 hover:opacity-70 transition-opacity">
         <a
           href={termsHref}
           target="_blank"

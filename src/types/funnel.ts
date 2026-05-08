@@ -27,6 +27,16 @@ export interface FunnelSettings {
   metaPixelId: string;
   metaAccessToken: string;
   metaTestEventCode: string;
+  /** Tamaño del texto de la pregunta (px). */
+  questionFontSizeMobile?: number;
+  /** Tamaño del texto de la pregunta en desktop (px). */
+  questionFontSizeDesktop?: number;
+  /** Espacio vertical entre pregunta y respuestas (px). */
+  questionOptionsSpacingMobile?: number;
+  /** Espacio vertical entre pregunta y respuestas en desktop (px). */
+  questionOptionsSpacingDesktop?: number;
+  /** Alineación del texto de la pregunta. */
+  questionTextAlign?: "left" | "center" | "right";
   /** Si es false, la vista pública empieza en la primera pregunta y oculta el paso intro. undefined = true (compatibilidad). */
   useLanding?: boolean;
 }
@@ -253,5 +263,10 @@ export const DEFAULT_SETTINGS: FunnelSettings = {
   metaPixelId: "",
   metaAccessToken: "",
   metaTestEventCode: "",
+  questionFontSizeMobile: 16,
+  questionFontSizeDesktop: 48,
+  questionOptionsSpacingMobile: 24,
+  questionOptionsSpacingDesktop: 24,
+  questionTextAlign: "center",
   useLanding: true,
 };

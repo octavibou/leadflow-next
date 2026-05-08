@@ -180,6 +180,8 @@ function LandingIntroLayoutFloatingDelete({
 type LandingCanvasIntroLayoutProps = {
   logoUrl?: string;
   showEditorChrome: boolean;
+  /** Fuerza tipografía del funnel (si no se hereda del wrapper). */
+  fontFamily?: string;
   /** Si true: se muestra la línea gris entre cabecera y contenido (preview/publico). Constructor siempre reserva hueco divisor. */
   showLandingDivider?: boolean;
   mainSelected?: boolean;
@@ -195,6 +197,7 @@ type LandingCanvasIntroLayoutProps = {
 export function LandingCanvasIntroLayout({
   logoUrl,
   showEditorChrome,
+  fontFamily,
   showLandingDivider,
   mainSelected,
   footerClassName,
@@ -223,7 +226,7 @@ export function LandingCanvasIntroLayout({
   );
 
   return (
-    <div className="flex w-full flex-col gap-0">
+    <div className="flex w-full flex-col gap-0" style={{ fontFamily }}>
       <div className={cn("flex w-full flex-col rounded-t-2xl rounded-b-none")}>
         {showEditorChrome ? (
           <LandingCanvasSectionFrame

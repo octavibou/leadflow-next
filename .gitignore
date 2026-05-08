@@ -41,6 +41,9 @@ supabase/.temp/
 .claude/
 .lovable/
 
+# Git worktrees locales (PRs en progreso, no versionar)
+.worktrees/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

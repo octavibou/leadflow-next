@@ -8,7 +8,8 @@ import type { Funnel, FunnelStep, FunnelType } from "@/types/funnel";
 import { computeResults, interpolate, formatNumber } from "@/lib/resultsEngine";
 import {
   trackEvent, saveLead, injectMetaPixel, injectGoogleTag,
-  fireExternalEvent, extractUtms, fireMetaCapi, getOrCreateFunnelSessionId,
+  fireExternalEvent, fireMetaCapi, getOrCreateFunnelSessionId,
+  getOrCreateFirstTouchForSession,
 } from "@/lib/tracking";
 import { funnelPublicFooterInnerClass } from "@/components/funnel/FunnelIntroScrollShell";
 import { FunnelBrandingFooter } from "@/components/funnel/FunnelBrandingFooter";
@@ -22,7 +23,6 @@ import {
 import { LandingCanvasIntroLayout } from "@/components/funnel/LandingCanvasIntroLayout";
 import { LandingIntroBodyBlocks } from "@/components/funnel/LandingIntroBodyBlocks";
 import { funnelContentFontFamily } from "@/lib/funnelTypography";
-import { CookieBanner } from "@/components/CookieBanner";
 
 interface CampaignSettings {
   metaPixelId?: string;
@@ -71,61 +71,25 @@ const PublicFunnel = () => {
   const [consentChecked, setConsentChecked] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaignSettings, setCampaignSettings] = useState<CampaignSettings>({});
-  const [cookieConsent, setCookieConsent] = useState<"accepted" | "rejected" | null>(null);
-  const [showCookieBanner, setShowCookieBanner] = useState(false);
-  const utmsRef = useRef<Record<string, string>>({});
+  /** UTMs + fbclid + referrer + attribution_source/medium (first-touch por funnel+sesión). */
+  const trackingPayloadRef = useRef<Record<string, string>>({});
   const trackedPageView = useRef(false);
   const sessionIdRef = useRef<string>("");
   const qualificationTrackedRef = useRef(false);
+  const contactViewTrackedRef = useRef(false);
   const searchParams = useSearchParams();
   const cSlug = searchParams.get("c");
   const [campaignGate, setCampaignGate] = useState<"pending" | "ok" | "fail">(() =>
     cSlug ? "pending" : "ok",
   );
 
-  // Extract UTMs once
+  // First-touch + session id por funnel (URLs públicas no cambian)
   useEffect(() => {
-    utmsRef.current = extractUtms();
+    if (!funnelId) return;
     sessionIdRef.current = getOrCreateFunnelSessionId();
-  }, []);
-
-  // Read cookie consent once on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("cookie_consent");
-    if (stored === "accepted" || stored === "rejected") {
-      setCookieConsent(stored);
-    } else {
-      setCookieConsent(null);
-    }
-  }, []);
-
-  const handleCookieAccept = useCallback(() => {
-    if (!funnel) return;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("cookie_consent", "accepted");
-    }
-    setCookieConsent("accepted");
-    setShowCookieBanner(false);
-    const pid = funnel.settings.metaPixelId;
-    if (pid) injectMetaPixel(pid);
-  }, [funnel]);
-
-  const handleCookieReject = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("cookie_consent", "rejected");
-    }
-    setCookieConsent("rejected");
-    setShowCookieBanner(false);
-  }, []);
-
-  const handleManageCookies = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("cookie_consent");
-    }
-    setCookieConsent(null);
-    setShowCookieBanner(true);
-  }, []);
+    trackingPayloadRef.current = getOrCreateFirstTouchForSession(funnelId, sessionIdRef.current);
+    contactViewTrackedRef.current = false;
+  }, [funnelId]);
 
   // Load funnel
   useEffect(() => {
@@ -221,27 +185,13 @@ const PublicFunnel = () => {
     };
   }, [funnelId, cSlug]);
 
-  // Inject funnel-level Meta Pixel only if cookies accepted
+  // Inject funnel-level Meta Pixel automáticamente al cargar el funnel.
+  // (El flujo de consentimiento de cookies se reactivará más adelante.)
   useEffect(() => {
     if (!funnel) return;
-    if (cookieConsent !== "accepted") return;
     const pid = funnel.settings.metaPixelId;
     if (pid) injectMetaPixel(pid);
-  }, [funnel, cookieConsent]);
-
-  // Show cookie banner when user reaches second question and has not decided yet
-  useEffect(() => {
-    if (!funnel) return;
-    if (cookieConsent !== null) {
-      setShowCookieBanner(false);
-      return;
-    }
-    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
-    const current = sorted[currentStepIndex];
-    if (current && current.type === "question" && currentStepIndex === 1) {
-      setShowCookieBanner(true);
-    }
-  }, [funnel, currentStepIndex, cookieConsent]);
+  }, [funnel]);
 
   // Helper to fire Meta CAPI for this funnel
   const fireCapiEvent = useCallback(
@@ -249,7 +199,12 @@ const PublicFunnel = () => {
       if (!funnel) return;
       const { metaPixelId } = funnel.settings;
       if (!metaPixelId) return;
-      fireMetaCapi(funnel.id, eventName, window.location.href, userData, customData);
+      const sid = sessionIdRef.current || getOrCreateFunnelSessionId();
+      const fbclid = trackingPayloadRef.current?.fbclid;
+      fireMetaCapi(funnel.id, eventName, window.location.href, userData, customData, {
+        sessionId: sid,
+        fbclid,
+      });
     },
     [funnel]
   );
@@ -260,9 +215,10 @@ const PublicFunnel = () => {
     if (cSlug && campaignGate !== "ok") return;
     trackedPageView.current = true;
     const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
-    const params = { funnel_id: funnelId, campaign_id: campaignId, session_id: sessionId, ...utmsRef.current };
-    trackEvent(funnel.id, campaignId, "session_started", { session_id: sessionId, ...utmsRef.current });
-    trackEvent(funnel.id, campaignId, "page_view", { session_id: sessionId, ...utmsRef.current });
+    const payload = trackingPayloadRef.current;
+    const params = { funnel_id: funnelId, campaign_id: campaignId, session_id: sessionId, ...payload };
+    trackEvent(funnel.id, campaignId, "session_started", { session_id: sessionId, ...payload });
+    trackEvent(funnel.id, campaignId, "page_view", { session_id: sessionId, ...payload });
     // Pixel + CAPI: PageView
     fireCapiEvent("PageView");
     // Legacy campaign-level tracking
@@ -283,6 +239,7 @@ const PublicFunnel = () => {
       session_id: sessionId,
       qualified,
       evaluated_questions: totalQuestionCount,
+      ...trackingPayloadRef.current,
     });
     qualificationTrackedRef.current = true;
   }, [answers, qualified, funnel, campaignId]);
@@ -291,6 +248,24 @@ const PublicFunnel = () => {
     () => (funnel?.steps ? JSON.stringify(funnel.steps.map((s) => s.id)) : ""),
     [funnel?.steps],
   );
+
+  // Track contact_view when user reaches the contact form step
+  useEffect(() => {
+    if (!funnel) return;
+    const sorted = [...funnel.steps].sort((a, b) => a.order - b.order);
+    const current = sorted[currentStepIndex];
+    if (current?.type !== "contact") return;
+    if (contactViewTrackedRef.current) return;
+    contactViewTrackedRef.current = true;
+
+    const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
+    trackEvent(funnel.id, campaignId, "contact_view", {
+      session_id: sessionId,
+      step_id: current.id,
+      step_type: "contact",
+      ...trackingPayloadRef.current,
+    });
+  }, [funnel, currentStepIndex, campaignId]);
 
   /** Saltar la landing: ajuste global `useLanding === false`, o URL `?landing=0` (p. ej. enlace de Publicar «Solo funnel»). */
   const hideIntro = useMemo(() => {
@@ -399,6 +374,13 @@ const PublicFunnel = () => {
   const sortedSteps = [...funnel.steps].sort((a, b) => a.order - b.order);
   const currentStep = sortedSteps[currentStepIndex];
   const primary = funnel.settings.primaryColor || "#1877F2";
+  const questionFontSizeMobilePx = funnel.settings.questionFontSizeMobile ?? 16;
+  const questionFontSizeDesktopPx = funnel.settings.questionFontSizeDesktop ?? 48;
+  const questionOptionsSpacingMobilePx = funnel.settings.questionOptionsSpacingMobile ?? 24;
+  const questionOptionsSpacingDesktopPx = funnel.settings.questionOptionsSpacingDesktop ?? 24;
+  const questionTextAlign = funnel.settings.questionTextAlign ?? "center";
+  const questionTextAlignClass =
+    questionTextAlign === "left" ? "text-left" : questionTextAlign === "right" ? "text-right" : "text-center";
   const questionSteps = sortedSteps.filter((s) => s.type === "question");
   const totalQuestions = questionSteps.length;
   const currentQuestionIndex = questionSteps.findIndex((s) => s.id === currentStep?.id);
@@ -435,22 +417,8 @@ const PublicFunnel = () => {
 
   const handleContactSubmit = () => {
     const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
-    // Track form_submit event
-    trackEvent(funnel.id, campaignId, "form_submit", { session_id: sessionId, ...utmsRef.current });
-    // Meta CAPI: Lead
-    fireCapiEvent("Lead", {}, { funnel_id: funnel.id, campaign_id: campaignId });
-    if (campaignSettings.trackingEnabled) {
-      fireExternalEvent("lead", { funnel_id: funnel.id, campaign_id: campaignId });
-    }
+    const tp = trackingPayloadRef.current;
 
-    // Save lead to DB
-    saveLead(funnel.id, campaignId, answers, qualified ? "qualified" : "disqualified", {
-      session_id: sessionId,
-      formData,
-      ...utmsRef.current,
-    });
-
-    // Build payload (shared between direct webhook and lead routing)
     const contactStep = sortedSteps.find((s) => s.type === "contact");
     const fields = contactStep?.contactFields || [];
     let firstName = "", lastName = "", email = "", phone = "";
@@ -476,6 +444,27 @@ const PublicFunnel = () => {
         }
       }
     }
+
+    trackEvent(funnel.id, campaignId, "form_submit", { session_id: sessionId, ...tp });
+    fireCapiEvent(
+      "Lead",
+      {
+        ...(email.trim() ? { em: email.trim() } : {}),
+        ...(phone.trim() ? { ph: phone.trim() } : {}),
+        ...(firstName.trim() ? { fn: firstName.trim() } : {}),
+        ...(lastName.trim() ? { ln: lastName.trim() } : {}),
+      },
+      { funnel_id: funnel.id, campaign_id: campaignId },
+    );
+    if (campaignSettings.trackingEnabled) {
+      fireExternalEvent("lead", { funnel_id: funnel.id, campaign_id: campaignId });
+    }
+
+    saveLead(funnel.id, campaignId, answers, qualified ? "qualified" : "disqualified", {
+      session_id: sessionId,
+      formData,
+      ...tp,
+    });
     const namedAnswers: Record<string, string> = {};
     const answerOptionIds: Record<string, string> = {};
     for (const step of sortedSteps) {
@@ -583,16 +572,15 @@ const PublicFunnel = () => {
   return (
     <div
       className="min-h-[100dvh] bg-white flex flex-col"
-      style={{ fontFamily: funnel ? funnelContentFontFamily(funnel.settings.fontFamily) : undefined }}
+      style={{
+        fontFamily: funnel ? funnelContentFontFamily(funnel.settings.fontFamily) : undefined,
+        ["--question-font-size" as any]: `${questionFontSizeMobilePx}px`,
+        ["--question-font-size-md" as any]: `${questionFontSizeDesktopPx}px`,
+        ["--question-options-spacing" as any]: `${questionOptionsSpacingMobilePx}px`,
+        ["--question-options-spacing-md" as any]: `${questionOptionsSpacingDesktopPx}px`,
+      }}
     >
       {funnel ? <FunnelGoogleFont fontFamily={funnel.settings.fontFamily} /> : null}
-      {showCookieBanner && (
-        <CookieBanner
-          primaryColor={primary}
-          onAccept={handleCookieAccept}
-          onReject={handleCookieReject}
-        />
-      )}
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center space-y-4">
@@ -638,6 +626,7 @@ const PublicFunnel = () => {
                 logoUrl={logo}
                 showEditorChrome={false}
                 showLandingDivider={false}
+                fontFamily={funnelContentFontFamily(funnel.settings.fontFamily)}
                 renderBrandingFooterInside={false}
               >
                 <LandingIntroHeroColumn
@@ -674,7 +663,14 @@ const PublicFunnel = () => {
                   Pregunta {currentQuestionIndex + 1} de {totalQuestions}
                 </div>
               )}
-              <h2 className="text-base md:text-5xl md:leading-[1.08] font-extrabold tracking-tight mb-6 text-center">
+              <h2
+                className={cn(
+                  "font-extrabold tracking-tight",
+                  questionTextAlignClass,
+                  "text-[length:var(--question-font-size)] md:text-[length:var(--question-font-size-md)]",
+                  "mb-[var(--question-options-spacing)] md:mb-[var(--question-options-spacing-md)] md:leading-[1.08]",
+                )}
+              >
                 {currentStep.question.text}
               </h2>
               <div className={currentStep.question.layout === "opts-2" ? "space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0" : "space-y-3"}>
@@ -862,7 +858,7 @@ const PublicFunnel = () => {
         {/* Sticky bottom area: progress + footer (like competitor) */}
         <div className="sticky bottom-0 z-10 shrink-0 w-full bg-white mt-auto">
           <div className={funnelPublicFooterInnerClass}>
-            <FunnelBrandingFooter onManageCookies={handleManageCookies} />
+            <FunnelBrandingFooter />
           </div>
           {isQuestion && totalQuestions > 0 && (
             <div className="w-full">

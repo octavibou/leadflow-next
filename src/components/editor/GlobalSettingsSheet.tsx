@@ -29,8 +29,8 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
     if (open) setSettings(funnel.settings);
   }, [open, funnel.settings, funnel.id]);
 
-  const set = (k: keyof FunnelSettings, v: string) => {
-    const updated = { ...settings, [k]: v };
+  const set = <K extends keyof FunnelSettings>(k: K, v: FunnelSettings[K]) => {
+    const updated: FunnelSettings = { ...settings, [k]: v };
     setSettings(updated);
     updateFunnel(funnel.id, { settings: updated });
   };
@@ -387,6 +387,38 @@ export function GlobalSettingsSheet({ funnel, open, onClose }: { funnel: Funnel;
               </div>
             </>
           )}
+
+          <Separator />
+
+          <div>
+            <Label className="text-xs mb-1.5 block">Funnel ID</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                className="h-9 text-sm font-mono flex-1"
+                value={funnel.id}
+                readOnly
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => copyToClipboard(funnel.id)}
+                className="gap-2"
+              >
+                {copiedField === funnel.id ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-600" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
         </div>
       </SheetContent>

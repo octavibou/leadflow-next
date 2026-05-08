@@ -2,6 +2,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const FUNNEL_SESSION_STORAGE_KEY = "leadflow_funnel_session_id";
 
+/** First-touch atribución por funnel + sesión interna (no cambia URLs públicas). */
+const FIRST_TOUCH_PREFIX = "leadflow_ft_v1_";
+
 export function getOrCreateFunnelSessionId(): string {
   if (typeof window === "undefined") {
     return crypto.randomUUID();
@@ -15,6 +18,111 @@ export function getOrCreateFunnelSessionId(): string {
   return created;
 }
 
+/** UTMs estándar + ids de clic + landing/referrer + fuente/medio derivados (first-touch). */
+export type FirstTouchPayload = Record<string, string>;
+
+export function extractUtms(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const utms: Record<string, string> = {};
+  ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((k) => {
+    const v = params.get(k);
+    if (v) utms[k] = v;
+  });
+  return utms;
+}
+
+/**
+ * Captura instantánea de atribución (ejecutar en el primer paint del funnel).
+ * Prioridad fuente/medio: UTMs → click ids → referrer → direct.
+ */
+export function captureFirstTouchSnapshot(): FirstTouchPayload {
+  if (typeof window === "undefined") return {};
+
+  const utms = extractUtms();
+  const params = new URLSearchParams(window.location.search);
+  const clickKeys = ["fbclid", "gclid", "ttclid", "msclkid"] as const;
+  const clickIds: Record<string, string> = {};
+  clickKeys.forEach((k) => {
+    const v = params.get(k);
+    if (v) clickIds[k] = v;
+  });
+
+  let attribution_source = "";
+  let attribution_medium = "";
+
+  if (utms.utm_source) {
+    attribution_source = utms.utm_source;
+    attribution_medium = utms.utm_medium || "";
+  } else if (clickIds.fbclid) {
+    attribution_source = "facebook";
+    attribution_medium = "paid_social";
+  } else if (clickIds.gclid) {
+    attribution_source = "google";
+    attribution_medium = "cpc";
+  } else if (clickIds.ttclid) {
+    attribution_source = "tiktok";
+    attribution_medium = "paid_social";
+  } else if (clickIds.msclkid) {
+    attribution_source = "bing";
+    attribution_medium = "cpc";
+  } else {
+    const ref = document.referrer?.trim() || "";
+    try {
+      if (ref) {
+        const h = new URL(ref).hostname.replace(/^www\./i, "");
+        attribution_source = h;
+        attribution_medium = "referral";
+      } else {
+        attribution_source = "direct";
+        attribution_medium = "none";
+      }
+    } catch {
+      attribution_source = "direct";
+      attribution_medium = "none";
+    }
+  }
+
+  let referrer_host = "";
+  try {
+    if (document.referrer) {
+      referrer_host = new URL(document.referrer).hostname.replace(/^www\./i, "");
+    }
+  } catch {
+    referrer_host = "";
+  }
+
+  return {
+    ...utms,
+    ...clickIds,
+    landing_url: window.location.href.split("#")[0],
+    referrer: document.referrer || "",
+    referrer_host,
+    attribution_source,
+    attribution_medium,
+    captured_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * First-touch persistente por funnel + session_id interno.
+ */
+export function getOrCreateFirstTouchForSession(funnelId: string, sessionId: string): FirstTouchPayload {
+  if (typeof window === "undefined") return {};
+  const key = `${FIRST_TOUCH_PREFIX}${funnelId}_${sessionId}`;
+  const existing = window.localStorage.getItem(key);
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing) as FirstTouchPayload;
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      /* replace */
+    }
+  }
+  const snap = captureFirstTouchSnapshot();
+  window.localStorage.setItem(key, JSON.stringify(snap));
+  return snap;
+}
+
 // ---- Internal event tracking ----
 export function trackEvent(
   funnelId: string,
@@ -22,6 +130,22 @@ export function trackEvent(
   eventType: string,
   metadata: Record<string, any> = {}
 ) {
+  if (typeof window !== "undefined") {
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        type: "event",
+        funnelId,
+        campaignId,
+        eventType,
+        metadata,
+      }),
+    }).catch(() => {});
+    return;
+  }
+
   supabase
     .from("events")
     .insert({
@@ -135,6 +259,13 @@ export function fireExternalEvent(
   }
 }
 
+export type FireMetaCapiOptions = {
+  /** Para fallback de `_fbc` en servidor si falta la cookie. */
+  fbclid?: string;
+  /** Se envía como `external_id` (hasheado en Edge). */
+  sessionId?: string;
+};
+
 // ---- Meta Conversions API (server-side) ----
 export function fireMetaCapi(
   funnelId: string,
@@ -142,11 +273,17 @@ export function fireMetaCapi(
   sourceUrl: string,
   userData: Record<string, unknown> = {},
   customData: Record<string, unknown> = {},
-  // testEventCode is resolved server-side from funnel settings
+  capiOptions?: FireMetaCapiOptions,
 ) {
   const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
   const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const eventId = crypto.randomUUID();
+
+  const mergedUserData: Record<string, unknown> = {
+    client_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    ...(capiOptions?.sessionId ? { external_id: capiOptions.sessionId } : {}),
+    ...userData,
+  };
 
   // Also fire pixel with matching event_id for deduplication
   const w = window as any;
@@ -163,6 +300,7 @@ export function fireMetaCapi(
     body: JSON.stringify({
       funnelId,
       metaCookies: getMetaCookies(),
+      fbclid: capiOptions?.fbclid,
       events: [
         {
           event_name: eventName,
@@ -170,10 +308,7 @@ export function fireMetaCapi(
           event_source_url: sourceUrl,
           action_source: "website",
           event_id: eventId,
-          user_data: {
-            client_user_agent: navigator.userAgent,
-            ...userData,
-          },
+          user_data: mergedUserData,
           custom_data: Object.keys(customData).length > 0 ? customData : undefined,
         },
       ],
@@ -208,15 +343,4 @@ export function getMetaCookies(): { fbp?: string; fbc?: string } {
     ...(fbp ? { fbp } : {}),
     ...(fbc ? { fbc } : {}),
   };
-}
-
-// ---- Extract UTMs from URL ----
-export function extractUtms(): Record<string, string> {
-  const params = new URLSearchParams(window.location.search);
-  const utms: Record<string, string> = {};
-  ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((k) => {
-    const v = params.get(k);
-    if (v) utms[k] = v;
-  });
-  return utms;
 }

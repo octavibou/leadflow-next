@@ -19,6 +19,8 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 import { FUNNEL_TYPE_LABELS } from "@/types/funnel";
 import { exportFunnelToHtml } from "@/lib/exportHtml";
 import { supabase } from "@/integrations/supabase/client";
+import { getSessionIdFromRow } from "@/lib/sessionAnalytics";
+import { cn } from "@/lib/utils";
 
 const TemplatePicker = dynamic(
   () => import("@/components/TemplatePicker").then((m) => m.TemplatePicker),
@@ -29,6 +31,69 @@ const PendingInvitations = dynamic(
   () => import("@/components/workspace/PendingInvitations").then((m) => m.PendingInvitations),
   { ssr: false }
 );
+
+function clampPct(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+function pct(numer: number, denom: number): number {
+  if (!denom) return 0;
+  return clampPct((numer / denom) * 100);
+}
+
+function HealthRing({
+  label,
+  valuePct,
+  detail,
+  colorClass,
+}: {
+  label: string;
+  valuePct: number;
+  detail: string;
+  colorClass: string;
+}) {
+  const size = 64;
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = (clampPct(valuePct) / 100) * c;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-16 w-16 shrink-0">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            strokeWidth={stroke}
+            className="fill-none stroke-muted"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            className={cn("fill-none transition-[stroke-dasharray] duration-300", colorClass)}
+            style={{
+              strokeDasharray: `${dash} ${c - dash}`,
+              transform: "rotate(-90deg)",
+              transformOrigin: "50% 50%",
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="text-sm font-semibold tabular-nums">{Math.round(clampPct(valuePct))}%</span>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold leading-tight">{label}</div>
+        <div className="text-[11px] text-muted-foreground leading-snug">{detail}</div>
+      </div>
+    </div>
+  );
+}
 
 const Dashboard = () => {
   const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel, saveFunnel, unpublishFunnel } = useFunnelStore();
@@ -56,6 +121,70 @@ const Dashboard = () => {
   const [funnelLeadCounts, setFunnelLeadCounts] = useState<Record<string, number>>({});
   const [funnelImpressionCounts, setFunnelImpressionCounts] = useState<Record<string, number>>({});
   const [funnelMetrics, setFunnelMetrics] = useState<Record<string, FunnelMetrics>>({});
+
+  const firstQuestionStepIdByFunnel = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const f of funnels) {
+      const sorted = [...(f.steps || [])].sort((a: any, b: any) => a.order - b.order);
+      const firstQ = sorted.find((s: any) => s.type === "question");
+      if (firstQ?.id) map[f.id] = firstQ.id;
+    }
+    return map;
+  }, [funnels]);
+
+  const [health, setHealth] = useState<{
+    sessions: number;
+    firstAnswered: number;
+    completed: number;
+    qualified: number;
+  }>({ sessions: 0, firstAnswered: 0, completed: 0, qualified: 0 });
+
+  useEffect(() => {
+    const loadHealth = async () => {
+      if (!supabase || funnels.length === 0) {
+        setHealth({ sessions: 0, firstAnswered: 0, completed: 0, qualified: 0 });
+        return;
+      }
+      const ids = funnels.map((f) => f.id);
+      const fromDate = getFromDate(dateRange);
+      let q = supabase
+        .from("events")
+        .select("event_type, metadata, created_at, funnel_id")
+        .in("funnel_id", ids)
+        .in("event_type", ["session_started", "step_view", "qualification_evaluated"]);
+      if (fromDate) q = q.gte("created_at", fromDate);
+      const { data } = await q;
+      const sessionStarted = new Set<string>();
+      const firstAnswered = new Set<string>();
+      const completed = new Set<string>();
+      const qualified = new Set<string>();
+      (data || []).forEach((e: any) => {
+        const sid = getSessionIdFromRow(e);
+        if (!sid) return;
+        if (e.event_type === "session_started") {
+          sessionStarted.add(sid);
+          return;
+        }
+        if (e.event_type === "step_view") {
+          const stepId = (e.metadata || {})?.step_id;
+          const first = firstQuestionStepIdByFunnel[e.funnel_id];
+          if (first && stepId === first) firstAnswered.add(sid);
+          return;
+        }
+        if (e.event_type === "qualification_evaluated") {
+          completed.add(sid);
+          if ((e.metadata || {})?.qualified === true) qualified.add(sid);
+        }
+      });
+      setHealth({
+        sessions: sessionStarted.size,
+        firstAnswered: firstAnswered.size,
+        completed: completed.size,
+        qualified: qualified.size,
+      });
+    };
+    loadHealth();
+  }, [funnels, dateRange, firstQuestionStepIdByFunnel]);
 
   // Fetch lead and impression counts for all funnels to sort by performance
   useEffect(() => {
@@ -297,6 +426,65 @@ const Dashboard = () => {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Overview (light analytics style) */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Resumen</CardTitle>
+            <CardDescription className="text-xs">
+              Sesiones, progreso del quiz y calidad del tráfico ({DATE_RANGE_LABELS[dateRange]}).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border bg-background p-3">
+                <div className="text-[11px] text-muted-foreground">Sesiones</div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{health.sessions.toLocaleString()}</div>
+              </div>
+              <div className="rounded-xl border bg-background p-3">
+                <div className="text-[11px] text-muted-foreground">1ª pregunta (rellenada)</div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{health.firstAnswered.toLocaleString()}</div>
+              </div>
+              <div className="rounded-xl border bg-background p-3">
+                <div className="text-[11px] text-muted-foreground">Completadas</div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{health.completed.toLocaleString()}</div>
+              </div>
+              <div className="rounded-xl border bg-background p-3">
+                <div className="text-[11px] text-muted-foreground">Cualificadas</div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{health.qualified.toLocaleString()}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Health Scores</CardTitle>
+            <CardDescription className="text-xs">Indicadores rápidos del estado del funnel.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <HealthRing
+              label="Landing Conversion"
+              valuePct={pct(health.firstAnswered, health.sessions)}
+              detail={`${health.firstAnswered.toLocaleString()} / ${health.sessions.toLocaleString()} sesiones`}
+              colorClass="stroke-emerald-500"
+            />
+            <HealthRing
+              label="Completion Rate"
+              valuePct={pct(health.completed, health.sessions)}
+              detail={`${health.completed.toLocaleString()} / ${health.sessions.toLocaleString()} iniciadas`}
+              colorClass="stroke-blue-500"
+            />
+            <HealthRing
+              label="Traffic Quality"
+              valuePct={pct(health.qualified, health.sessions)}
+              detail={`${health.qualified.toLocaleString()} cualificadas`}
+              colorClass="stroke-violet-500"
+            />
+          </CardContent>
+        </Card>
       </div>
 
       {loading ? (
