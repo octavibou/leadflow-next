@@ -5,11 +5,18 @@ import { cn } from "@/lib/utils";
 import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import type { Funnel, FunnelStep, FunnelType } from "@/types/funnel";
-import { computeResults, interpolate, formatNumber } from "@/lib/resultsEngine";
+import type { Language } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { resolveContactStepCopy } from "@/lib/contactStepCopy";
+import { FunnelContactStepPanel } from "@/components/funnel/FunnelContactStepPanel";
+import { computeResults } from "@/lib/resultsEngine";
+import { FunnelResultsStep } from "@/components/funnel/FunnelResultsStep";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   trackEvent, saveLead, injectMetaPixel, injectGoogleTag,
   fireExternalEvent, fireMetaCapi, getOrCreateFunnelSessionId,
   getOrCreateFirstTouchForSession,
+  syncLeadflowPreviewFromUrlSearch,
 } from "@/lib/tracking";
 import { funnelPublicFooterInnerClass } from "@/components/funnel/FunnelIntroScrollShell";
 import { FunnelBrandingFooter } from "@/components/funnel/FunnelBrandingFooter";
@@ -82,6 +89,12 @@ const PublicFunnel = () => {
   const [campaignGate, setCampaignGate] = useState<"pending" | "ok" | "fail">(() =>
     cSlug ? "pending" : "ok",
   );
+  const isMobileViewport = useIsMobile();
+
+  useLayoutEffect(() => {
+    const q = searchParams.toString();
+    syncLeadflowPreviewFromUrlSearch(q ? `?${q}` : "");
+  }, [searchParams]);
 
   // First-touch + session id por funnel (URLs públicas no cambian)
   useEffect(() => {
@@ -385,7 +398,20 @@ const PublicFunnel = () => {
   const totalQuestions = questionSteps.length;
   const currentQuestionIndex = questionSteps.findIndex((s) => s.id === currentStep?.id);
   const isQuestion = currentStep?.type === "question";
-  const progress = totalQuestions > 1 && currentQuestionIndex >= 0 ? (currentQuestionIndex / (totalQuestions - 1)) * 100 : isQuestion ? 0 : 100;
+  const lang = (funnel.settings.language || "es") as Language;
+  const isContactStep = currentStep?.type === "contact";
+  const contactResolved =
+    isContactStep && currentStep ? resolveContactStepCopy(currentStep, lang) : null;
+  const showContactStickyProgress = Boolean(contactResolved?.showProgress);
+
+  const progress =
+    isQuestion && totalQuestions > 0 && currentQuestionIndex >= 0
+      ? ((currentQuestionIndex + 1) / totalQuestions) * 100
+      : showContactStickyProgress && contactResolved
+        ? contactResolved.progressPercent
+        : isQuestion
+          ? 0
+          : 100;
 
   const handleOptionSelect = (step: FunnelStep, optionValue: string) => {
     if (!step.question) return;
@@ -420,6 +446,15 @@ const PublicFunnel = () => {
     const tp = trackingPayloadRef.current;
 
     const contactStep = sortedSteps.find((s) => s.type === "contact");
+    const consentUiRequired =
+      contactStep &&
+      contactStep.showContactConsentCheckbox !== false &&
+      Boolean(contactStep.contactConsent?.trim());
+    if (consentUiRequired && !consentChecked) {
+      alert(t((funnel!.settings.language || "es") as Language, "contact.consent.alert"));
+      return;
+    }
+
     const fields = contactStep?.contactFields || [];
     let firstName = "", lastName = "", email = "", phone = "";
     const hasLastNameField = fields.some((f) => f.label.toLowerCase().includes("apellido"));
@@ -539,7 +574,11 @@ const PublicFunnel = () => {
   const handleResultsCta = (step: FunnelStep) => {
     if (!step.resultsConfig) return;
     const r = step.resultsConfig;
-    const hasEngine = (r.formulas?.length ?? 0) > 0 || r.headline;
+    const hasEngine =
+      (r.formulas?.length ?? 0) > 0 ||
+      Boolean(r.headline?.trim()) ||
+      Boolean(r.headlineLead?.trim()) ||
+      Boolean(r.headlineEmphasis?.trim());
 
     // Track result_assigned
     const resultLabel = hasEngine ? "engine" : (qualified ? "qualified" : "disqualified");
@@ -598,11 +637,16 @@ const PublicFunnel = () => {
       ) : (
         <>
       {/* Logo (fuera del scroll salvo landing: ahí va en la cabecera del canvas) */}
-      {funnel.settings.logoUrl && currentStep?.type !== "intro" && (
-        <div className="flex justify-center pt-4 pb-0 shrink-0">
-          <img src={funnel.settings.logoUrl} alt="Logo" className="h-8 object-contain" />
-        </div>
-      )}
+      {funnel.settings.logoUrl &&
+        currentStep?.type !== "intro" &&
+        !(
+          currentStep?.type === "results" &&
+          currentStep.resultsConfig?.resultsPageLayout === "conversion"
+        ) && (
+          <div className="flex justify-center pt-4 pb-0 shrink-0">
+            <img src={funnel.settings.logoUrl} alt="Logo" className="h-8 object-contain" />
+          </div>
+        )}
 
       {/* Scroll natural del documento: footer siempre al final */}
       <div className="flex flex-1 flex-col">
@@ -657,7 +701,10 @@ const PublicFunnel = () => {
             <div className="animate-fade-in">
               {totalQuestions > 0 && currentQuestionIndex >= 0 && (
                 <div
-                  className="hidden md:block text-center text-sm font-semibold mb-3"
+                  className={cn(
+                    "text-xs font-semibold mb-2 md:text-sm md:mb-3",
+                    questionTextAlignClass,
+                  )}
                   style={{ color: primary }}
                 >
                   Pregunta {currentQuestionIndex + 1} de {totalQuestions}
@@ -696,75 +743,118 @@ const PublicFunnel = () => {
           )}
 
           {/* Contact */}
-          {currentStep.type === "contact" && (
-            <div className="animate-fade-in">
-              <div className="text-center">
-                <h2 className="text-base md:text-5xl md:leading-[1.08] font-extrabold tracking-tight mb-8">
-                  Tus datos
-                </h2>
-              </div>
-              <div className="mx-auto w-full max-w-md space-y-4">
-                {(() => {
-                  const rawFields = currentStep.contactFields || [];
-                  const hasLastName = rawFields.some((f) => f.label.toLowerCase().includes("apellido"));
-                  const firstText = rawFields.find((f) => f.fieldType === "text");
-                  const augmented =
-                    !hasLastName && firstText
-                      ? [
-                          ...rawFields,
-                          { id: "__virtual_lastName", step_id: currentStep.id, fieldType: "text" as const, label: "Apellidos", placeholder: "Tus apellidos", required: true },
-                        ]
-                      : rawFields;
-                  const order = ["Nombre", "Apellidos", "Email", "Teléfono"];
-                  const sorted = [...augmented].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
-                  return sorted.map((f) => (
-                    <div key={f.id}>
-                      <label className="font-semibold text-xs md:sr-only block mb-2">
-                        {f.label}{f.required && " *"}
-                      </label>
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                          {f.fieldType === "email" ? "✉️" : f.fieldType === "tel" ? "📞" : "👤"}
-                        </span>
-                        <input
-                          type={f.fieldType}
-                          name={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : undefined}
-                          autoComplete={f.fieldType === "email" ? "email" : f.fieldType === "tel" ? "tel" : f.label === "Nombre" ? "given-name" : f.label === "Apellidos" ? "family-name" : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company") ? "organization" : "on"}
-                          placeholder={f.placeholder}
-                          value={formData[f.id] || ""}
-                          onChange={(e) => handleFormChange(f.id, e.target.value)}
-                          className="w-full rounded-md border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm md:text-base outline-none focus:border-blue-400 transition-colors"
-                          required={f.required}
-                        />
+          {currentStep.type === "contact" && contactResolved && (
+            <FunnelContactStepPanel
+              copy={contactResolved}
+              isMobile={isMobileViewport}
+              fields={
+                <>
+                  {(() => {
+                    const rawFields = currentStep.contactFields || [];
+                    const hasLastName = rawFields.some((f) => f.label.toLowerCase().includes("apellido"));
+                    const firstText = rawFields.find((f) => f.fieldType === "text");
+                    const augmented =
+                      !hasLastName && firstText
+                        ? [
+                            ...rawFields,
+                            {
+                              id: "__virtual_lastName",
+                              step_id: currentStep.id,
+                              fieldType: "text" as const,
+                              label: "Apellidos",
+                              placeholder: "Tus apellidos",
+                              required: true,
+                            },
+                          ]
+                        : rawFields;
+                    const order = ["Nombre", "Apellidos", "Email", "Teléfono"];
+                    const sorted = [...augmented].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+                    return sorted.map((f) => (
+                      <div key={f.id}>
+                        <label className="font-semibold text-xs md:sr-only block mb-2">
+                          {f.label}
+                          {f.required && " *"}
+                        </label>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            {f.fieldType === "email" ? "✉️" : f.fieldType === "tel" ? "📞" : "👤"}
+                          </span>
+                          <input
+                            type={f.fieldType}
+                            name={
+                              f.fieldType === "email"
+                                ? "email"
+                                : f.fieldType === "tel"
+                                  ? "tel"
+                                  : f.label === "Nombre"
+                                    ? "given-name"
+                                    : f.label === "Apellidos"
+                                      ? "family-name"
+                                      : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company")
+                                        ? "organization"
+                                        : undefined
+                            }
+                            autoComplete={
+                              f.fieldType === "email"
+                                ? "email"
+                                : f.fieldType === "tel"
+                                  ? "tel"
+                                  : f.label === "Nombre"
+                                    ? "given-name"
+                                    : f.label === "Apellidos"
+                                      ? "family-name"
+                                      : f.label.toLowerCase().includes("empresa") || f.label.toLowerCase().includes("company")
+                                        ? "organization"
+                                        : "on"
+                            }
+                            placeholder={f.placeholder}
+                            value={formData[f.id] || ""}
+                            onChange={(e) => handleFormChange(f.id, e.target.value)}
+                            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm md:text-base outline-none focus:border-blue-400 transition-colors"
+                            required={f.required}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-              {currentStep.contactConsent && (
-                <label className="mx-auto mt-6 flex max-w-md items-start justify-center gap-2 text-xs text-gray-500 cursor-pointer">
-                  <input type="checkbox" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="mt-0.5" />
-                  <span className="text-left">{currentStep.contactConsent}</span>
-                </label>
-              )}
-              <button
-                onClick={handleContactSubmit}
-                className="mx-auto mt-6 block w-full max-w-md rounded-md px-8 py-4 font-semibold text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: primary, color: "#fff" }}
-              >
-                {currentStep.contactCta || "Enviar"}
-              </button>
-            </div>
+                    ));
+                  })()}
+                </>
+              }
+              consentSlot={
+                currentStep.showContactConsentCheckbox !== false && currentStep.contactConsent?.trim() ? (
+                  <label className="mt-6 flex w-full items-start gap-2 text-xs text-gray-500 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={consentChecked}
+                      onChange={(e) => setConsentChecked(e.target.checked)}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <span className="text-left leading-snug">{currentStep.contactConsent}</span>
+                  </label>
+                ) : null
+              }
+              ctaSlot={
+                <button
+                  type="button"
+                  onClick={handleContactSubmit}
+                  className="mt-6 w-full rounded-xl px-8 py-4 font-semibold text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ background: primary, color: "#fff" }}
+                >
+                  {currentStep.contactCta || t(lang, "submit")}
+                </button>
+              }
+            />
           )}
 
           {/* Results */}
           {currentStep.type === "results" && currentStep.resultsConfig && (
-            <DynamicResultsPublic
-              step={currentStep}
+            <FunnelResultsStep
+              resultsConfig={currentStep.resultsConfig}
+              ctx={computeResults(currentStep.resultsConfig.formulas || [], answers, sortedSteps)}
               primary={primary}
-              answers={answers}
               qualified={qualified}
-              allSteps={sortedSteps}
+              isMobile={isMobileViewport}
+              logoUrl={funnel.settings.logoUrl}
+              mode="public"
               onCta={() => handleResultsCta(currentStep)}
             />
           )}
@@ -858,9 +948,9 @@ const PublicFunnel = () => {
         {/* Sticky bottom area: progress + footer (like competitor) */}
         <div className="sticky bottom-0 z-10 shrink-0 w-full bg-white mt-auto">
           <div className={funnelPublicFooterInnerClass}>
-            <FunnelBrandingFooter />
+            <FunnelBrandingFooter brandLogoUrl={funnel.settings.logoUrl} />
           </div>
-          {isQuestion && totalQuestions > 0 && (
+          {((isQuestion && totalQuestions > 0) || showContactStickyProgress) && (
             <div className="w-full">
               <div className="h-1 bg-gray-100 w-full overflow-hidden">
                 <div
@@ -878,72 +968,5 @@ const PublicFunnel = () => {
     </div>
   );
 };
-
-function DynamicResultsPublic({ step, primary, answers, qualified, allSteps, onCta }: {
-  step: FunnelStep;
-  primary: string;
-  answers: Record<string, string>;
-  qualified: boolean;
-  allSteps: FunnelStep[];
-  onCta: () => void;
-}) {
-  const r = step.resultsConfig!;
-  const hasEngine = (r.formulas?.length ?? 0) > 0 || r.headline;
-
-  if (!hasEngine) {
-    return (
-      <div className="animate-fade-in">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-5" style={{ background: `${primary}15` }}>
-          {qualified ? "✅" : "ℹ️"}
-        </div>
-        <h1 className="text-xl md:text-3xl font-bold mb-3">
-          {qualified ? r.qualifiedHeadline : r.disqualifiedHeadline}
-        </h1>
-        <p className="text-gray-500 text-sm md:text-lg mb-6">
-          {qualified ? r.qualifiedSubheadline : r.disqualifiedSubheadline}
-        </p>
-        <button onClick={onCta} className="px-8 py-4 rounded-xl font-semibold text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity w-full md:w-auto" style={{ background: primary, color: "#fff" }}>
-          {qualified ? r.qualifiedCta : r.disqualifiedCta}
-        </button>
-      </div>
-    );
-  }
-
-  const ctx = computeResults(r.formulas || [], answers, allSteps);
-  const headline = r.headline || "Resultados";
-  const metricCards = r.metricCards || [];
-  const cta = r.ctaConfig || { action: "next_step", label: "Continuar", url: "" };
-
-  return (
-    <div className="animate-fade-in">
-      <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-5" style={{ background: `${primary}15` }}>📊</div>
-      <h1 className="text-xl md:text-3xl font-bold mb-4">
-        {interpolate(headline, ctx)}
-      </h1>
-
-      {metricCards.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-          {metricCards.map((card) => (
-            <div key={card.id} className="border-2 border-gray-100 rounded-xl p-4">
-              <div className="text-xs text-gray-400 mb-1">{card.label}</div>
-              <div className="text-xl md:text-2xl font-bold" style={{ color: primary }}>
-                {card.valueSource && ctx[card.valueSource] !== undefined ? formatNumber(ctx[card.valueSource]) : "—"}{card.suffix}
-              </div>
-              {card.description && <div className="text-xs text-gray-400 mt-1">{card.description}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={onCta}
-        className="px-8 py-4 rounded-xl font-semibold text-sm md:text-base cursor-pointer hover:opacity-90 transition-opacity w-full md:w-auto mt-4"
-        style={{ background: primary, color: "#fff" }}
-      >
-        {cta.label || "Continuar"}
-      </button>
-    </div>
-  );
-}
 
 export default PublicFunnel;

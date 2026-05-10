@@ -279,8 +279,81 @@ function ContactProps({ step, funnel, update }: { step: FunnelStep; funnel: Funn
         </div>
       ))}
       <Separator />
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Label className="text-xs">Mostrar casilla de consentimiento</Label>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">«He leído y acepto…» bajo los campos</p>
+        </div>
+        <Switch
+          checked={step.showContactConsentCheckbox !== false}
+          onCheckedChange={(on) => update({ showContactConsentCheckbox: on ? undefined : false })}
+          aria-label="Mostrar casilla de consentimiento"
+        />
+      </div>
       <TextArea label="Texto de consentimiento" value={step.contactConsent || ""} onChange={(v) => update({ contactConsent: v })} />
-      <Field label="Texto del botón" value={step.contactCta || ""} onChange={(v) => update({ contactCta: v })} />
+      <Field label="Texto del botón (CTA)" value={step.contactCta || ""} onChange={(v) => update({ contactCta: v })} placeholder="Ej.: Obtener mi resultado →" />
+
+      <Separator />
+      <Label className="text-xs font-semibold">Copia del paso (conversión)</Label>
+      <p className="text-[10px] text-muted-foreground leading-snug">
+        Si vacías un campo, se usa el texto recomendado según el idioma del funnel (“casi listo”, envío del resultado, etc.).
+      </p>
+      <Field
+        label="Titular"
+        value={step.contactHeadline ?? ""}
+        onChange={(v) => update({ contactHeadline: v.trim() ? v : undefined })}
+        placeholder="¡Casi listo! Solo un paso más"
+      />
+      <TextArea
+        label="Subtítulo"
+        value={step.contactSubheadline ?? ""}
+        onChange={(v) => update({ contactSubheadline: v.trim() ? v : undefined })}
+        placeholder="Indica dónde enviarte el resultado..."
+      />
+      <Field
+        label="Frase de confianza"
+        value={step.contactTrustLine ?? ""}
+        onChange={(v) => update({ contactTrustLine: v.trim() ? v : undefined })}
+        placeholder="Datos cifrados · Sin spam"
+      />
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Mostrar frase de confianza</Label>
+        <Switch
+          checked={step.contactShowTrustBadge !== false}
+          onCheckedChange={(v) => update({ contactShowTrustBadge: v ? true : false })}
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-xs">Barra “casi completado”</Label>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Solo en el pie fijo de la página</p>
+        </div>
+        <Switch
+          checked={step.contactShowNearCompleteProgress !== false}
+          onCheckedChange={(v) => update({ contactShowNearCompleteProgress: v ? true : false })}
+        />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">Porcentaje mostrado (80–99)</Label>
+        <Input
+          type="number"
+          min={80}
+          max={99}
+          className="h-9 text-sm mt-1"
+          value={step.contactProgressPercent ?? ""}
+          placeholder="92"
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === "") {
+              update({ contactProgressPercent: undefined });
+              return;
+            }
+            const n = parseInt(raw, 10);
+            if (Number.isNaN(n)) return;
+            update({ contactProgressPercent: Math.min(99, Math.max(80, n)) });
+          }}
+        />
+      </div>
 
       <Separator />
 

@@ -10,6 +10,18 @@ export type ResultType = "roi_calculator" | "score";
 
 export type CtaAction = "redirect" | "booking" | "webhook" | "next_step";
 
+export type ResultsPageLayout = "minimal" | "conversion";
+
+export type MetricCardAccent = "success" | "primary" | "neutral";
+
+/** Ítem con emoji en pantalla (`iconKey` solo legacy → mapeo a emoji). */
+export interface ResultsIconLabelItem {
+  id: string;
+  label: string;
+  emoji?: string;
+  iconKey?: string;
+}
+
 export interface FunnelSettings {
   primaryColor: string;
   fontFamily: string;
@@ -110,7 +122,15 @@ export interface MetricCard {
   label: string;
   valueSource: string;
   suffix: string;
-  description: string;
+  /** Texto auxiliar bajo la métrica (layout minimal / legacy). */
+  description?: string;
+  accent?: MetricCardAccent;
+  checklist?: string[];
+  footerHighlight?: string;
+  footerHighlightIconKey?: string;
+  footerHighlightEmoji?: string;
+  cardIconKey?: string;
+  cardIconEmoji?: string;
 }
 
 export interface ResultFormula {
@@ -139,6 +159,42 @@ export interface ResultsConfig {
   headline?: string;
   metricCards?: MetricCard[];
   ctaConfig?: ResultCtaConfig;
+  /** Default `minimal` para funnels existentes. */
+  resultsPageLayout?: ResultsPageLayout;
+  /** Título en dos tonos: parte en negro (interpolable). */
+  headlineLead?: string;
+  /** Parte destacada en color primario (interpolable). */
+  headlineEmphasis?: string;
+  resultsSubheadline?: string;
+  /** Sin `logoUrl`, emoji mostrado arriba a la izquierda (plantilla conversión). Vacío → 📊. */
+  conversionHeaderEmoji?: string;
+  calloutText?: string;
+  /** Emoji en círculo del callout superior derecho. Vacío → 🎁. */
+  calloutEmoji?: string;
+  calloutIconKey?: string;
+  /** Viñeta de checklist en tarjetas de métrica. Vacío → ✅. */
+  metricChecklistBulletEmoji?: string;
+  painTitle?: string;
+  /** Emoji grande bajo el título de “coste de no actuar”. Vacío → 😟. */
+  painHeroEmoji?: string;
+  /** Viñeta de cada bullet de dolor. Vacío → ❌. */
+  painBulletEmoji?: string;
+  /** Emoji junto al titular del aside naranja. Vacío → ⚠️. */
+  painWarningEmoji?: string;
+  painBullets?: string[];
+  painAsideTitle?: string;
+  painAsideBody?: string;
+  solutionTitle?: string;
+  solutionBody?: string;
+  solutionImageUrl?: string;
+  /** Plantilla conversión: si es false, oculta ilustración (URL) o robot por defecto. undefined/true = mostrar. */
+  solutionShowVisual?: boolean;
+  /** Sin imagen en solución: emoji en el recuadro blanco. Vacío → 🤖. */
+  solutionPlaceholderEmoji?: string;
+  solutionFeatures?: ResultsIconLabelItem[];
+  trustSignals?: ResultsIconLabelItem[];
+  closingQuoteLead?: string;
+  closingQuoteAccent?: string;
 }
 
 export interface ThankYouNextStep {
@@ -187,6 +243,19 @@ export interface FunnelStep {
   contactFields?: ContactField[];
   contactCta?: string;
   contactConsent?: string;
+  /** Casilla «He leído y acepto». `false` la oculta. Por defecto true (compactación: undefined). */
+  showContactConsentCheckbox?: boolean;
+  /** Si no se define, se usa copy orientada a conversión (último paso antes del resultado). */
+  contactHeadline?: string;
+  contactSubheadline?: string;
+  /** Solo relevante si `contactShowTrustBadge` no es false. */
+  contactTrustLine?: string;
+  /** Por defecto true: insignia de confianza bajo el subtítulo. */
+  contactShowTrustBadge?: boolean;
+  /** Por defecto true: barra ~90–95 % en la tarjeta y en el pie fijo. */
+  contactShowNearCompleteProgress?: boolean;
+  /** Porcentaje mostrado en el paso contacto (80–99). Por defecto 92. */
+  contactProgressPercent?: number;
   /** Skip the contact form for disqualified leads */
   skipContactIfDisqualified?: boolean;
   /** Where qualified leads go after contact form */

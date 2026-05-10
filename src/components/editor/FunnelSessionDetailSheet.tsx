@@ -16,6 +16,7 @@ import {
 import { SessionTimelineEventDetails } from "@/components/session/SessionTimelineEventDetails";
 import type { FunnelStep } from "@/types/funnel";
 import { cn } from "@/lib/utils";
+import { GeoCountryCityInline } from "@/components/GeoCountryCityInline";
 
 function helperTooltip(label: string, hint: string) {
   return (
@@ -154,11 +155,11 @@ export function FunnelSessionDetailSheet({
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{sessionSourceShortLabel(detail)}</Badge>
                   {detail.qualified === true && <Badge>Cualificado</Badge>}
-                  {detail.qualified === false && <Badge variant="destructive">No cualificado</Badge>}
+                  {detail.qualified === false && <Badge variant="destructive">Descualificado</Badge>}
                   {detail.qualified === null && <Badge variant="secondary">Quiz sin evaluar</Badge>}
                   {detail.hasLead && (
                     <Badge variant="secondary">
-                      Lead: {detail.leadResult === "qualified" ? "cualificado" : detail.leadResult === "disqualified" ? "no cualificado" : detail.leadResult || "—"}
+                      Lead: {detail.leadResult === "qualified" ? "cualificado" : detail.leadResult === "disqualified" ? "descualificado" : detail.leadResult || "—"}
                     </Badge>
                   )}
                 </div>
@@ -211,6 +212,16 @@ export function FunnelSessionDetailSheet({
                       .join(" · ") || "—"}
                   </dd>
                 </div>
+                {(detail.geo?.country || detail.geo?.city) && (
+                  <div className="grid grid-cols-[minmax(0,8rem)_1fr] gap-x-2">
+                    <dt className="text-muted-foreground">
+                      {helperTooltip("País", "País y, si está disponible, ciudad (detección aproximada por IP).")}
+                    </dt>
+                    <dd className="font-medium flex min-w-0 items-center gap-1 text-[11px]">
+                      <GeoCountryCityInline country={detail.geo?.country} city={detail.geo?.city} />
+                    </dd>
+                  </div>
+                )}
               </dl>
             </section>
 

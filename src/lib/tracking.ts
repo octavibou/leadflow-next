@@ -2,6 +2,66 @@ import { supabase } from "@/integrations/supabase/client";
 
 const FUNNEL_SESSION_STORAGE_KEY = "leadflow_funnel_session_id";
 
+/** Sesión actual: métricas desactivadas (no events, pixels, CAPI ni leads). */
+const LF_PREVIEW_SESSION_KEY = "leadflow_lf_preview_s";
+/** Persistente entre visitas hasta limpiar almacenamiento o `lf_preview=clear`. */
+const LF_PREVIEW_LOCAL_KEY = "leadflow_lf_preview_p";
+
+/** Sincroniza flags desde la query (`lf_preview`). Llamar en cliente antes de tracking. */
+export function syncLeadflowPreviewFromUrlSearch(search: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const qs = search.startsWith("?") ? search : `?${search}`;
+    const params = new URLSearchParams(qs);
+    const raw = params.get("lf_preview");
+    if (raw === null) return;
+    const v = raw.trim().toLowerCase();
+    if (v === "0" || v === "false" || v === "off") {
+      sessionStorage.removeItem(LF_PREVIEW_SESSION_KEY);
+      return;
+    }
+    if (v === "clear" || v === "clearpersist") {
+      sessionStorage.removeItem(LF_PREVIEW_SESSION_KEY);
+      localStorage.removeItem(LF_PREVIEW_LOCAL_KEY);
+      return;
+    }
+    if (v === "persist") {
+      localStorage.setItem(LF_PREVIEW_LOCAL_KEY, "1");
+      sessionStorage.setItem(LF_PREVIEW_SESSION_KEY, "1");
+      return;
+    }
+    if (v === "" || v === "1" || v === "true" || v === "yes") {
+      sessionStorage.setItem(LF_PREVIEW_SESSION_KEY, "1");
+    }
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/** Añade `lf_preview` a una URL absoluta o relativa (para compartir o abrir pestaña de prueba). */
+export function appendLfPreviewQueryParam(url: string, value: string = "1"): string {
+  try {
+    const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "https://example.com");
+    u.searchParams.set("lf_preview", value);
+    return u.toString();
+  } catch {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}lf_preview=${encodeURIComponent(value)}`;
+  }
+}
+
+/** True si esta pestaña (o el almacenamiento persistente) está en modo prueba sin métricas. */
+export function isLeadflowPreviewMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (sessionStorage.getItem(LF_PREVIEW_SESSION_KEY) === "1") return true;
+    if (localStorage.getItem(LF_PREVIEW_LOCAL_KEY) === "1") return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /** First-touch atribución por funnel + sesión interna (no cambia URLs públicas). */
 const FIRST_TOUCH_PREFIX = "leadflow_ft_v1_";
 
@@ -130,6 +190,10 @@ export function trackEvent(
   eventType: string,
   metadata: Record<string, any> = {}
 ) {
+  if (typeof window !== "undefined" && isLeadflowPreviewMode()) {
+    return;
+  }
+
   if (typeof window !== "undefined") {
     fetch("/api/track", {
       method: "POST",
@@ -165,6 +229,10 @@ export async function saveLead(
   result: string | null,
   metadata: Record<string, any> = {}
 ) {
+  if (typeof window !== "undefined" && isLeadflowPreviewMode()) {
+    return;
+  }
+
   const { error } = await supabase
     .from("leads")
     .insert({
@@ -190,7 +258,7 @@ export async function saveLead(
 
 // ---- External tracking scripts ----
 export function injectMetaPixel(pixelId: string) {
-  if (!pixelId) return;
+  if (!pixelId || isLeadflowPreviewMode()) return;
   const w = window as any;
   if (w.fbq) return;
 
@@ -216,7 +284,7 @@ export function injectMetaPixel(pixelId: string) {
 }
 
 export function injectGoogleTag(tagId: string) {
-  if (!tagId || document.getElementById("gtag-script")) return;
+  if (!tagId || isLeadflowPreviewMode() || document.getElementById("gtag-script")) return;
   const gtagScript = document.createElement("script");
   gtagScript.id = "gtag-script";
   gtagScript.async = true;
@@ -238,6 +306,7 @@ export function fireExternalEvent(
   type: "page_view" | "view_content" | "lead" | "conversion",
   params: Record<string, any> = {}
 ) {
+  if (isLeadflowPreviewMode()) return;
   const w = window as any;
   switch (type) {
     case "page_view":
@@ -275,6 +344,10 @@ export function fireMetaCapi(
   customData: Record<string, unknown> = {},
   capiOptions?: FireMetaCapiOptions,
 ) {
+  if (typeof window !== "undefined" && isLeadflowPreviewMode()) {
+    return;
+  }
+
   const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
   const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const eventId = crypto.randomUUID();

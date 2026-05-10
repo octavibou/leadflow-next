@@ -10,6 +10,7 @@ import type { Funnel } from "@/types/funnel";
 import type { EditorTab } from "@/views/FunnelEditor";
 import { useFunnelStore } from "@/store/funnelStore";
 import { cn } from "@/lib/utils";
+import { appendLfPreviewQueryParam } from "@/lib/tracking";
 
 const editorTabs = [
   { id: "landing" as const, label: "Landing" },
@@ -54,7 +55,7 @@ export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, on
 
   const handlePreview = () => {
     const url = `${window.location.origin}/f/${funnel.id}`;
-    window.open(url, "_blank");
+    window.open(appendLfPreviewQueryParam(url), "_blank", "noopener,noreferrer");
   };
 
   const saveName = () => {

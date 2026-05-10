@@ -335,8 +335,9 @@ export function buildSessionDetails(
         geo = parseSessionGeo((e.metadata || {}) as Record<string, unknown>);
       }
       if (t === "qualification_evaluated") {
-        qualified = Boolean((e.metadata as any)?.qualified);
         completedQuiz = true;
+        const q = (e.metadata as any)?.qualified;
+        if (typeof q === "boolean") qualified = q;
         if (!qualificationEvaluatedAt) qualificationEvaluatedAt = String(e.created_at);
         const eq = (e.metadata as any)?.evaluated_questions;
         evaluatedQuestions = typeof eq === "number" ? eq : (typeof eq === "string" && eq ? Number(eq) : null);
@@ -382,9 +383,11 @@ export function buildSessionDetails(
       }
     }
 
-    if (qualified === null && lead) {
-      if (lead.result === "qualified") qualified = true;
-      if (lead.result === "disqualified") qualified = false;
+    /* La cualificación de negocio solo aplica cuando el cliente emitió `qualification_evaluated`
+       (quiz terminado según tracking). No inferir cualificado/desde tabla leads aquí — evita
+       sesiones abandonadas a mitad del quiz apareciendo como evaluadas. */
+    if (!completedQuiz) {
+      qualified = null;
     }
     if (!geo && lead?.metadata && typeof lead.metadata === "object") {
       geo = parseSessionGeo(lead.metadata as Record<string, unknown>);

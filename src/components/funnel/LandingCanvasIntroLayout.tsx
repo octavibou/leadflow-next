@@ -323,7 +323,10 @@ export function LandingCanvasIntroLayout({
           )}
           innerClassName="pb-8 pt-4 max-sm:pb-6 max-sm:pt-3"
         >
-          <FunnelBrandingFooter className={cn("mx-auto mt-0 w-full max-w-md shrink-0", footerClassName)} />
+          <FunnelBrandingFooter
+            brandLogoUrl={hasLogo ? logoUrl : undefined}
+            className={cn("mx-auto mt-0 w-full max-w-md shrink-0", footerClassName)}
+          />
         </LandingCanvasSectionFrame>
       ) : null}
     </div>

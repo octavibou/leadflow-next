@@ -172,7 +172,7 @@ export function SessionTimelineEventDetails({
       <div className="mt-1.5 space-y-1 rounded-md border border-border/60 bg-background/50 p-2">
         <FieldRow
           label="Resultado del quiz"
-          value={ok ? "Cualificado" : no ? "No cualificado" : "—"}
+          value={ok ? "Cualificado" : no ? "Descualificado" : "—"}
         />
         {typeof m.evaluated_questions === "number" && (
           <FieldRow label="Preguntas evaluadas" value={String(m.evaluated_questions)} />

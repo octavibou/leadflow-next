@@ -9,6 +9,7 @@ import { Copy, Check, Eye, Code, Rocket, Link as LinkIcon, XCircle, PencilSimple
 import type { Funnel } from "@/types/funnel";
 import type { Campaign } from "@/store/campaignStore";
 import { VariationSettingsDialog } from "@/components/editor/VariationSettingsDialog";
+import { appendLfPreviewQueryParam } from "@/lib/tracking";
 
 type PublishVariant = {
   key: string;
@@ -127,7 +128,7 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
     setBusy(false);
   };
 
-  const copy = (text: string, kind: "url" | "embed") => {
+  const copy = (text: string, kind: "url" | "embed" | "url-quiet") => {
     void navigator.clipboard.writeText(text);
     setCopied(kind);
     toast.success("Copiado al portapapeles");
@@ -150,7 +151,10 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
           variant="outline"
           size="sm"
           className="gap-1.5"
-          onClick={() => selected && window.open(selected.url, "_blank", "noopener,noreferrer")}
+          onClick={() =>
+            selected &&
+            window.open(appendLfPreviewQueryParam(selected.url), "_blank", "noopener,noreferrer")
+          }
         >
           <Eye className="h-4 w-4" weight="bold" />
           Preview
@@ -169,7 +173,10 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           «Solo funnel (sin landing)» entra directo al cuestionario (parámetro{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">landing=0</code>). El resto de variantes usan su enlace; publicación y QR son por selección.
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">landing=0</code>). Para probar tú mismo sin ensuciar métricas, usa{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">lf_preview=1</code> en la URL (persistente en el navegador:{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">lf_preview=persist</code>
+          ; quitar con <code className="rounded bg-muted px-1 py-0.5 text-[11px]">lf_preview=clear</code>). El resto de variantes usan su enlace; publicación y QR son por selección.
         </p>
       </div>
 
@@ -282,6 +289,15 @@ export function PublishTab({ funnel }: { funnel: Funnel }) {
                   <Button type="button" variant="outline" className="h-10 justify-center gap-2" onClick={() => copy(selected.url, "url")}>
                     {copied === "url" ? <Check className="h-4 w-4 shrink-0" weight="bold" /> : <LinkIcon className="h-4 w-4 shrink-0" weight="bold" />}
                     Copiar enlace
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 justify-center gap-2"
+                    onClick={() => copy(appendLfPreviewQueryParam(selected.url), "url-quiet")}
+                  >
+                    {copied === "url-quiet" ? <Check className="h-4 w-4 shrink-0" weight="bold" /> : <LinkIcon className="h-4 w-4 shrink-0" weight="bold" />}
+                    Copiar enlace (sin métricas)
                   </Button>
                   <Button type="button" variant="outline" className="h-10 justify-center gap-2" onClick={() => copy(selected.embedCode, "embed")}>
                     {copied === "embed" ? <Check className="h-4 w-4 shrink-0" weight="bold" /> : <Code className="h-4 w-4 shrink-0" weight="bold" />}

@@ -12,6 +12,12 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
 const funnelStrings: Record<Language, Record<string, string>> = {
   es: {
     "contact.title": "Tus datos",
+    "contact.headline.final": "¡Casi listo! Solo un paso más",
+    "contact.subheadline.final":
+      "Has completado el cuestionario. Indícanos dónde enviarte tu resultado personalizado.",
+    "contact.trust.default": "Datos cifrados · Sin spam · 100 % seguros",
+    "contact.badge.quizDone": "Cuestionario completado",
+    "contact.progress.label": "Casi completado",
     "contact.consent.default": "He leído y acepto los Términos de Uso y la Política de Privacidad.",
     "contact.consent.alert": "Por favor acepta los términos.",
     "contact.email.invalid": "Por favor introduce un email válido.",
@@ -26,6 +32,12 @@ const funnelStrings: Record<Language, Record<string, string>> = {
   },
   en: {
     "contact.title": "Your details",
+    "contact.headline.final": "Almost there! Just one more step",
+    "contact.subheadline.final":
+      "You have finished the quiz. Tell us where to send your personalized result.",
+    "contact.trust.default": "Encrypted data · No spam · 100% secure",
+    "contact.badge.quizDone": "Quiz completed",
+    "contact.progress.label": "Almost done",
     "contact.consent.default": "I have read and agree to the Terms of Use and Privacy Policy.",
     "contact.consent.alert": "Please accept the terms.",
     "contact.email.invalid": "Please enter a valid email.",
@@ -40,6 +52,12 @@ const funnelStrings: Record<Language, Record<string, string>> = {
   },
   de: {
     "contact.title": "Deine Daten",
+    "contact.headline.final": "Fast geschafft! Nur noch ein Schritt",
+    "contact.subheadline.final":
+      "Du hast das Quiz abgeschlossen. Sag uns, wohin wir dir dein persönliches Ergebnis schicken sollen.",
+    "contact.trust.default": "Verschlüsselt · Kein Spam · 100 % sicher",
+    "contact.badge.quizDone": "Quiz abgeschlossen",
+    "contact.progress.label": "Fast fertig",
     "contact.consent.default": "Ich habe die Nutzungsbedingungen und Datenschutzrichtlinie gelesen und akzeptiere diese.",
     "contact.consent.alert": "Bitte akzeptiere die Bedingungen.",
     "contact.email.invalid": "Bitte gib eine gültige E-Mail ein.",
@@ -54,6 +72,12 @@ const funnelStrings: Record<Language, Record<string, string>> = {
   },
   fr: {
     "contact.title": "Vos informations",
+    "contact.headline.final": "Presque terminé ! Plus qu'une étape",
+    "contact.subheadline.final":
+      "Vous avez terminé le quiz. Indiquez-nous où envoyer votre résultat personnalisé.",
+    "contact.trust.default": "Données chiffrées · Pas de spam · 100 % sécurisé",
+    "contact.badge.quizDone": "Quiz terminé",
+    "contact.progress.label": "Presque fini",
     "contact.consent.default": "J'ai lu et j'accepte les Conditions d'utilisation et la Politique de confidentialité.",
     "contact.consent.alert": "Veuillez accepter les conditions.",
     "contact.email.invalid": "Veuillez entrer un email valide.",
@@ -68,6 +92,12 @@ const funnelStrings: Record<Language, Record<string, string>> = {
   },
   pt: {
     "contact.title": "Seus dados",
+    "contact.headline.final": "Quase lá! Falta apenas um passo",
+    "contact.subheadline.final":
+      "Você concluiu o quiz. Diga onde enviar seu resultado personalizado.",
+    "contact.trust.default": "Dados cifrados · Sem spam · 100 % seguros",
+    "contact.badge.quizDone": "Quiz concluído",
+    "contact.progress.label": "Quase concluído",
     "contact.consent.default": "Li e aceito os Termos de Uso e a Política de Privacidade.",
     "contact.consent.alert": "Por favor aceite os termos.",
     "contact.email.invalid": "Por favor insira um email válido.",

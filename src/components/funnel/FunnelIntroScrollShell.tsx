@@ -18,10 +18,13 @@ export function FunnelIntroScrollShell({
   className,
   /** Solo constructor de landing: borde discontinuo + etiqueta “Pie” en hover. */
   showEditorChrome,
+  brandLogoUrl,
 }: {
   children: ReactNode;
   className?: string;
   showEditorChrome?: boolean;
+  /** Logo del funnel para la badge “Hecho con Leadflow”; mismo que cabecera. */
+  brandLogoUrl?: string | null;
 }) {
   const editorChrome = Boolean(showEditorChrome);
 
@@ -34,14 +37,14 @@ export function FunnelIntroScrollShell({
     >
       <div className="overflow-hidden rounded-2xl bg-white">
         <div className={funnelPublicFooterInnerClass}>
-          <FunnelBrandingFooter />
+          <FunnelBrandingFooter brandLogoUrl={brandLogoUrl} />
         </div>
       </div>
     </LandingCanvasSectionFrame>
   ) : (
     <div className="shrink-0 bg-white">
       <div className={funnelPublicFooterInnerClass}>
-        <FunnelBrandingFooter />
+        <FunnelBrandingFooter brandLogoUrl={brandLogoUrl} />
       </div>
     </div>
   );

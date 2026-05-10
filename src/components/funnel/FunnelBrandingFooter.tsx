@@ -2,89 +2,53 @@
 
 import { cn } from "@/lib/utils";
 
-const DEFAULT_PLATFORM_URL = "https://leadflow.es";
-const DEFAULT_TERMS_URL = "https://leadflow.es";
-const DEFAULT_PRIVACY_URL = "https://leadflow.es";
-const DEFAULT_COOKIES_URL = "https://leadflow.es";
-
-function LeadflowMark({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-sky-500 via-indigo-500 to-amber-400 text-[11px] font-bold leading-none text-white shadow-sm",
-        className,
-      )}
-      aria-hidden
-    >
-      L
-    </span>
-  );
-}
+/** Marca Leadflow en `/public` (fallback si el funnel no tiene logo propio). */
+const DEFAULT_LEADFLOW_MARK = "/leadflow-mark.png";
 
 /**
- * Pie de página de marca (enlace cookies + badge “Hecho con Leadflow”), al estilo de la vista previa pública.
+ * Pie de página de marca (enlaces legales placeholder + badge «Hecho con Leadflow»).
+ * Los destinos se conectarán cuando haya URLs definitivas.
  */
 export function FunnelBrandingFooter({
   className,
-  onManageCookies,
+  brandLogoUrl,
 }: {
   className?: string;
-  onManageCookies?: () => void;
+  brandLogoUrl?: string | null;
 }) {
-  const cookiesHref = process.env.NEXT_PUBLIC_LEADFLOW_COOKIES_URL ?? DEFAULT_COOKIES_URL;
-  const platformHref = process.env.NEXT_PUBLIC_LEADFLOW_SITE_URL ?? DEFAULT_PLATFORM_URL;
-  const termsHref = process.env.NEXT_PUBLIC_LEADFLOW_TERMS_URL ?? DEFAULT_TERMS_URL;
-  const privacyHref = process.env.NEXT_PUBLIC_LEADFLOW_PRIVACY_URL ?? DEFAULT_PRIVACY_URL;
+  const trimmedLogo = typeof brandLogoUrl === "string" ? brandLogoUrl.trim() : "";
+
+  const linkButtonClass =
+    "shrink-0 cursor-default whitespace-nowrap border-0 bg-transparent p-0 font-inherit text-inherit underline underline-offset-2 transition-colors hover:text-gray-700";
 
   return (
-    <footer className={cn("flex flex-col items-center gap-3", className)}>
-      <div className="flex items-center justify-center gap-4 text-center text-xs text-gray-500 opacity-35 hover:opacity-70 transition-opacity">
-        <a
-          href={termsHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 transition-colors hover:text-gray-700"
-        >
+    <footer className={cn("flex flex-col items-center gap-8 md:gap-10", className)}>
+      {/* flex-nowrap + nowrap + menor gap: cabe una sola línea en el marco ~375 del builder */}
+      <div className="flex w-full max-w-full flex-nowrap items-center justify-center gap-1.5 text-[10px] leading-snug text-gray-500 opacity-35 transition-opacity hover:opacity-70 sm:gap-2.5 sm:text-[11px] md:gap-3 md:text-xs">
+        <button type="button" className={linkButtonClass}>
           Terms of Use
-        </a>
-        <span aria-hidden className="text-gray-400">·</span>
-        <a
-          href={privacyHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 transition-colors hover:text-gray-700"
-        >
+        </button>
+        <span aria-hidden className="shrink-0 text-gray-400">
+          ·
+        </span>
+        <button type="button" className={linkButtonClass}>
           Privacy Policy
-        </a>
-        <span aria-hidden className="text-gray-400">·</span>
-        {onManageCookies ? (
-          <button
-            type="button"
-            onClick={onManageCookies}
-            className="underline underline-offset-2 transition-colors hover:text-gray-700"
-          >
-            Manage Cookies
-          </button>
-        ) : (
-          <a
-            href={cookiesHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 transition-colors hover:text-gray-700"
-          >
-            Manage Cookies
-          </a>
-        )}
+        </button>
+        <span aria-hidden className="shrink-0 text-gray-400">
+          ·
+        </span>
+        <button type="button" className={linkButtonClass}>
+          Manage Cookies
+        </button>
       </div>
-      <a
-        href={platformHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex max-w-full items-center gap-2 rounded-full bg-[#f0f0f0] px-2.5 py-1.5 text-xs text-gray-600 transition-opacity hover:opacity-90"
-      >
-        <LeadflowMark />
+      <div className="inline-flex max-w-full cursor-default items-center gap-2 rounded-full bg-[#f0f0f0] px-2.5 py-1.5 text-xs text-gray-600 opacity-100">
+        <img
+          src={trimmedLogo || DEFAULT_LEADFLOW_MARK}
+          alt=""
+          className="h-5 w-auto max-w-[5rem] shrink-0 rounded-md object-contain object-left"
+        />
         <span className="truncate font-medium">Hecho con Leadflow</span>
-      </a>
+      </div>
     </footer>
   );
 }

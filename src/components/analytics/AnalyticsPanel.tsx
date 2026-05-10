@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Funnel, FunnelStep } from "@/types/funnel";
 import { cn } from "@/lib/utils";
+import { GeoCountryCityInline } from "@/components/GeoCountryCityInline";
 import {
   buildSessionDetails,
   classifySessionSource,
@@ -393,8 +394,8 @@ export function AnalyticsPanel({
               {(
                 [
                   ["all", "Todas"],
-                  ["qualified", "Cualif."],
-                  ["disqualified", "No cualif."],
+                  ["qualified", "Cualificado"],
+                  ["disqualified", "Descualificado"],
                   ["lead", "Con lead"],
                   ["pending", "Sin eval."],
                 ] as const
@@ -420,21 +421,39 @@ export function AnalyticsPanel({
             <p className="text-sm text-muted-foreground">No hay sesiones que coincidan</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border">
-              <div className="min-w-[1080px]">
-                <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,0.65fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_minmax(0,0.6fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_auto] gap-2 px-3 py-2 bg-muted/40 text-[11px] text-muted-foreground font-medium">
-                  <span>ID / hora / día</span>
-                  <span>País / ciudad</span>
-                  <span>Fuente</span>
-                  <span className="text-center">Tiempo total</span>
-                  <span className="text-center">1ª preg.</span>
-                  <span className="text-center">Se fue en</span>
-                  <span className="text-center">Acabó</span>
-                  <span className="text-center">Tiempo form</span>
-                  <span className="text-center">Cualif.</span>
-                  <span className="text-center">Visitas</span>
-                  <span className="text-right" />
-                </div>
-                <div className="max-h-[520px] overflow-y-auto divide-y">
+              {/* Un solo área scroll: si el scroll vertical solo aplicara al body, la barra estrecha las filas y desalinea los títulos. */}
+              <div className="max-h-[520px] min-w-[1080px] overflow-y-auto [scrollbar-gutter:stable]">
+                <table className="w-full caption-bottom border-collapse text-xs table-fixed">
+                  <colgroup>
+                    {/* ID solo necesita ~9 chars + línea de hora; el exceso empujaba país muy a la derecha. */}
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "7%" }} />
+                    <col style={{ width: "7%" }} />
+                    <col style={{ width: "7%" }} />
+                    <col style={{ width: "9%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "7%" }} />
+                    <col style={{ width: "10%" }} />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10 border-b border-border bg-muted/95 backdrop-blur-sm supports-[backdrop-filter]:bg-muted/80">
+                    <tr className="text-[11px] font-medium text-muted-foreground">
+                      <th className="py-2 pl-3 pr-2 text-left font-medium align-middle">ID / hora / día</th>
+                      <th className="py-2 pl-2 pr-3 text-center font-medium align-middle">País</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Fuente</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Tiempo total</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">1ª preg.</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Se fue en</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Acabó</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Tiempo form</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Cualificado</th>
+                      <th className="px-3 py-2 text-center font-medium align-middle">Visitas</th>
+                      <th className="px-3 py-2 text-right font-medium align-middle">Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
                   {filteredRows.map((s) => {
                     const formTime =
                       s.contactViewAt && s.formSubmitAt
@@ -445,7 +464,11 @@ export function AnalyticsPanel({
                         ? formatDurationMs(s.landingStartAt, s.sessionEndAt)
                         : "—";
                     const finalStatusLabel =
-                      s.qualified === true ? "Cualif." : s.qualified === false ? "No cualif." : "—";
+                      s.qualified === true
+                        ? "Cualificado"
+                        : s.qualified === false
+                          ? "Descualificado"
+                          : "—";
                     const finalStatusClass =
                       s.qualified === true ? "bg-green-500/10 text-green-700" :
                       s.qualified === false ? "bg-red-500/10 text-red-700" :
@@ -454,16 +477,6 @@ export function AnalyticsPanel({
                     const hasStarted = s.startedQuiz;
                     const leftAt = sessionQuestionNumber(s);
                     const finished = s.completedQuiz;
-                    const qualifiedSoFarLabel =
-                      s.qualified !== null ? finalStatusLabel :
-                      s.qualifiedSoFar === true ? "Sí" :
-                      s.qualifiedSoFar === false ? "No" :
-                      "—";
-                    const qualifiedSoFarClass =
-                      s.qualified !== null ? finalStatusClass :
-                      s.qualifiedSoFar === true ? "bg-green-500/10 text-green-700" :
-                      s.qualifiedSoFar === false ? "bg-red-500/10 text-red-700" :
-                      "bg-zinc-500/10 text-zinc-600";
 
                     const visits = s.sessionStarts > 0 ? s.sessionStarts : 1;
                     const when = s.lastSeen ? new Date(s.lastSeen) : null;
@@ -475,11 +488,8 @@ export function AnalyticsPanel({
                       : "—";
 
                     return (
-                      <div
-                        key={s.sessionId}
-                        className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,0.65fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_minmax(0,0.6fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_minmax(0,0.5fr)_minmax(0,0.55fr)_auto] gap-2 px-3 py-2 text-xs items-center"
-                      >
-                        <div className="min-w-0">
+                      <tr key={s.sessionId} className="hover:bg-muted/30">
+                        <td className="min-w-0 py-2 pl-3 pr-2 align-middle">
                           <p className="font-mono text-[10px] truncate" title={s.sessionId}>
                             {s.sessionId.slice(0, 8)}…
                           </p>
@@ -487,61 +497,64 @@ export function AnalyticsPanel({
                             {whenTime} · {whenDay}
                             {s.campaignName ? ` · ${s.campaignName}` : ""}
                           </p>
-                        </div>
-                        <div className="min-w-0">
+                        </td>
+                        <td className="min-w-0 py-2 pl-2 pr-3 text-center align-middle">
                           {s.geo?.country || s.geo?.city ? (
-                            <p className="text-[11px] font-medium truncate" title={[s.geo?.country, s.geo?.city].filter(Boolean).join(" · ")}>
-                              {[s.geo?.country, s.geo?.city].filter(Boolean).join(" · ")}
+                            <p
+                              className="flex min-w-0 items-center justify-center gap-1 truncate text-[11px] font-medium"
+                              title={[s.geo?.country, s.geo?.city].filter(Boolean).join(" · ")}
+                            >
+                              <GeoCountryCityInline country={s.geo?.country} city={s.geo?.city} />
                             </p>
                           ) : (
                             <span className="text-[10px] text-muted-foreground">—</span>
                           )}
-                        </div>
-                        <div className="min-w-0">
-                          <Badge variant="outline" className="w-fit justify-center text-[10px] font-normal">
-                            {sessionSourceShortLabel(s)}
-                          </Badge>
-                        </div>
-
-                        <span className="text-center text-[10px] text-muted-foreground tabular-nums">
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle">
+                          <div className="flex justify-center">
+                            <Badge variant="outline" className="w-fit text-[10px] font-normal">
+                              {sessionSourceShortLabel(s)}
+                            </Badge>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle text-[10px] tabular-nums text-muted-foreground">
                           {totalTime}
-                        </span>
-
-                        <span className="text-center">
-                          {hasStarted ? (
-                            <Badge variant="secondary" className="text-[10px] font-normal">
-                              Sí
-                            </Badge>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
-                          )}
-                        </span>
-
-                        <span className="text-center font-medium tabular-nums">
-                          {leftAt ? `P${leftAt}` : "—"}
-                        </span>
-
-                        <span className="text-center">
-                          {finished ? (
-                            <Badge variant="secondary" className="text-[10px] font-normal">
-                              Sí
-                            </Badge>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
-                          )}
-                        </span>
-
-                        <span className="text-center text-[10px] text-muted-foreground tabular-nums">
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          <div className="flex justify-center">
+                            {hasStarted ? (
+                              <Badge variant="secondary" className="text-[10px] font-normal">
+                                Sí
+                              </Badge>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle font-medium tabular-nums">{leftAt ? `P${leftAt}` : "—"}</td>
+                        <td className="px-3 py-2 align-middle">
+                          <div className="flex justify-center">
+                            {finished ? (
+                              <Badge variant="secondary" className="text-[10px] font-normal">
+                                Sí
+                              </Badge>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle text-[10px] tabular-nums text-muted-foreground">
                           {formTime}
-                        </span>
-
-                        <span className={cn("mx-auto inline-flex w-fit items-center justify-center rounded px-2 py-0.5 text-[10px] font-medium", qualifiedSoFarClass)}>
-                          {qualifiedSoFarLabel}
-                        </span>
-
-                        <span className="text-center font-medium tabular-nums">{visits}</span>
-
-                        <div className="flex justify-end">
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle">
+                          <div className="flex justify-center">
+                            <span className={cn("inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-medium", finalStatusClass)}>
+                              {finalStatusLabel}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-middle font-medium tabular-nums">{visits}</td>
+                        <td className="px-3 py-2 text-right align-middle">
                           <Button
                             type="button"
                             variant="outline"
@@ -554,11 +567,12 @@ export function AnalyticsPanel({
                             <Eye className="h-3.5 w-3.5" weight="bold" />
                             Detalle
                           </Button>
-                        </div>
-                      </div>
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

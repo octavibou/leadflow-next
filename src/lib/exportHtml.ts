@@ -1,6 +1,7 @@
 import type { Funnel, FunnelStep } from "@/types/funnel";
 import { t } from "@/lib/i18n";
 import type { Language } from "@/lib/i18n";
+import { resolveContactStepCopy } from "@/lib/contactStepCopy";
 import { funnelContentFontFamily, funnelGoogleFontsStylesheetHref, funnelLoadsGoogleFont } from "@/lib/funnelTypography";
 
 function getEmbedUrlExport(url: string): string {
@@ -64,7 +65,18 @@ export function exportFunnelToHtml(funnel: Funnel): string {
   const stepsHtml = sortedSteps.map((step) => renderStep(step, sortedSteps, primaryColor, lang)).join("\n");
 
   const totalQuestionSteps = sortedSteps.filter((s) => s.type === "question").length;
-  const contactStepOrder = sortedSteps.find((s) => s.type === "contact")?.order ?? 0;
+  const contactStepEntity = sortedSteps.find((s) => s.type === "contact");
+  const contactStepOrder = contactStepEntity?.order ?? 0;
+  const contactConsentRequired =
+    !!contactStepEntity &&
+    contactStepEntity.showContactConsentCheckbox !== false &&
+    Boolean((contactStepEntity.contactConsent || "").trim());
+  const CONTACT_PROG_JS_PCT = (() => {
+    const p = contactStepEntity?.contactProgressPercent;
+    const n = p != null ? Math.round(p) : 92;
+    return Math.min(99, Math.max(80, n));
+  })();
+  const CONTACT_PROG_JS_SHOW = contactStepEntity ? contactStepEntity.contactShowNearCompleteProgress !== false : false;
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -124,6 +136,12 @@ h2{font-size:1.5rem;font-weight:700;line-height:1.3;margin-bottom:8px!important}
 .delivery-card{background:#f9fafb;border:2px solid #e5e7eb;border-radius:16px;padding:32px!important;text-align:center}
 .delivery-card h2{margin-bottom:8px!important}
 .delivery-card p{color:#666;margin-bottom:24px!important}
+.contact-card{max-width:420px;margin:0 auto!important;padding:24px 22px 28px!important;border:1px solid #f3f4f6;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.contact-badge{display:flex;justify-content:center;margin-bottom:16px!important}
+.contact-badge span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:.74rem;font-weight:700;border-radius:999px;background:#ecfdf5;color:#065f46}
+.contact-head{text-align:center;font-size:1.35rem;font-weight:800;line-height:1.2;color:#111;margin:0!important}
+.contact-sub{text-align:center;font-size:.92rem;color:#525252;line-height:1.55;margin:14px 0 0!important}
+.contact-trust{text-align:center;font-size:.78rem;color:#737373;margin:14px 0 0!important}
 ${settings.logoUrl ? `.logo{max-height:40px;margin-bottom:32px!important}` : ""}
 @media(max-width:640px){
   .inner{padding:24px 20px 70px!important}
@@ -150,8 +168,11 @@ var RESULTS_STEP=${resultsStep?.order ?? 0};
 var THANKYOU_STEP=${thankYouStep?.order ?? 0};
 var TOTAL_Q=${totalQuestionSteps};
 var CONTACT_STEP=${contactStepOrder};
+var CONTACT_PROG_PCT=${CONTACT_PROG_JS_PCT};
+var CONTACT_PROG_SHOW=${CONTACT_PROG_JS_SHOW};
 var QUALIFIED_ROUTE=${resultsStep?.resultsConfig?.qualifiedRoute ?? 0};
 var DISQUALIFIED_ROUTE=${resultsStep?.resultsConfig?.disqualifiedRoute ?? 0};
+var CONTACT_CONSENT_REQUIRED=${JSON.stringify(contactConsentRequired)};
 var CONSENT_ALERT=${JSON.stringify(t(lang, "contact.consent.alert"))};
 var EMAIL_ALERT=${JSON.stringify(t(lang, "contact.email.invalid"))};
 var Q_LABELS=${JSON.stringify(buildQuestionLabelMap(sortedSteps))};
@@ -162,9 +183,13 @@ function setProg(s){
   var f=document.getElementById('progFill');
   var t=document.getElementById('progText');
   if(s===0||s>=RESULTS_STEP){p.classList.remove('visible');return}
+  var onContact=CONTACT_STEP>0&&s===CONTACT_STEP;
+  if(onContact&&!CONTACT_PROG_SHOW){p.classList.remove('visible');return}
   p.classList.add('visible');
-  var pct=Math.round((s/CONTACT_STEP)*100);
-  if(pct>100)pct=100;
+  var pct;
+  if(onContact){pct=CONTACT_PROG_PCT}
+  else if(CONTACT_STEP>0){pct=Math.round((s/CONTACT_STEP)*88);if(pct>88)pct=88}
+  else{pct=0}
   f.style.width=pct+'%';
   t.textContent=pct+'%';
 }
@@ -208,7 +233,7 @@ function submitF(e){
    var lastName=ln?ln.value.trim():'';
    var email=em?em.value.trim():'';
    var phone=ph?ph.value.trim():'';
-   if(!cons){alert(CONSENT_ALERT);return}
+   if(CONTACT_CONSENT_REQUIRED&&!cons){alert(CONSENT_ALERT);return}
    if(email&&!email.includes('@')){alert(EMAIL_ALERT);return}
    var isQ=checkQ();
    if(WEBHOOK_URL){
@@ -282,14 +307,24 @@ ${optsHtml}
         const inputId = f.fieldType === "email" ? "fe" : f.fieldType === "tel" ? "fph" : isLastName ? "fln" : "fn";
         return `<div class="form-group"><label>${escHtml(f.label)}</label><input type="${f.fieldType}" id="${inputId}" placeholder="${escAttr(f.placeholder)}" ${f.required ? "required" : ""}></div>`;
       }).join("\n");
+      const cv = resolveContactStepCopy(step, lang);
+      const trustBlk = cv.trustLine ? `<p class="contact-trust">🔒 ${escHtml(cv.trustLine)}</p>` : "";
+      const consentHtml =
+        step.showContactConsentCheckbox !== false && (step.contactConsent || "").trim()
+          ? `<div class="consent"><input type="checkbox" id="consent" onchange="cons=this.checked"><label for="consent">${escHtml(step.contactConsent || t(lang, "contact.consent.default"))}</label></div>`
+          : "";
       return `<div class="step" id="s${step.order}"><div class="inner">
 ${backBtn}
-<h2>${t(lang, "contact.title")}</h2>
-<form onsubmit="submitF(event);return false" style="margin-top:24px">
+<div class="contact-card">
+<div class="contact-badge"><span>✓ ${escHtml(cv.badgeLabel)}</span></div>
+<h2 class="contact-head">${escHtml(cv.headline)}</h2>
+<p class="contact-sub">${escHtml(cv.subheadline)}</p>${trustBlk}
+<form onsubmit="submitF(event);return false" style="margin-top:22px;width:100%">
 ${fieldsHtml}
-<div class="consent"><input type="checkbox" id="consent" onchange="cons=this.checked"><label for="consent">${escHtml(step.contactConsent || t(lang, "contact.consent.default"))}</label></div>
-<button type="submit" class="btn">${escHtml(step.contactCta || t(lang, "submit"))}</button>
+${consentHtml}
+<button type="submit" class="btn" style="width:100%">${escHtml(step.contactCta || t(lang, "submit"))}</button>
 </form>
+</div>
 </div></div>`;
     }
 

@@ -135,7 +135,9 @@ const FunnelEditor = () => {
           { id: crypto.randomUUID(), step_id: "", fieldType: "email" as const, label: "Email", placeholder: "tu@email.com", required: true },
           { id: crypto.randomUUID(), step_id: "", fieldType: "tel" as const, label: "Teléfono", placeholder: "+34 600 000 000", required: true },
         ],
-        contactCta: "Enviar", contactConsent: "Acepto los Términos de Uso.",
+        contactCta: "Obtener mi resultado →",
+        contactConsent:
+          "He leído y acepto los Términos de Uso y la Política de Privacidad.",
       }),
       ...(type === "results" && { resultsConfig: { qualifiedHeadline: "¡Calificas!", qualifiedSubheadline: "Reserva una llamada abajo.", qualifiedCta: "Reservar ahora", disqualifiedHeadline: "¡Gracias!", disqualifiedSubheadline: "No es el mejor momento.", disqualifiedCta: "Saber más", qualifiedRoute: maxOrder + 2, disqualifiedRoute: maxOrder + 2 } }),
       ...(type === "booking" && { bookingConfig: { bookingUrl: "" } }),
