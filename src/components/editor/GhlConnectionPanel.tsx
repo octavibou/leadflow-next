@@ -80,8 +80,19 @@ export function GhlConnectionPanel({
       url.searchParams.delete("ghl");
       window.history.replaceState({}, "", url.toString());
     } else if (ghlStatus === "error") {
-      const message = params.get("message") || "Error desconocido";
-      toast.error(`Error al conectar GoHighLevel: ${message}`);
+      const code = params.get("message") || "unknown";
+      const errorMessages: Record<string, string> = {
+        workspace_id_required:
+          "Indica el workspace: abre Enviar → GoHighLevel desde un funnel o añade ?workspace_id= a la URL.",
+        no_admin_workspace: "Necesitas ser admin u owner del workspace para conectar GoHighLevel.",
+        funnel_has_no_workspace: "Este funnel no está vinculado a un workspace.",
+        unauthorized: "Inicia sesión e inténtalo de nuevo.",
+        forbidden: "No tienes permisos de admin en este workspace.",
+        ghl_not_configured: "La integración GHL no está configurada en el servidor (variables de entorno).",
+      };
+      toast.error(
+        errorMessages[code] ?? `Error al conectar GoHighLevel: ${code}`,
+      );
       const url = new URL(window.location.href);
       url.searchParams.delete("ghl");
       url.searchParams.delete("message");
