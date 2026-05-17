@@ -3,11 +3,31 @@ import { createClient } from "@supabase/supabase-js";
 import type { GhlOAuthConfig, GhlTokenResponse } from "@/lib/ghl/types";
 import { GHL_OAUTH_BASE_URL } from "@/lib/ghl/types";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false, autoRefreshToken: false } }
-);
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseAdmin() {
+  if (_supabaseAdmin) return _supabaseAdmin;
+  
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  console.log("[GHL Callback] Supabase config check:", {
+    hasUrl: !!url,
+    urlPrefix: url?.substring(0, 30),
+    hasServiceKey: !!key,
+    keyLength: key?.length,
+  });
+  
+  if (!url || !key) {
+    throw new Error("Missing Supabase configuration: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
+  
+  _supabaseAdmin = createClient(url, key, { 
+    auth: { persistSession: false, autoRefreshToken: false } 
+  });
+  
+  return _supabaseAdmin;
+}
 
 interface StatePayload {
   workspace_id: string;
@@ -81,51 +101,85 @@ async function fetchLocationInfo(accessToken: string, locationId: string) {
 }
 
 export async function GET(req: Request) {
+  console.log("[GHL Callback] ========== STEP 1: Received callback ==========");
+  
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
   const error = searchParams.get("error");
 
+  console.log("[GHL Callback] URL params:", { 
+    hasCode: !!code, 
+    codeLength: code?.length,
+    hasState: !!state,
+    stateLength: state?.length,
+    error 
+  });
+
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.leadflow.ai";
+  console.log("[GHL Callback] appBaseUrl:", appBaseUrl);
 
   if (error) {
-    console.error("[GHL Callback] OAuth error:", error);
+    console.error("[GHL Callback] FAIL: OAuth error from GHL:", error);
     return NextResponse.redirect(
       `${appBaseUrl}/dashboard?ghl=error&message=${encodeURIComponent(error)}`
     );
   }
 
   if (!code || !state) {
+    console.error("[GHL Callback] FAIL: Missing params - code:", !!code, "state:", !!state);
     return NextResponse.redirect(
       `${appBaseUrl}/dashboard?ghl=error&message=missing_params`
     );
   }
 
+  console.log("[GHL Callback] ========== STEP 2: Received code ==========");
+
   const statePayload = parseState(state);
+  console.log("[GHL Callback] Parsed state payload:", statePayload);
+  
   if (!statePayload) {
+    console.error("[GHL Callback] FAIL: Could not parse state. Raw state:", state);
     return NextResponse.redirect(
       `${appBaseUrl}/dashboard?ghl=error&message=invalid_state`
     );
   }
 
   const stateAge = Date.now() - statePayload.ts;
+  console.log("[GHL Callback] State age (ms):", stateAge, "Max allowed:", 10 * 60 * 1000);
+  
   if (stateAge > 10 * 60 * 1000) {
+    console.error("[GHL Callback] FAIL: State expired. Age:", stateAge);
     return NextResponse.redirect(
       `${appBaseUrl}/dashboard?ghl=error&message=state_expired`
     );
   }
 
   try {
+    console.log("[GHL Callback] ========== STEP 3: Exchanging code for tokens ==========");
     const tokens = await exchangeCodeForTokens(code);
+    console.log("[GHL Callback] Token exchange SUCCESS. Response keys:", Object.keys(tokens));
+    console.log("[GHL Callback] Token data:", {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      locationId: tokens.locationId,
+      companyId: tokens.companyId,
+      userType: tokens.userType,
+    });
     
     const expiresAt = new Date(
       Date.now() + tokens.expires_in * 1000
     ).toISOString();
 
+    console.log("[GHL Callback] ========== STEP 4: Location ID received ==========");
+    console.log("[GHL Callback] Location ID:", tokens.locationId);
+
     const locationName = await fetchLocationInfo(
       tokens.access_token,
       tokens.locationId
     );
+    console.log("[GHL Callback] Location name fetched:", locationName);
 
     const oauthConfig: GhlOAuthConfig = {
       access_token: tokens.access_token,
@@ -138,7 +192,15 @@ export async function GET(req: Request) {
       user_type: tokens.userType,
     };
 
-    const { error: upsertError } = await supabaseAdmin
+    console.log("[GHL Callback] ========== STEP 5: Inserting into workspace_integrations ==========");
+    console.log("[GHL Callback] Upsert data:", {
+      workspace_id: statePayload.workspace_id,
+      provider: "ghl",
+      enabled: true,
+      configKeys: Object.keys(oauthConfig),
+    });
+
+    const { error: upsertError, data: upsertData } = await getSupabaseAdmin()
       .from("workspace_integrations")
       .upsert(
         {
@@ -149,16 +211,22 @@ export async function GET(req: Request) {
           updated_at: new Date().toISOString(),
         },
         { onConflict: "workspace_id,provider" }
-      );
+      )
+      .select();
+
+    console.log("[GHL Callback] Upsert result - error:", upsertError, "data:", upsertData);
 
     if (upsertError) {
-      console.error("[GHL Callback] Failed to save integration:", upsertError);
+      console.error("[GHL Callback] FAIL: Supabase upsert error:", JSON.stringify(upsertError, null, 2));
       return NextResponse.redirect(
         `${appBaseUrl}/dashboard?ghl=error&message=save_failed`
       );
     }
 
-    await supabaseAdmin.from("ghl_sync_events").insert({
+    console.log("[GHL Callback] ========== STEP 5: Supabase insert SUCCESS ==========");
+
+    console.log("[GHL Callback] Inserting sync event...");
+    const { error: syncEventError } = await getSupabaseAdmin().from("ghl_sync_events").insert({
       workspace_id: statePayload.workspace_id,
       event_type: "connected",
       payload: {
@@ -169,10 +237,20 @@ export async function GET(req: Request) {
       },
       status: "ok",
     });
+    
+    if (syncEventError) {
+      console.error("[GHL Callback] Warning: sync event insert failed:", syncEventError);
+    } else {
+      console.log("[GHL Callback] Sync event inserted successfully");
+    }
 
+    console.log("[GHL Callback] ========== STEP 6: Redirect SUCCESS ==========");
     return NextResponse.redirect(`${appBaseUrl}/dashboard?ghl=connected`);
   } catch (err) {
-    console.error("[GHL Callback]", err);
+    console.error("[GHL Callback] ========== CAUGHT ERROR ==========");
+    console.error("[GHL Callback] Error type:", err?.constructor?.name);
+    console.error("[GHL Callback] Error message:", err instanceof Error ? err.message : String(err));
+    console.error("[GHL Callback] Error stack:", err instanceof Error ? err.stack : "no stack");
     return NextResponse.redirect(
       `${appBaseUrl}/dashboard?ghl=error&message=${encodeURIComponent(
         err instanceof Error ? err.message : "unknown_error"
