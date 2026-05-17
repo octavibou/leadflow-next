@@ -200,15 +200,17 @@ export async function GET(req: Request) {
       configKeys: Object.keys(oauthConfig),
     });
 
+    const upsertPayload = {
+      workspace_id: statePayload.workspace_id,
+      provider: "ghl",
+      config: oauthConfig,
+      enabled: true,
+      updated_at: new Date().toISOString(),
+    };
+
     const upsertResult = await getSupabaseAdmin()
       .from("workspace_integrations")
-      .upsert({
-        workspace_id: statePayload.workspace_id,
-        provider: "ghl",
-        config: oauthConfig,
-        enabled: true,
-        updated_at: new Date().toISOString(),
-      }, { 
+      .upsert(upsertPayload as never, { 
         onConflict: "workspace_id,provider",
         ignoreDuplicates: false 
       });
@@ -226,7 +228,7 @@ export async function GET(req: Request) {
     console.log("[GHL Callback] ========== STEP 5: Supabase insert SUCCESS ==========");
 
     console.log("[GHL Callback] Inserting sync event...");
-    const { error: syncEventError } = await getSupabaseAdmin().from("ghl_sync_events").insert({
+    const syncEventPayload = {
       workspace_id: statePayload.workspace_id,
       event_type: "connected",
       payload: {
@@ -236,7 +238,10 @@ export async function GET(req: Request) {
         connected_by: statePayload.user_id,
       },
       status: "ok",
-    });
+    };
+    const { error: syncEventError } = await getSupabaseAdmin()
+      .from("ghl_sync_events")
+      .insert(syncEventPayload as never);
     
     if (syncEventError) {
       console.error("[GHL Callback] Warning: sync event insert failed:", syncEventError);
