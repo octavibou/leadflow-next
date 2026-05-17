@@ -63,7 +63,7 @@ export function useGhlIntegration(workspaceId: string | null) {
           provider: "ghl",
           inbound_secret: secret,
           enabled: true,
-          config: {},
+          config: integration?.config ?? {},
           updated_at: new Date().toISOString(),
         },
         { onConflict: "workspace_id,provider" }

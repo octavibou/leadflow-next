@@ -26,6 +26,7 @@ interface GhlConnectionPanelProps {
 interface ConnectionState {
   connected: boolean;
   expired: boolean;
+  needsReconnect?: boolean;
   locationId: string | null;
   locationName: string | null;
   connectedAt: string | null;
@@ -146,6 +147,7 @@ export function GhlConnectionPanel({
 
   const isConnected = connectionState?.connected;
   const isExpired = connectionState?.expired;
+  const needsReconnect = connectionState?.needsReconnect && !isConnected;
 
   const getStatusBadge = () => {
     if (!isConnected) {
@@ -211,7 +213,9 @@ export function GhlConnectionPanel({
             <p className="text-xs text-muted-foreground mt-0.5">
               {isConnected
                 ? `Ubicación: ${connectionState?.locationName || connectionState?.locationId || "—"}`
-                : "Conecta para enviar leads automáticamente"}
+                : needsReconnect
+                  ? "La conexión se perdió tras sincronizar campos. Vuelve a conectar GoHighLevel."
+                  : "Conecta para enviar leads automáticamente"}
             </p>
           </div>
         </div>

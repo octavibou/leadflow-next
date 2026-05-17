@@ -4,6 +4,7 @@ import { GHL_API_BASE_URL } from "./types";
 import { getValidGhlToken } from "./tokenRefresh";
 import { buildSyncPlan } from "./diffEngine";
 import { isGhlNativeContactField, isGhlStandardFieldConflictError } from "./nativeFields";
+import { setGhlLastSyncAt } from "./integrationConfig";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -355,18 +356,7 @@ export async function executePushSync(
     error_message: result.errors.length > 0 ? result.errors.join("; ") : null,
   });
 
-  await supabaseAdmin
-    .from("workspace_integrations")
-    .update({
-      config: supabaseAdmin.rpc("jsonb_set_nested", {
-        target: "config",
-        path: ["last_sync_at"],
-        value: JSON.stringify(new Date().toISOString()),
-      }),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("workspace_id", workspaceId)
-    .eq("provider", "ghl");
+  await setGhlLastSyncAt(workspaceId);
 
   result.success = result.errors.length === 0;
   return result;

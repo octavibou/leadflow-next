@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { GhlOAuthConfig } from "./types";
 import { refreshGhlAccessToken } from "./oauth";
+import { isCorruptedGhlConfig, isGhlOAuthConfig, patchGhlOAuthConfig } from "./integrationConfig";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,8 +46,17 @@ export async function getValidGhlToken(
     };
   }
 
-  const config = integration.config as GhlOAuthConfig | null;
-  if (!config?.access_token || !config?.refresh_token) {
+  const config = integration.config;
+  if (isCorruptedGhlConfig(config)) {
+    return {
+      accessToken: "",
+      locationId: "",
+      needsReconnect: true,
+      error: "OAuth config corrupted. Please reconnect GoHighLevel.",
+    };
+  }
+
+  if (!isGhlOAuthConfig(config)) {
     return {
       accessToken: "",
       locationId: "",
@@ -73,20 +83,14 @@ export async function getValidGhlToken(
       Date.now() + tokens.expires_in * 1000
     ).toISOString();
 
-    const updatedConfig: GhlOAuthConfig = {
-      ...config,
+    await patchGhlOAuthConfig(workspaceId, {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: newExpiresAt,
-    };
-
-    await supabaseAdmin
-      .from("workspace_integrations")
-      .update({
-        config: updatedConfig,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", integration.id);
+      location_id: tokens.locationId || config.location_id,
+      company_id: tokens.companyId ?? config.company_id,
+      user_type: tokens.userType ?? config.user_type,
+    });
 
     await supabaseAdmin.from("ghl_sync_events").insert({
       workspace_id: workspaceId,
@@ -131,6 +135,7 @@ export async function checkGhlConnectionStatus(
 ): Promise<{
   connected: boolean;
   expired: boolean;
+  needsReconnect: boolean;
   locationId: string | null;
   locationName: string | null;
   connectedAt: string | null;
@@ -147,6 +152,7 @@ export async function checkGhlConnectionStatus(
     return {
       connected: false,
       expired: false,
+      needsReconnect: false,
       locationId: null,
       locationName: null,
       connectedAt: null,
@@ -154,11 +160,12 @@ export async function checkGhlConnectionStatus(
     };
   }
 
-  const config = integration.config as GhlOAuthConfig | null;
-  if (!config?.access_token) {
+  const config = integration.config;
+  if (isCorruptedGhlConfig(config) || !isGhlOAuthConfig(config)) {
     return {
       connected: false,
       expired: false,
+      needsReconnect: isCorruptedGhlConfig(config),
       locationId: null,
       locationName: null,
       connectedAt: null,
@@ -172,6 +179,7 @@ export async function checkGhlConnectionStatus(
   return {
     connected: true,
     expired: isExpired,
+    needsReconnect: isExpired,
     locationId: config.location_id,
     locationName: config.location_name || null,
     connectedAt: config.connected_at,
