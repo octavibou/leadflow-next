@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { GhlFieldMapping, GhlContact } from "./types";
 import { GHL_API_BASE_URL } from "./types";
 import { getValidGhlToken } from "./tokenRefresh";
+import { GHL_NATIVE_CONTACT_SLUGS } from "./nativeFields";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,6 +80,7 @@ function buildCustomFieldsPayload(
 
   const setField = (slug: string, value: string | undefined | null) => {
     if (value === undefined || value === null || value === "") return;
+    if (GHL_NATIVE_CONTACT_SLUGS.has(slug)) return;
     const mapping = mappingBySlug.get(slug);
     if (mapping?.ghl_field_id) {
       customFields[mapping.ghl_field_id] = value;

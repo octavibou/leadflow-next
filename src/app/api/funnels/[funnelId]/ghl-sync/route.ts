@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUserIdFromRoute, createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { extractFunnelSchema } from "@/lib/ghl/schemaExtractor";
 import { computeDiff, getDiffSummary, hasPendingChanges } from "@/lib/ghl/diffEngine";
-import { executePushSync, getExistingMappings } from "@/lib/ghl/pushSync";
+import { executePushSync, ensureNativeContactFieldMappings, getExistingMappings } from "@/lib/ghl/pushSync";
 import { checkGhlConnectionStatus } from "@/lib/ghl/tokenRefresh";
 import type { Funnel } from "@/types/funnel";
 
@@ -74,6 +74,7 @@ export async function GET(
     }
 
     const schema = extractFunnelSchema(funnel as unknown as Funnel);
+    await ensureNativeContactFieldMappings(funnel.workspace_id, funnelId, schema);
     const existingMappings = await getExistingMappings(
       funnel.workspace_id,
       funnelId
@@ -163,6 +164,7 @@ export async function POST(
     }
 
     const schema = extractFunnelSchema(funnel as unknown as Funnel);
+    await ensureNativeContactFieldMappings(funnel.workspace_id, funnelId, schema);
     const existingMappings = await getExistingMappings(
       funnel.workspace_id,
       funnelId
@@ -180,7 +182,7 @@ export async function POST(
       });
     }
 
-    const result = await executePushSync(funnel.workspace_id, funnelId, diffs);
+    const result = await executePushSync(funnel.workspace_id, funnelId, diffs, schema);
 
     return NextResponse.json({
       success: result.success,

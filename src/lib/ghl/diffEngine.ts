@@ -1,4 +1,5 @@
 import type { LeadflowField, GhlFieldMapping, FieldDiff } from "./types";
+import { isGhlNativeContactField } from "./nativeFields";
 
 export function computeDiff(
   currentSchema: LeadflowField[],
@@ -17,6 +18,10 @@ export function computeDiff(
   }
 
   for (const field of currentSchema) {
+    if (isGhlNativeContactField(field)) {
+      continue;
+    }
+
     const existingMapping = mappingBySlug.get(field.slug);
 
     if (!existingMapping) {

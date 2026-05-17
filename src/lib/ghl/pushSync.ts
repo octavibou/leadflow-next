@@ -3,6 +3,7 @@ import type { LeadflowField, GhlFieldMapping, FieldDiff, GhlCustomField } from "
 import { GHL_API_BASE_URL } from "./types";
 import { getValidGhlToken } from "./tokenRefresh";
 import { buildSyncPlan } from "./diffEngine";
+import { isGhlNativeContactField, isGhlStandardFieldConflictError } from "./nativeFields";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -118,10 +119,45 @@ export interface PushSyncResult {
   errors: string[];
 }
 
+export async function ensureNativeContactFieldMappings(
+  workspaceId: string,
+  funnelId: string,
+  fields: LeadflowField[]
+): Promise<number> {
+  let ensured = 0;
+  const now = new Date().toISOString();
+
+  for (const field of fields) {
+    if (!isGhlNativeContactField(field)) continue;
+
+    const { error } = await supabaseAdmin.from("ghl_field_mappings").upsert(
+      {
+        workspace_id: workspaceId,
+        funnel_id: funnelId,
+        leadflow_field_slug: field.slug,
+        leadflow_field_label: field.label,
+        leadflow_field_type: field.type,
+        ghl_field_id: null,
+        ghl_field_name: `native:${field.slug}`,
+        created_in_ghl: false,
+        sync_status: "synced",
+        last_synced_at: now,
+        updated_at: now,
+      },
+      { onConflict: "funnel_id,leadflow_field_slug" }
+    );
+
+    if (!error) ensured++;
+  }
+
+  return ensured;
+}
+
 export async function executePushSync(
   workspaceId: string,
   funnelId: string,
-  diffs: FieldDiff[]
+  diffs: FieldDiff[],
+  schema?: LeadflowField[]
 ): Promise<PushSyncResult> {
   const result: PushSyncResult = {
     success: true,
@@ -141,9 +177,18 @@ export async function executePushSync(
   }
 
   const { accessToken, locationId } = tokenResult;
+
+  if (schema?.length) {
+    await ensureNativeContactFieldMappings(workspaceId, funnelId, schema);
+  }
+
   const plan = buildSyncPlan(diffs);
 
   for (const diff of plan.toCreate) {
+    if (isGhlNativeContactField(diff.field)) {
+      continue;
+    }
+
     try {
       const ghlField = await createGhlCustomField(
         accessToken,
@@ -179,6 +224,12 @@ export async function executePushSync(
       result.created++;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Unknown error";
+
+      if (isGhlStandardFieldConflictError(errorMsg)) {
+        await ensureNativeContactFieldMappings(workspaceId, funnelId, [diff.field]);
+        continue;
+      }
+
       result.errors.push(`Failed to create field "${diff.field.label}": ${errorMsg}`);
 
       await supabaseAdmin.from("ghl_sync_events").insert({
@@ -197,6 +248,9 @@ export async function executePushSync(
   }
 
   for (const diff of plan.toUpdate) {
+    if (isGhlNativeContactField(diff.field)) {
+      continue;
+    }
     if (!diff.mapping?.ghl_field_id) {
       result.errors.push(`Cannot update field "${diff.field.label}": no GHL field ID`);
       continue;
