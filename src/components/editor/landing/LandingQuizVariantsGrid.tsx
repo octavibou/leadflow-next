@@ -113,7 +113,7 @@ function PreviewCenterDualImage() {
       <div className="h-1 w-[80%] rounded-sm bg-foreground/85" />
       <div className="h-0.5 w-[72%] rounded-sm bg-muted-foreground/35" />
       <div className="mt-0.5 flex w-full gap-1">
-        <div className="aspect-video min-w-0 flex-1 rounded-md bg-gradient-to-br from-sky-200/50 to-muted-foreground/20" />
+        <div className="aspect-video min-w-0 flex-1 rounded-md bg-gradient-to-br from-primary/25 to-muted-foreground/20" />
         <div className="aspect-video min-w-0 flex-1 rounded-md bg-gradient-to-br from-amber-100/60 to-muted-foreground/20" />
       </div>
     </div>

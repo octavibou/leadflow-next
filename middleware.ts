@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { Session } from "@supabase/supabase-js";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -12,37 +13,38 @@ const PUBLIC_PATHS = [
 ];
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  /** Next.js 15+: no mutar `request.cookies` (lanza y devuelve 500). Solo escribir en la respuesta. @see https://github.com/supabase/supabase/issues/30030 */
+  let response = NextResponse.next({ request });
 
   // Skip auth check if Supabase is not configured
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return response;
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+  let session: Session | null = null;
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+      }
+    );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession();
+    session = data.session ?? null;
+  } catch (err) {
+    console.error("[middleware] Supabase getSession failed:", err);
+  }
 
   const { pathname } = request.nextUrl;
 

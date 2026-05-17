@@ -23,9 +23,15 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
+    if (!supabase) {
+      setSubRecord(null);
+      return;
+    }
+
+    const client = supabase;
 
     const fetchSub = async () => {
-      const { data } = await supabase
+      const { data } = await client
         .from("subscriptions")
         .select("status, stripe_subscription_id, stripe_customer_id")
         .eq("user_id", user.id)
@@ -67,6 +73,10 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     interval: BillingInterval;
     breakdown: PriceBreakdown;
   }) => {
+    if (!supabase) {
+      toast.error("Supabase no está configurado");
+      return;
+    }
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -85,6 +95,10 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   };
 
   const handleManagePayments = async () => {
+    if (!supabase) {
+      toast.error("Supabase no está configurado");
+      return;
+    }
     setPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();

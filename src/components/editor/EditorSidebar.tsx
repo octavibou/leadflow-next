@@ -9,6 +9,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { EditorPluginsPanel } from "@/components/editor/EditorPluginsPanel";
 
 const STEP_ICONS: Record<StepType, React.ReactNode> = {
   intro: <TextAlignLeft className="h-4 w-4" weight="bold" />,
@@ -48,19 +49,33 @@ function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelSt
       style={style}
       className={cn(
         "relative flex w-full min-w-0 items-start gap-2 rounded-lg py-2 pl-2.5 pr-10 text-sm leading-snug transition-colors group cursor-pointer",
-        isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+        isSelected
+          ? "bg-primary font-medium text-primary-foreground shadow-sm"
+          : "text-muted-foreground hover:bg-muted"
       )}
       onClick={onSelect}
     >
-      <span {...attributes} {...listeners} className="mt-0.5 shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
+      <span
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "mt-0.5 shrink-0 cursor-grab",
+          isSelected ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+        )}
+      >
         <DotsSixVertical className="h-3.5 w-3.5" weight="bold" />
       </span>
-      <span className="mt-0.5 shrink-0 text-muted-foreground">{STEP_ICONS[step.type]}</span>
+      <span className={cn("mt-0.5 shrink-0", isSelected ? "text-primary-foreground/90" : "text-muted-foreground")}>{STEP_ICONS[step.type]}</span>
       <span className="min-w-0 flex-1 break-words text-left" title={fullLabel}>{fullLabel}</span>
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-0.5 top-1/2 h-6 w-6 shrink-0 -translate-y-1/2 text-muted-foreground/35 hover:bg-destructive/10 hover:text-destructive/90"
+        className={cn(
+          "absolute right-0.5 top-1/2 h-6 w-6 shrink-0 -translate-y-1/2",
+          isSelected
+            ? "text-primary-foreground/50 hover:bg-white/15 hover:text-primary-foreground"
+            : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+        )}
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         aria-label={`Eliminar paso ${fullLabel}`}
       >
@@ -72,6 +87,7 @@ function SortableStep({ step, isSelected, onSelect, onDelete }: { step: FunnelSt
 
 export function EditorSidebar({
   steps,
+  pluginSteps,
   selectedIndex,
   onSelect,
   onReorder,
@@ -84,6 +100,8 @@ export function EditorSidebar({
   onUpdateSettings,
 }: {
   steps: FunnelStep[];
+  /** Pasos completos del funnel (p. ej. fórmulas en Plugins). Por defecto `steps`. */
+  pluginSteps?: FunnelStep[];
   selectedIndex: number;
   onSelect: (index: number) => void;
   onReorder: (steps: FunnelStep[]) => void;
@@ -91,10 +109,11 @@ export function EditorSidebar({
   onDeleteStep: (stepId: string) => void;
   excludeAddTypes?: StepType[];
   settings: FunnelSettings;
-  sidebarTab: "steps" | "design";
-  onSidebarTabChange: (tab: "steps" | "design") => void;
+  sidebarTab: "steps" | "design" | "plugins";
+  onSidebarTabChange: (tab: "steps" | "design" | "plugins") => void;
   onUpdateSettings: (updates: Partial<FunnelSettings>) => void;
 }) {
+  const stepsForPlugins = pluginSteps ?? steps;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const sorted = [...steps].sort((a, b) => a.order - b.order);
   const addTypesMenu = excludeAddTypes?.length
@@ -111,16 +130,32 @@ export function EditorSidebar({
   };
 
   return (
-    <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-muted/30">
+    <div className="flex min-h-0 w-80 shrink-0 flex-col border-r border-border bg-background text-foreground">
       <Tabs
         value={sidebarTab}
-        onValueChange={(v) => onSidebarTabChange(v as "steps" | "design")}
+        onValueChange={(v) => onSidebarTabChange(v as "steps" | "design" | "plugins")}
         className="min-h-0 flex-1 gap-0"
       >
-        <div className="shrink-0 border-b px-4 py-3">
-          <TabsList className="w-full" variant="default">
-            <TabsTrigger value="steps" className="text-xs">Pasos</TabsTrigger>
-            <TabsTrigger value="design" className="text-xs">Diseño</TabsTrigger>
+        <div className="shrink-0 border-b border-border px-4 py-3">
+          <TabsList className="w-full p-1" variant="default">
+            <TabsTrigger
+              value="steps"
+              className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+            >
+              Pasos
+            </TabsTrigger>
+            <TabsTrigger
+              value="design"
+              className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+            >
+              Diseño
+            </TabsTrigger>
+            <TabsTrigger
+              value="plugins"
+              className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+            >
+              Plugins
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -142,10 +177,14 @@ export function EditorSidebar({
               </DndContext>
             </div>
           </ScrollArea>
-          <div className="shrink-0 border-t p-3">
+          <div className="shrink-0 border-t border-border p-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
                   <Plus className="h-4 w-4 mr-2" weight="bold" /> Añadir paso
                 </Button>
               </DropdownMenuTrigger>
@@ -161,14 +200,24 @@ export function EditorSidebar({
           </div>
         </TabsContent>
 
+        <TabsContent value="plugins" className="min-h-0 flex-1">
+          <ScrollArea className="min-h-0 flex-1">
+            <EditorPluginsPanel
+              settings={settings}
+              steps={stepsForPlugins}
+              onUpdateSettings={onUpdateSettings}
+            />
+          </ScrollArea>
+        </TabsContent>
+
         <TabsContent value="design" className="min-h-0 flex-1">
           <ScrollArea className="min-h-0 flex-1">
-            <div className="p-4 space-y-6">
+            <div className="space-y-6 p-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Alineación de la pregunta</span>
+                  <span className="text-sm font-semibold text-foreground">Alineación de la pregunta</span>
                 </div>
-                <div className="border rounded-xl bg-background p-2">
+                <div className="rounded-xl border border-border bg-muted/50 p-2">
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       { id: "left", label: "Izq." },
@@ -182,10 +231,10 @@ export function EditorSidebar({
                           type="button"
                           onClick={() => onUpdateSettings({ questionTextAlign: opt.id })}
                           className={cn(
-                            "h-9 rounded-lg text-xs font-semibold transition-colors border",
+                            "h-9 rounded-lg border text-xs font-semibold transition-colors",
                             active
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-background hover:bg-muted border-muted-foreground/20",
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
                           )}
                         >
                           {opt.label}
@@ -194,20 +243,20 @@ export function EditorSidebar({
                     })}
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   Controla si el texto de la pregunta se alinea a la izquierda, centro o derecha.
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Tamaño de la pregunta</span>
+                  <span className="text-sm font-semibold text-foreground">Tamaño de la pregunta</span>
                 </div>
-                <div className="border rounded-xl bg-background p-3 space-y-4">
+                <div className="space-y-4 rounded-xl border border-border bg-muted/50 p-3">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Mobile</span>
-                      <span className="text-xs font-medium tabular-nums">
+                      <span className="text-xs font-medium tabular-nums text-foreground">
                         {(settings.questionFontSizeMobile ?? 16)}px
                       </span>
                     </div>
@@ -222,7 +271,7 @@ export function EditorSidebar({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Desktop</span>
-                      <span className="text-xs font-medium tabular-nums">
+                      <span className="text-xs font-medium tabular-nums text-foreground">
                         {(settings.questionFontSizeDesktop ?? 48)}px
                       </span>
                     </div>
@@ -235,20 +284,20 @@ export function EditorSidebar({
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   Cambia en tiempo real en el builder (mobile/desktop según el toggle de vista).
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Espacio pregunta → respuestas</span>
+                  <span className="text-sm font-semibold text-foreground">Espacio pregunta → respuestas</span>
                 </div>
-                <div className="border rounded-xl bg-background p-3 space-y-4">
+                <div className="space-y-4 rounded-xl border border-border bg-muted/50 p-3">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Mobile</span>
-                      <span className="text-xs font-medium tabular-nums">
+                      <span className="text-xs font-medium tabular-nums text-foreground">
                         {(settings.questionOptionsSpacingMobile ?? 24)}px
                       </span>
                     </div>
@@ -263,7 +312,7 @@ export function EditorSidebar({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Desktop</span>
-                      <span className="text-xs font-medium tabular-nums">
+                      <span className="text-xs font-medium tabular-nums text-foreground">
                         {(settings.questionOptionsSpacingDesktop ?? 24)}px
                       </span>
                     </div>
@@ -276,7 +325,7 @@ export function EditorSidebar({
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   Controla el margen inferior del título de la pregunta.
                 </p>
               </div>

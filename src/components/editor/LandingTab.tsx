@@ -3,8 +3,9 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { EditorCanvas } from "@/components/editor/EditorCanvas";
 import { EditorViewModeFloatingToggle } from "@/components/editor/EditorViewModeFloatingToggle";
-import { LandingVariationFloatingToolbar, type LandingSelection } from "@/components/editor/CampaignsTab";
+import { LandingVariationsSidebar, type LandingSelection } from "@/components/editor/CampaignsTab";
 import { LandingAddSectionPanel } from "@/components/editor/landing/LandingAddSectionPanel";
+import { LandingDesignPanel } from "@/components/editor/landing/LandingDesignPanel";
 import { LandingLeftSidebarWithBasicBlocksCluster } from "@/components/editor/landing/LandingLeftSidebarWithBasicBlocks";
 import {
   LandingBuilderProvider,
@@ -19,11 +20,14 @@ import {
 } from "@/components/editor/landing/landingBuilderTypes";
 import { LandingInspectorColumn } from "@/components/editor/landing/LandingInspectorColumn";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Funnel, FunnelStep, IntroConfig, LandingIntroBodyBlock } from "@/types/funnel";
 import { toast } from "sonner";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useCampaignStore } from "@/store/campaignStore";
 import { LANDING_BODY_REORDER_APPEND } from "@/lib/landingBodyDrag";
+
+export type LandingLeftSidebarTab = "constructor" | "variant" | "design";
 
 function CloseInspectorOnVariationChange({ selectedKey }: { selectedKey: LandingSelection }) {
   const { closeInspector } = useLandingBuilder();
@@ -48,6 +52,7 @@ export function LandingTab({
   const { campaigns, fetchCampaigns, updateCampaign } = useCampaignStore();
 
   const [selectedKey, setSelectedKey] = useState<LandingSelection>("default");
+  const [landingLeftTab, setLandingLeftTab] = useState<LandingLeftSidebarTab>("constructor");
 
   const emptyIntroBaseline: IntroConfig = useMemo(() => ({
     headline: "",
@@ -250,19 +255,60 @@ export function LandingTab({
         <LandingBuilderProvider bodyCanvasActions={bodyCanvasActions} introChromeActions={introChromeActions}>
         <CloseInspectorOnVariationChange selectedKey={selectedKey} />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <LandingLeftSidebarWithBasicBlocksCluster constructorTab={true}>
-          <div className="flex w-80 shrink-0 flex-col border-r bg-muted/30 min-h-0">
-            <div className="shrink-0 border-b px-3 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Constructor
-              </span>
+          <LandingLeftSidebarWithBasicBlocksCluster constructorTab={landingLeftTab === "constructor"}>
+            <div className="flex h-full min-h-0 w-80 shrink-0 flex-col border-r border-border bg-background">
+              <Tabs
+                value={landingLeftTab}
+                onValueChange={(v) => setLandingLeftTab(v as LandingLeftSidebarTab)}
+                className="flex min-h-0 flex-1 flex-col gap-0"
+              >
+                <div className="shrink-0 border-b border-border px-4 py-3">
+                  <TabsList className="w-full p-1" variant="default">
+                    <TabsTrigger
+                      value="constructor"
+                      className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                    >
+                      Constructor
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="variant"
+                      className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                    >
+                      Variante
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="design"
+                      className="text-xs data-[state=active]:border-transparent data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                    >
+                      Diseño
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="constructor" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+                  <ScrollArea className="min-h-0 flex-1">
+                    <div className="p-3">
+                      <LandingAddSectionPanel />
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="variant" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+                  <LandingVariationsSidebar
+                    embedded
+                    funnel={funnel}
+                    selectedKey={selectedKey}
+                    onSelect={setSelectedKey}
+                  />
+                </TabsContent>
+
+                <TabsContent value="design" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+                  <ScrollArea className="min-h-0 flex-1">
+                    <LandingDesignPanel funnel={funnel} />
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
             </div>
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="p-3">
-                <LandingAddSectionPanel />
-              </div>
-            </ScrollArea>
-          </div>
           </LandingLeftSidebarWithBasicBlocksCluster>
 
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -275,11 +321,6 @@ export function LandingTab({
                     settings={funnel.settings}
                     viewMode={viewMode}
                     landingConstructorPick={true}
-                  />
-                  <LandingVariationFloatingToolbar
-                    funnel={funnel}
-                    selectedKey={selectedKey}
-                    onSelect={setSelectedKey}
                   />
                   <EditorViewModeFloatingToggle viewMode={viewMode} onToggleView={onToggleView} />
                 </div>

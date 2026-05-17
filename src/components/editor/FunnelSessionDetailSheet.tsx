@@ -197,6 +197,22 @@ export function FunnelSessionDetailSheet({
                   <dd className="font-medium">{detail.campaignName || "—"}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,8rem)_1fr] gap-x-2">
+                  <dt className="text-muted-foreground">
+                    {helperTooltip(
+                      "Versión publicada",
+                      "Rama + versión activa al inicio de la visita (Publish v1). No aplica en URLs con ?c=.",
+                    )}
+                  </dt>
+                  <dd className="font-medium">
+                    {detail.visitDeploymentLabel || "—"}
+                    {detail.visitEntrySurface ? (
+                      <span className="ml-1 text-muted-foreground">
+                        · entrada: {detail.visitEntrySurface === "quiz_only" ? "solo funnel" : "con landing"}
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[minmax(0,8rem)_1fr] gap-x-2">
                   <dt className="text-muted-foreground">{helperTooltip("Landing URL", "Primera URL que registramos al entrar.")}</dt>
                   <dd className="break-all font-mono text-[10px]">{detail.attribution?.landing_url || "—"}</dd>
                 </div>

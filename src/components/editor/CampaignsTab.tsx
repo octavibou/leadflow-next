@@ -252,12 +252,14 @@ export function LandingVariationsSidebar({
     <div
       className={cn(
         "flex min-h-0 flex-col",
-        embedded ? "flex min-h-0 min-w-0 flex-1 flex-col bg-muted/20" : "w-80 shrink-0 border-r bg-muted/30",
+        embedded ? "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-muted/20" : "w-80 shrink-0 border-r bg-muted/30",
       )}
     >
-      <div className="px-4 py-3 border-b">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Variaciones</span>
-      </div>
+      {!embedded && (
+        <div className="border-b px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Variaciones</span>
+        </div>
+      )}
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-0.5 p-2 pr-3">

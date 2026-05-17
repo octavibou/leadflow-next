@@ -107,7 +107,7 @@ function CoreListIcon() {
         <div className="h-1 w-10 rounded-sm bg-slate-400" />
       </div>
       <div className="flex items-center gap-1.5">
-        <div className="h-2 w-2 rounded-full bg-sky-500" />
+        <div className="h-2 w-2 rounded-full bg-primary" />
         <div className="h-1 w-8 rounded-sm bg-slate-400" />
       </div>
     </div>
@@ -130,7 +130,7 @@ function CoreLogoBarIcon() {
       <div className="h-4 w-4 rounded-sm bg-violet-500" />
       <div className="h-0 w-0 border-x-[5px] border-x-transparent border-b-[9px] border-b-emerald-500" />
       <div className="text-[10px] leading-none text-amber-500">★</div>
-      <div className="h-4 w-4 rounded-full bg-sky-500" />
+      <div className="h-4 w-4 rounded-full bg-primary" />
     </div>
   );
 }
@@ -212,7 +212,7 @@ export function LandingBasicBlocksGrids() {
         </BlockTile>
         <BlockTile
           label="Botón"
-          bgClassName="bg-sky-100/80 dark:bg-sky-950/40"
+          bgClassName="bg-primary/12 dark:bg-chrome-panel/40"
           isActive={isActive("core_button")}
           onSelect={() => openComponent("core_button")}
           builderBlockId="core_button"
@@ -352,7 +352,7 @@ export function LandingBasicBlocksGrids() {
         </BlockTile>
         <BlockTile
           label="Google Maps"
-          bgClassName="bg-indigo-100/35 dark:bg-indigo-950/25"
+          bgClassName="bg-primary/10 dark:bg-chrome-panel/30"
           isActive={isActive("embed_google_maps")}
           onSelect={() => openComponent("embed_google_maps")}
           builderBlockId="embed_google_maps"

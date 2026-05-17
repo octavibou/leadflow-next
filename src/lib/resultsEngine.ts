@@ -99,3 +99,15 @@ export function generateSampleContext(steps: FunnelStep[]): Record<string, numbe
   }
   return ctx;
 }
+
+/** Respuestas de ejemplo (valor de opción central) por `step.id` para preview / plugins. */
+export function generateSampleAnswers(steps: FunnelStep[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const step of steps) {
+    if (step.type !== "question" || !step.question?.options?.length) continue;
+    const opts = step.question.options;
+    const mid = opts[Math.floor(opts.length / 2)];
+    if (mid) out[step.id] = mid.value;
+  }
+  return out;
+}

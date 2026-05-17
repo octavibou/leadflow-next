@@ -7,16 +7,28 @@ export function useAuthReady() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    if (!supabase) {
+      setUser(null);
       setIsReady(true);
-    });
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
         setUser(session?.user ?? null);
-      }
-    );
+        setIsReady(true);
+      })
+      .catch(() => {
+        setUser(null);
+        setIsReady(true);
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => subscription.unsubscribe();
   }, []);

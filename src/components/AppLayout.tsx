@@ -8,10 +8,10 @@ export default function AppLayout({ children }: { children?: React.ReactNode }) 
       <div className="min-h-screen flex w-full bg-sidebar">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0 p-2 pl-0">
-          <div className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm overflow-hidden flex flex-col">
-            {/* Dark header */}
-            <header className="h-12 flex items-center px-4 text-zinc-100">
-              <SidebarTrigger className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" />
+          <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-chrome-border bg-chrome shadow-sm">
+            {/* Cromado Leadflow */}
+            <header className="flex h-12 items-center px-4 text-chrome-fg">
+              <SidebarTrigger className="text-chrome-fg-muted hover:bg-chrome-hover hover:text-chrome-fg" />
             </header>
             {/* Main content with rounded top corners */}
             <main className="flex-1 overflow-auto bg-background rounded-t-2xl">

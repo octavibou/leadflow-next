@@ -121,7 +121,7 @@ function PreviewCenterLightSocial() {
 function PreviewCenterGradientLogos() {
   return (
     <div className="flex w-full justify-center px-1">
-      <div className="flex w-full max-w-[90%] flex-col items-center gap-1 rounded-md bg-gradient-to-b from-sky-100/80 to-background px-2 py-1.5 dark:from-sky-950/50">
+      <div className="flex w-full max-w-[90%] flex-col items-center gap-1 rounded-md bg-gradient-to-b from-primary/12 to-background px-2 py-1.5 dark:from-chrome-panel/50">
         <div className="h-1 w-[82%] rounded-sm bg-foreground/85" />
         <div className="h-0.5 w-[72%] rounded-sm bg-muted-foreground/35" />
         <div className="h-2 w-[42%] rounded-sm bg-primary/90" />

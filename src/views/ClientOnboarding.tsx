@@ -180,8 +180,8 @@ const ClientOnboarding = () => {
             <Card key={funnel.id}>
               <CardContent className="pt-5 space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-blue-600">{funnel.name.charAt(0).toUpperCase()}</span>
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15">
+                    <span className="text-sm font-bold text-brand-dark">{funnel.name.charAt(0).toUpperCase()}</span>
                   </div>
                   <span className="font-semibold">{funnel.name}</span>
                   {selectedCount > 0 && (

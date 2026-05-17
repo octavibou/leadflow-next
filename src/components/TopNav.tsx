@@ -117,17 +117,17 @@ export function TopNav() {
   };
 
   return (
-    <header className="h-14 flex items-center px-4 gap-6 shrink-0 bg-zinc-900 text-zinc-100">
+    <header className="h-14 flex shrink-0 items-center gap-6 bg-chrome px-4 text-chrome-fg">
       {/* Left section with Workspace */}
       <div className="flex items-center gap-2">
         {/* Workspace Switcher */}
         {editingName ? (
           <div className="flex items-center gap-2 px-2">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="h-7 w-7 rounded-lg bg-brand-lime flex items-center justify-center shrink-0 overflow-hidden">
               {currentWorkspace?.logo_url ? (
                 <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
               ) : (
-                <span className="text-xs font-bold text-primary-foreground">
+                <span className="text-xs font-bold text-brand-dark">
                   {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
                 </span>
               )}
@@ -149,17 +149,17 @@ export function TopNav() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="gap-2 font-medium text-sm px-2 h-9 text-zinc-100 hover:bg-zinc-800 hover:text-white"
+                className="h-9 gap-2 px-2 text-sm font-medium text-chrome-fg hover:bg-chrome-hover hover:text-white"
                 onClick={(e) => {
                   e.preventDefault();
                   handleWorkspaceClick();
                 }}
               >
-                <div className="h-6 w-6 rounded-lg bg-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-chrome-muted">
                   {currentWorkspace?.logo_url ? (
                     <img src={currentWorkspace.logo_url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-semibold text-zinc-100">
+                    <span className="text-xs font-semibold text-chrome-fg">
                       {currentWorkspace?.name?.charAt(0).toUpperCase() || "Q"}
                     </span>
                   )}
@@ -167,7 +167,7 @@ export function TopNav() {
                 <span className="max-w-[160px] truncate">
                   {currentWorkspace?.name || "Workspace"}
                 </span>
-                <CaretDown className="h-3.5 w-3.5 text-zinc-400" weight="bold" />
+                <CaretDown className="h-3.5 w-3.5 text-chrome-fg-muted" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
@@ -214,7 +214,7 @@ export function TopNav() {
             return (
               <PlasticButton
                 key={tab.label}
-                variant="primary"
+                variant="brand-lime"
                 onClick={() => router.push(tab.path)}
                 className="h-8 px-3"
               >
@@ -230,7 +230,7 @@ export function TopNav() {
               variant="ghost"
               onClick={() => !disabled && router.push(tab.path)}
               disabled={disabled}
-              className="h-8 px-3 gap-2 text-zinc-400 hover:text-white hover:bg-zinc-800"
+              className="h-8 gap-2 px-3 text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
             >
               <Icon className="h-3.5 w-3.5" weight="bold" />
               {tab.label}
@@ -249,7 +249,7 @@ export function TopNav() {
           variant="ghost"
           size="icon"
           onClick={() => window.open("https://www.skool.com/leadcommerce-4121", "_blank", "noopener,noreferrer")}
-          className="h-8 w-8 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          className="h-8 w-8 rounded-lg text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
         >
           <GraduationCap className="h-4 w-4" weight="bold" />
         </Button>
@@ -258,7 +258,7 @@ export function TopNav() {
           variant="ghost"
           size="icon"
           onClick={() => setAssistantOpen(!assistantOpen)}
-          className="h-8 w-8 rounded-lg text-zinc-200 hover:bg-zinc-800 hover:text-white"
+          className="h-8 w-8 rounded-lg text-chrome-fg hover:bg-chrome-hover hover:text-white"
           aria-label={assistantOpen ? "Cerrar asistente" : "Abrir asistente"}
         >
           <Sparkle className="h-4 w-4" weight="fill" />
@@ -267,9 +267,9 @@ export function TopNav() {
         {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-lg hover:bg-zinc-800">
+            <Button variant="ghost" size="icon" className="rounded-lg hover:bg-chrome-hover">
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold rounded-lg">
+                <AvatarFallback className="text-xs bg-brand-lime text-brand-dark font-semibold rounded-lg">
                   {initials}
                 </AvatarFallback>
               </Avatar>

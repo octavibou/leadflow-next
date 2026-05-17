@@ -19,12 +19,7 @@ export function FunnelContactStepPanel({
 
   return (
     <div className="animate-fade-in">
-      <div
-        className={cn(
-          "mx-auto w-full max-w-md rounded-2xl border border-gray-100 bg-white shadow-sm",
-          isMobile ? "px-4 py-5" : "px-8 py-8",
-        )}
-      >
+      <div className="mx-auto w-full max-w-md">
         <div className="mb-4 flex justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
             <span aria-hidden>✓</span>
@@ -60,7 +55,7 @@ export function FunnelContactStepPanel({
           </p>
         ) : null}
 
-        <div className={cn("mt-6 space-y-4", !isMobile && "mx-auto w-full max-w-md")}>{fields}</div>
+        <div className="mt-6 space-y-4">{fields}</div>
 
         {consentSlot}
 

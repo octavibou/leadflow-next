@@ -66,7 +66,7 @@ function PreviewSplitSupportImage() {
 function PreviewSplitAnalyses() {
   return (
     <div className="flex w-full gap-1.5 px-0.5">
-      <div className="w-[42%] shrink-0 rounded-md bg-gradient-to-br from-sky-200/50 to-muted-foreground/30" />
+      <div className="w-[42%] shrink-0 rounded-md bg-gradient-to-br from-primary/25 to-muted-foreground/30" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="h-1.5 w-full rounded-sm bg-foreground/80" />
         {[1, 2].map((i) => (
@@ -166,7 +166,7 @@ function PreviewListDashboard() {
           </div>
         ))}
       </div>
-      <div className="w-[35%] shrink-0 rounded-md border border-border/40 bg-gradient-to-b from-indigo-100/40 to-muted-foreground/25 dark:from-indigo-950/50" />
+      <div className="w-[35%] shrink-0 rounded-md border border-border/40 bg-gradient-to-b from-primary/15 to-muted-foreground/25 dark:from-chrome-panel/50" />
     </div>
   );
 }

@@ -1,10 +1,13 @@
-import type { FunnelStep, FunnelSettings } from "@/types/funnel";
+"use client";
+
+import { useMemo } from "react";
+import type { Funnel, FunnelStep, FunnelSettings } from "@/types/funnel";
 import type { Language } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { resolveContactStepCopy } from "@/lib/contactStepCopy";
 import { FunnelContactStepPanel } from "@/components/funnel/FunnelContactStepPanel";
 import { cn } from "@/lib/utils";
-import { evaluateFormulas, generateSampleContext } from "@/lib/resultsEngine";
+import { evaluateFormulas, generateSampleAnswers, generateSampleContext } from "@/lib/resultsEngine";
 import { FunnelResultsStep } from "@/components/funnel/FunnelResultsStep";
 import { useLandingBuilderOptional } from "@/components/editor/landing/LandingBuilderContext";
 import {
@@ -24,6 +27,9 @@ import { LandingCanvasIntroLayout } from "@/components/funnel/LandingCanvasIntro
 import { LandingIntroBodyBlocks } from "@/components/funnel/LandingIntroBodyBlocks";
 import { LandingIntroBodyBlocksEditorRegion } from "@/components/editor/landing/LandingIntroBodyBlocksEditorRegion";
 import { funnelContentFontFamily } from "@/lib/funnelTypography";
+import { PluginHost } from "@/components/plugins/PluginHost";
+import { stepTypeToPluginPlacement } from "@/lib/plugins/stepPlacement";
+import type { FunnelPluginRuntimeContext } from "@/components/plugins/pluginRuntimeTypes";
 
 /** Transición unificada móvil ↔ escritorio: ancho del marco + paddings (contenido y pie) en paralelo. */
 const viewModeTransitionClass =
@@ -139,6 +145,8 @@ export function EditorCanvas({
   const isContact = step.type === "contact";
   const contactResolved = isContact ? resolveContactStepCopy(step, panelLanguage) : null;
   const showContactStickyProgress = Boolean(contactResolved?.showProgress);
+  const showStickyProgressBar =
+    (isQuestion && totalQuestions > 0) || showContactStickyProgress;
 
   const bottomProgress =
     isQuestion && totalQuestions > 0 && currentQuestionIndex >= 0
@@ -189,6 +197,7 @@ export function EditorCanvas({
               <StepContent
                 step={step}
                 steps={steps}
+                settings={settings}
                 primary={primary}
                 isMobile={isMobile}
                 landingConstructorPick={landingConstructorPick}
@@ -206,7 +215,9 @@ export function EditorCanvas({
                 className={cn(
                   "mx-auto w-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden transition-[padding]",
                   viewModeTransitionClass,
-                  isMobile ? "px-5 py-6" : "px-10 py-8",
+                  isMobile
+                    ? cn("px-5 pt-6", showStickyProgressBar ? "pb-4" : "pb-6")
+                    : cn("px-10 pt-8", showStickyProgressBar ? "pb-5" : "pb-8"),
                 )}
                 style={{
                   ["--question-font-size" as any]: `${questionFontSizeMobilePx}px`,
@@ -218,6 +229,7 @@ export function EditorCanvas({
                 <StepContent
                   step={step}
                   steps={steps}
+                  settings={settings}
                   primary={primary}
                   isMobile={isMobile}
                   landingConstructorPick={landingConstructorPick}
@@ -228,13 +240,12 @@ export function EditorCanvas({
                   questionTextAlignClass={questionTextAlignClass}
                   panelLanguage={panelLanguage}
                 />
-              </div>
-              {/* Mismo orden que PublicFunnel: pie Leadflow + barra de progreso al borde inferior */}
-              <div className="sticky bottom-0 z-10 mt-auto shrink-0 w-full bg-white">
                 <div className={funnelPublicFooterInnerClass}>
                   <FunnelBrandingFooter brandLogoUrl={settings.logoUrl} />
                 </div>
-                {((isQuestion && totalQuestions > 0) || showContactStickyProgress) && (
+              </div>
+              {showStickyProgressBar && (
+                <div className="sticky bottom-0 z-10 mt-auto shrink-0 w-full bg-white">
                   <div className="w-full">
                     <div className="h-1 bg-gray-100 w-full overflow-hidden">
                       <div
@@ -243,8 +254,8 @@ export function EditorCanvas({
                       />
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
           {showSidebarPrimitiveOverlay ? (
@@ -269,6 +280,7 @@ export function EditorCanvas({
 function StepContent({
   step,
   steps,
+  settings,
   primary,
   isMobile,
   landingConstructorPick,
@@ -281,6 +293,7 @@ function StepContent({
 }: {
   step: FunnelStep;
   steps: FunnelStep[];
+  settings: FunnelSettings;
   primary: string;
   isMobile: boolean;
   landingConstructorPick?: boolean;
@@ -308,6 +321,56 @@ function StepContent({
       activeLanding === "core_text" ||
       activeLanding === "core_button");
 
+  const sortedPreview = useMemo(() => [...steps].sort((a, b) => a.order - b.order), [steps]);
+  const sortedStepIndex = sortedPreview.findIndex((s) => s.id === step.id);
+  const sampleAnswers = useMemo(() => generateSampleAnswers(steps), [steps]);
+  const sampleScore = useMemo(() => {
+    let sc = 0;
+    for (const s of steps) {
+      if (s.type !== "question" || !s.question) continue;
+      const v = sampleAnswers[s.id];
+      const opt = s.question.options.find((o) => o.value === v);
+      if (opt) sc += opt.score;
+    }
+    return sc;
+  }, [sampleAnswers, steps]);
+
+  const previewFunnel: Funnel = useMemo(
+    () => ({
+      id: step.funnel_id || "editor-preview",
+      user_id: "",
+      name: "",
+      slug: "",
+      type: "blank",
+      settings,
+      steps,
+      created_at: "",
+      updated_at: "",
+      saved_at: "",
+    }),
+    [step.funnel_id, settings, steps],
+  );
+
+  const pluginRuntimeCtx = useMemo((): FunnelPluginRuntimeContext | null => {
+    const placement = stepTypeToPluginPlacement(step.type);
+    if (!placement) return null;
+    return {
+      funnel: previewFunnel,
+      campaignId: null,
+      sortedSteps: sortedPreview,
+      answers: sampleAnswers,
+      totalScore: sampleScore,
+      qualified: true,
+      currentQuestionIndex: step.type === "question" ? Math.max(0, currentQuestionIndex) : 0,
+      totalQuestions,
+      currentStep: step,
+      placement,
+      isPreview: true,
+      primaryColor: primary,
+      isMobile,
+    };
+  }, [currentQuestionIndex, isMobile, previewFunnel, primary, sampleAnswers, sampleScore, sortedPreview, step, totalQuestions]);
+
   return (
     <>
       {step.type === "intro" && (() => {
@@ -323,6 +386,11 @@ function StepContent({
             renderBrandingFooterInside={false}
           >
             <>
+              {pluginRuntimeCtx ? (
+                <div className="px-1 pb-3">
+                  <PluginHost ctx={pluginRuntimeCtx} sortedStepIndex={sortedStepIndex >= 0 ? sortedStepIndex : 0} />
+                </div>
+              ) : null}
               <LandingIntroHeroColumn
                 ic={ic}
                 primary={primary}
@@ -398,6 +466,9 @@ function StepContent({
 
       {step.type === "question" && step.question && (
         <div className="animate-fade-in">
+          {pluginRuntimeCtx ? (
+            <PluginHost ctx={pluginRuntimeCtx} sortedStepIndex={sortedStepIndex >= 0 ? sortedStepIndex : 0} />
+          ) : null}
           {totalQuestions > 0 && currentQuestionIndex >= 0 ? (
             <div
               className={cn(
@@ -425,7 +496,7 @@ function StepContent({
           )}>
             {step.question.options.map((opt) => (
               <div key={opt.id} className={cn(
-                "flex items-center gap-3 border-2 border-gray-200 rounded-xl cursor-default hover:border-blue-200 transition-colors font-medium",
+                "flex cursor-default items-center gap-3 rounded-xl border-2 border-gray-200 font-medium transition-colors hover:border-primary/35",
                 isMobile ? "text-sm py-3 px-4" : "text-base py-4 px-5"
               )}>
                 <span className={cn(isMobile ? "text-lg" : "text-xl")}>{opt.emoji}</span>
@@ -437,7 +508,11 @@ function StepContent({
       )}
 
       {step.type === "contact" && (
-        <FunnelContactStepPanel
+        <>
+          {pluginRuntimeCtx ? (
+            <PluginHost ctx={pluginRuntimeCtx} sortedStepIndex={sortedStepIndex >= 0 ? sortedStepIndex : 0} />
+          ) : null}
+          <FunnelContactStepPanel
           copy={resolveContactStepCopy(step, panelLanguage)}
           isMobile={isMobile}
           fields={
@@ -485,6 +560,7 @@ function StepContent({
             </button>
           }
         />
+        </>
       )}
 
       {step.type === "results" && step.resultsConfig && (

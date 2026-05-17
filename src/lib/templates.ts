@@ -27,8 +27,7 @@ function makeContactStep(funnelId: string, order: number, cta: string): FunnelSt
   return {
     id: stepId, funnel_id: funnelId, order, type: "contact",
     contactFields: [
-      makeField(stepId, "text", "Nombre", "Tu nombre"),
-      makeField(stepId, "text", "Apellidos", "Tus apellidos"),
+      makeField(stepId, "text", "Nombre completo", "Ej.: María Pérez"),
       makeField(stepId, "email", "Email", "tu@email.com"),
       makeField(stepId, "tel", "Teléfono", "+34 600 000 000"),
     ],

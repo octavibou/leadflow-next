@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Trash, Plus, DotsSixVertical, Monitor, DeviceMobile } from "@phosphor-icons/react";
 import type { Funnel, FunnelStep, QuestionOption, ContactField, ThankYouNextStep } from "@/types/funnel";
+import { cn } from "@/lib/utils";
 import { ResultsPropertiesAdvanced } from "./ResultsPropertiesAdvanced";
 
 interface Props {
@@ -171,7 +172,7 @@ function QuestionProps({ step, update }: { step: FunnelStep; update: (u: Partial
         </label>
         {q.variableName && (
           <div className="mt-1.5 flex items-center gap-2">
-            <span className="text-[10px] text-primary font-semibold shrink-0">Variable:</span>
+            <span className="text-[10px] font-semibold text-foreground shrink-0">Variable:</span>
             <Input
               className="h-6 text-xs font-mono flex-1"
               value={q.variableName}
@@ -202,11 +203,16 @@ function QuestionProps({ step, update }: { step: FunnelStep; update: (u: Partial
             </div>
             <div className="flex items-center gap-2 pl-5">
               <Badge
-                variant={opt.qualifies ? "default" : "destructive"}
-                className="cursor-pointer text-xs"
+                variant="outline"
+                className={cn(
+                  "h-auto cursor-pointer rounded-full border-0 px-3 py-1 text-xs font-medium shadow-none transition-colors",
+                  opt.qualifies
+                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100/80 dark:bg-emerald-950/35 dark:text-emerald-200"
+                    : "bg-rose-100 text-rose-800 hover:bg-rose-100/80 dark:bg-rose-950/40 dark:text-rose-200",
+                )}
                 onClick={() => setOpt(opt.id, { qualifies: !opt.qualifies })}
               >
-                {opt.qualifies ? "Califica ✓" : "Descalifica ✗"}
+                {opt.qualifies ? "Cualificado" : "Descualificado"}
               </Badge>
               <span className="text-xs text-muted-foreground">Puntos:</span>
               <select
@@ -220,7 +226,7 @@ function QuestionProps({ step, update }: { step: FunnelStep; update: (u: Partial
             {/* Numeric value — only shown when question has a variable */}
             {q.variableName && (
               <div className="flex items-center gap-2 pl-5">
-                <span className="text-[10px] text-primary font-semibold shrink-0">Valor:</span>
+                <span className="text-[10px] font-semibold text-foreground shrink-0">Valor:</span>
                 <Input
                   type="number"
                   className="h-6 text-xs w-20 text-center"
@@ -249,30 +255,101 @@ function ContactProps({ step, funnel, update }: { step: FunnelStep; funnel: Funn
     return `${s.order + 1}. ${labels[s.type] || s.type}`;
   };
 
-  const contactToggles = [
-    { key: "nombre", label: "Nombre", fieldType: "text" as const, placeholder: "Nombre" },
-    { key: "apellidos", label: "Apellidos", fieldType: "text" as const, placeholder: "Apellidos" },
-    { key: "email", label: "Email", fieldType: "email" as const, placeholder: "Email" },
-    { key: "tel", label: "Teléfono", fieldType: "tel" as const, placeholder: "Teléfono" },
+  const isApellidosLabel = (label: string) => label.toLowerCase().includes("apellido");
+  const nombreLikeField = fields.find((f) => f.fieldType === "text" && !isApellidosLabel(f.label));
+  const hasLegacyApellidosField = fields.some((f) => isApellidosLabel(f.label));
+
+  const NOMBRE_TOGGLE = {
+    key: "nombre" as const,
+    label: "Nombre completo",
+    fieldType: "text" as const,
+    placeholder: "Ej.: María Pérez",
+  };
+  const emailTelToggles = [
+    { key: "email" as const, label: "Email", fieldType: "email" as const, placeholder: "Email" },
+    { key: "tel" as const, label: "Teléfono", fieldType: "tel" as const, placeholder: "Teléfono" },
   ];
 
-  const fieldOrder = contactToggles.map((t) => t.label);
+  const fieldOrder = ["Nombre completo", "Nombre", "Apellidos", "Email", "Teléfono"];
   const sortFields = (list: typeof fields) =>
     [...list].sort((a, b) => fieldOrder.indexOf(a.label) - fieldOrder.indexOf(b.label));
 
-  const toggleField = (toggle: typeof contactToggles[0]) => {
+  type ContactFieldToggle = typeof NOMBRE_TOGGLE | (typeof emailTelToggles)[number];
+
+  const toggleField = (toggle: ContactFieldToggle) => {
+    if (toggle.key === "nombre") {
+      const exists = nombreLikeField;
+      if (exists) {
+        update({ contactFields: fields.filter((f) => f.id !== exists.id) });
+      } else {
+        const newFields = [
+          ...fields,
+          {
+            id: crypto.randomUUID(),
+            step_id: step.id,
+            fieldType: "text" as const,
+            label: "Nombre completo",
+            placeholder: toggle.placeholder,
+            required: true,
+          },
+        ];
+        update({ contactFields: sortFields(newFields) });
+      }
+      return;
+    }
     const exists = fields.find((f) => f.label === toggle.label);
     if (exists) {
       update({ contactFields: fields.filter((f) => f.id !== exists.id) });
     } else {
-      const newFields = [...fields, { id: crypto.randomUUID(), step_id: step.id, fieldType: toggle.fieldType, label: toggle.label, placeholder: toggle.placeholder, required: true }];
+      const newFields = [
+        ...fields,
+        {
+          id: crypto.randomUUID(),
+          step_id: step.id,
+          fieldType: toggle.fieldType,
+          label: toggle.label,
+          placeholder: toggle.placeholder,
+          required: true,
+        },
+      ];
       update({ contactFields: sortFields(newFields) });
     }
   };
 
   return (
     <>
-      {contactToggles.map((toggle) => (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs shrink-0">{NOMBRE_TOGGLE.label}</Label>
+          <Switch checked={Boolean(nombreLikeField)} onCheckedChange={() => toggleField(NOMBRE_TOGGLE)} />
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          Un solo campo en el funnel. Si escriben «María Pérez», tomamos la última palabra como apellido y el resto como
+          nombre; en el webhook van separados como{" "}
+          <span className="font-mono text-[9px] text-foreground/80">firstName</span> /{" "}
+          <span className="font-mono text-[9px] text-foreground/80">lastName</span> (y lo mismo en{" "}
+          <span className="font-mono text-[9px] text-foreground/80">first_name</span> /{" "}
+          <span className="font-mono text-[9px] text-foreground/80">last_name</span>) para automatizaciones.
+        </p>
+      </div>
+      {hasLegacyApellidosField ? (
+        <div className="flex flex-col gap-2 rounded-md border border-amber-200/80 bg-amber-50/80 px-2.5 py-2">
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Este paso aún tiene un campo «Apellidos» antiguo guardado. Ya no se usa el doble campo; puedes quitarlo para
+            alinearlo con el nombre completo único.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 self-start text-xs"
+            onClick={() => update({ contactFields: fields.filter((f) => !isApellidosLabel(f.label)) })}
+          >
+            Quitar campo Apellidos
+          </Button>
+        </div>
+      ) : null}
+      {emailTelToggles.map((toggle) => (
         <div key={toggle.key} className="flex items-center justify-between">
           <Label className="text-xs">{toggle.label}</Label>
           <Switch checked={fields.some((f) => f.label === toggle.label)} onCheckedChange={() => toggleField(toggle)} />

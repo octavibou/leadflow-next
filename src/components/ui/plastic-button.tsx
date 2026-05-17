@@ -1,8 +1,10 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type PlasticButtonVariant = 
-  | "primary" 
+type PlasticButtonVariant =
+  | "primary"
+  /** Lima fija: pestañas activas sobre `bg-chrome` (no usar `--primary` en claro). */
+  | "brand-lime"
   | "blue" | "blue-muted"
   | "green" | "green-muted"
   | "purple" | "purple-muted"
@@ -25,21 +27,30 @@ const variantStyles: Record<PlasticButtonVariant, {
   primary: {
     gradient: "linear-gradient(to bottom, color-mix(in oklab, var(--primary), white 22%) 0%, var(--primary) 55%, color-mix(in oklab, var(--primary), white 30%) 100%)",
     boxShadow: "0 2px 8px 0 color-mix(in oklab, var(--primary), transparent 65%), 0 1.5px 0 0 rgba(255,255,255,0.25) inset, 0 -2px 8px 0 color-mix(in oklab, var(--primary), transparent 55%) inset",
-    textColor: "text-white",
-    hoverTextColor: "group-hover:text-white",
+    textColor: "text-primary-foreground",
+    hoverTextColor: "group-hover:text-primary-foreground",
+  },
+  "brand-lime": {
+    gradient:
+      "linear-gradient(to bottom, color-mix(in oklab, var(--brand-lime), white 22%) 0%, var(--brand-lime) 55%, color-mix(in oklab, var(--brand-lime), white 30%) 100%)",
+    boxShadow:
+      "0 2px 8px 0 color-mix(in oklab, var(--brand-lime), transparent 65%), 0 1.5px 0 0 rgba(255,255,255,0.25) inset, 0 -2px 8px 0 color-mix(in oklab, var(--brand-lime), transparent 55%) inset",
+    textColor: "text-brand-dark",
+    hoverTextColor: "group-hover:text-brand-dark",
   },
   blue: {
     gradient: "linear-gradient(to bottom, color-mix(in oklab, var(--primary), white 22%) 0%, var(--primary) 55%, color-mix(in oklab, var(--primary), white 30%) 100%)",
     boxShadow: "0 2px 8px 0 color-mix(in oklab, var(--primary), transparent 65%), 0 1.5px 0 0 rgba(255,255,255,0.25) inset, 0 -2px 8px 0 color-mix(in oklab, var(--primary), transparent 55%) inset",
-    textColor: "text-white",
-    hoverTextColor: "group-hover:text-white",
+    textColor: "text-primary-foreground",
+    hoverTextColor: "group-hover:text-primary-foreground",
   },
-  // Blue - Muted (inactive)
+  // Muted pill sobre cromado (marca oscura + toque de acento)
   "blue-muted": {
-    gradient: "linear-gradient(to bottom, rgb(30, 58, 95) 0%, rgb(23, 47, 77) 50%, rgb(37, 99, 235) 100%)",
-    boxShadow: "0 1px 4px 0 rgba(0, 0, 0, 0.3), 0 1px 0 0 rgba(255,255,255,0.08) inset",
-    textColor: "text-blue-300/70",
-    hoverTextColor: "group-hover:text-white",
+    gradient:
+      "linear-gradient(to bottom, color-mix(in oklab, var(--brand-dark), white 8%) 0%, var(--brand-dark) 50%, color-mix(in oklab, var(--brand-dark), var(--brand-lime) 18%) 100%)",
+    boxShadow: "0 1px 4px 0 color-mix(in oklab, var(--brand-dark), transparent 40%), 0 1px 0 0 color-mix(in oklab, white, transparent 92%) inset",
+    textColor: "text-brand-lime/90",
+    hoverTextColor: "group-hover:text-brand-lime",
   },
   // Green - Active (green-400 style)
   green: {
@@ -83,18 +94,19 @@ const variantStyles: Record<PlasticButtonVariant, {
     textColor: "text-amber-400/70",
     hoverTextColor: "group-hover:text-amber-900",
   },
-  // Dark variants (for generic dark buttons)
+  // Dark variants (cromado marca)
   dark: {
-    gradient: "linear-gradient(to bottom, rgb(63, 63, 70) 0%, rgb(39, 39, 42) 50%, rgb(82, 82, 91) 100%)",
-    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 0 0 rgba(255,255,255,0.08) inset",
-    textColor: "text-zinc-300",
-    hoverTextColor: "group-hover:text-white",
+    gradient:
+      "linear-gradient(to bottom, color-mix(in oklab, var(--chrome-hover), white 6%) 0%, var(--chrome) 50%, color-mix(in oklab, var(--chrome-muted), black 5%) 100%)",
+    boxShadow: "0 1px 3px 0 color-mix(in oklab, var(--brand-dark), transparent 50%), 0 1px 0 0 color-mix(in oklab, white, transparent 90%) inset",
+    textColor: "text-chrome-fg-muted",
+    hoverTextColor: "group-hover:text-chrome-fg",
   },
   "dark-active": {
-    gradient: "linear-gradient(to bottom, rgb(250, 250, 250) 0%, rgb(229, 229, 229) 50%, rgb(255, 255, 255) 100%)",
-    boxShadow: "0 2px 8px 0 rgba(0, 0, 0, 0.15), 0 1px 0 0 rgba(255,255,255,0.9) inset",
-    textColor: "text-zinc-900",
-    hoverTextColor: "group-hover:text-zinc-900",
+    gradient: "linear-gradient(to bottom, color-mix(in oklab, var(--background), white 4%) 0%, var(--muted) 50%, var(--background) 100%)",
+    boxShadow: "0 2px 8px 0 color-mix(in oklab, var(--foreground), transparent 88%), 0 1px 0 0 color-mix(in oklab, white, transparent 85%) inset",
+    textColor: "text-foreground",
+    hoverTextColor: "group-hover:text-foreground",
   },
 };
 

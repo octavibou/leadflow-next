@@ -77,6 +77,12 @@ export type SessionDetail = {
   hasLead: boolean;
   leadResult: string | null;
   leadAt: string | null;
+  /** Primer `deployment_id` de la visita (columna o metadata); null si campaña `?c=` o sin Publish v1. */
+  visitDeploymentId: string | null;
+  /** Etiqueta legible: `main · v3` o `Campaña (?c=)`. */
+  visitDeploymentLabel: string | null;
+  /** `landing` | `quiz_only` desde metadata de la primera vista. */
+  visitEntrySurface: string | null;
   utm: SessionUtm;
   attribution: SessionAttribution | null;
   timeline: Array<{
@@ -417,6 +423,49 @@ export function buildSessionDetails(
       timeline.sort((a, b) => a.created_at.localeCompare(b.created_at));
     }
 
+    let visitDeploymentId: string | null = null;
+    let visitDeploymentLabel: string | null = null;
+    let visitEntrySurface: string | null = null;
+    for (const e of evs) {
+      const t = e.event_type as string;
+      if (t !== "session_started" && t !== "page_view") continue;
+      const meta = (e.metadata || {}) as Record<string, unknown>;
+      const depFromRow = typeof e.deployment_id === "string" && e.deployment_id ? e.deployment_id : null;
+      const depFromMeta = typeof meta.deployment_id === "string" ? meta.deployment_id : null;
+      const did = depFromRow || depFromMeta;
+      if (did) {
+        visitDeploymentId = did;
+        const slug = typeof meta.branch_slug === "string" ? meta.branch_slug : "?";
+        const ver = meta.deployment_version != null ? String(meta.deployment_version) : "?";
+        visitDeploymentLabel = `${slug} · v${ver}`;
+        const es = meta.entry_surface;
+        visitEntrySurface = es === "quiz_only" || es === "landing" ? es : null;
+        break;
+      }
+      if (e.campaign_id) {
+        visitDeploymentLabel = "Campaña (?c=)";
+        visitDeploymentId = null;
+        visitEntrySurface = null;
+        break;
+      }
+    }
+    if (!visitDeploymentLabel && lead) {
+      const lm = (lead.metadata || {}) as Record<string, unknown>;
+      const depLead = typeof lead.deployment_id === "string" && lead.deployment_id ? lead.deployment_id : null;
+      const depLm = typeof lm.deployment_id === "string" ? lm.deployment_id : null;
+      const did = depLead || depLm;
+      if (did) {
+        visitDeploymentId = did;
+        const slug = typeof lm.branch_slug === "string" ? lm.branch_slug : "?";
+        const ver = lm.deployment_version != null ? String(lm.deployment_version) : "?";
+        visitDeploymentLabel = `${slug} · v${ver}`;
+        const es = lm.entry_surface;
+        visitEntrySurface = es === "quiz_only" || es === "landing" ? es : null;
+      } else if (lead.campaign_id) {
+        visitDeploymentLabel = "Campaña (?c=)";
+      }
+    }
+
     rows.push({
       sessionId,
       funnelId,
@@ -450,6 +499,9 @@ export function buildSessionDetails(
       hasLead: !!lead,
       leadResult: lead ? (lead.result as string | null) : null,
       leadAt: lead ? String(lead.created_at) : null,
+      visitDeploymentId,
+      visitDeploymentLabel,
+      visitEntrySurface,
       utm,
       attribution,
       timeline,
@@ -458,4 +510,609 @@ export function buildSessionDetails(
 
   rows.sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
   return rows;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Agregadores para el dashboard de Analytics                                */
+/* -------------------------------------------------------------------------- */
+
+export type DailySessionBucket = {
+  date: string;
+  sessions: number;
+  leads: number;
+  qualified: number;
+  /** Sesiones que han empezado el quiz (primera pregunta). */
+  startedQuiz: number;
+  /** Sesiones con quiz terminado (todas las preguntas). */
+  completedQuiz: number;
+};
+
+/**
+ * Agrupa por día (UTC) tomando `firstSeen` (fallback a `lastSeen`).
+ * Rellena los días vacíos del rango `[fromIso, toIso]` para que el line chart sea continuo.
+ */
+export function groupSessionsByDay(
+  sessions: SessionDetail[],
+  fromIso?: string | null,
+  toIso?: string | null,
+): DailySessionBucket[] {
+  const map = new Map<string, DailySessionBucket>();
+  for (const s of sessions) {
+    const ts = s.firstSeen || s.lastSeen;
+    if (!ts) continue;
+    const t = new Date(ts).getTime();
+    if (!Number.isFinite(t)) continue;
+    const date = new Date(ts).toISOString().slice(0, 10);
+    let b = map.get(date);
+    if (!b) {
+      b = { date, sessions: 0, leads: 0, qualified: 0, startedQuiz: 0, completedQuiz: 0 };
+      map.set(date, b);
+    }
+    b.sessions += 1;
+    if (s.hasLead) b.leads += 1;
+    if (s.qualified === true) b.qualified += 1;
+    if (s.startedQuiz) b.startedQuiz += 1;
+    if (s.completedQuiz) b.completedQuiz += 1;
+  }
+
+  if (fromIso && toIso) {
+    const from = new Date(fromIso);
+    const to = new Date(toIso);
+    if (Number.isFinite(from.getTime()) && Number.isFinite(to.getTime()) && to.getTime() >= from.getTime()) {
+      const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+      const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+      while (cursor.getTime() <= end.getTime()) {
+        const k = cursor.toISOString().slice(0, 10);
+        if (!map.has(k)) map.set(k, { date: k, sessions: 0, leads: 0, qualified: 0, startedQuiz: 0, completedQuiz: 0 });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export type CountryBucket = {
+  countryCode: string;
+  sessions: number;
+  leads: number;
+  share: number;
+};
+
+export function groupSessionsByCountry(sessions: SessionDetail[], topN = 10): CountryBucket[] {
+  const map = new Map<string, { sessions: number; leads: number }>();
+  for (const s of sessions) {
+    const code = (s.geo?.country || "").trim() || "—";
+    let b = map.get(code);
+    if (!b) {
+      b = { sessions: 0, leads: 0 };
+      map.set(code, b);
+    }
+    b.sessions += 1;
+    if (s.hasLead) b.leads += 1;
+  }
+  const total = sessions.length || 1;
+  const out: CountryBucket[] = Array.from(map.entries()).map(([countryCode, v]) => ({
+    countryCode,
+    sessions: v.sessions,
+    leads: v.leads,
+    share: v.sessions / total,
+  }));
+  out.sort((a, b) => b.sessions - a.sessions);
+  return out.slice(0, topN);
+}
+
+export type SourceKey = "facebook" | "google" | "direct" | "other";
+
+export type SourceBucket = {
+  source: SourceKey;
+  label: string;
+  sessions: number;
+  leads: number;
+  share: number;
+};
+
+const SOURCE_LABELS: Record<SourceKey, string> = {
+  facebook: "Meta",
+  google: "Google",
+  direct: "Directo",
+  other: "Otro",
+};
+
+export function groupSessionsBySource(sessions: SessionDetail[]): SourceBucket[] {
+  const keys: SourceKey[] = ["facebook", "google", "direct", "other"];
+  const counts: Record<SourceKey, { sessions: number; leads: number }> = {
+    facebook: { sessions: 0, leads: 0 },
+    google: { sessions: 0, leads: 0 },
+    direct: { sessions: 0, leads: 0 },
+    other: { sessions: 0, leads: 0 },
+  };
+  for (const s of sessions) {
+    const k = classifySessionSource(s);
+    counts[k].sessions += 1;
+    if (s.hasLead) counts[k].leads += 1;
+  }
+  const total = sessions.length || 1;
+  return keys.map((k) => ({
+    source: k,
+    label: SOURCE_LABELS[k],
+    sessions: counts[k].sessions,
+    leads: counts[k].leads,
+    share: counts[k].sessions / total,
+  }));
+}
+
+export type FunnelBucket = {
+  funnelId: string;
+  funnelName: string;
+  sessions: number;
+  startedQuiz: number;
+  completedQuiz: number;
+  leads: number;
+  qualified: number;
+  /** Cualificados / sesiones evaluadas (con `qualification_evaluated`). */
+  qualificationRate: number;
+};
+
+export function groupSessionsByFunnel(
+  sessions: SessionDetail[],
+  funnelNameById: Map<string, string>,
+): FunnelBucket[] {
+  const map = new Map<string, FunnelBucket & { evaluated: number }>();
+  for (const s of sessions) {
+    const funnelId = s.funnelId || "—";
+    let b = map.get(funnelId);
+    if (!b) {
+      b = {
+        funnelId,
+        funnelName: funnelNameById.get(funnelId) || funnelId.slice(0, 8) || "—",
+        sessions: 0,
+        startedQuiz: 0,
+        completedQuiz: 0,
+        leads: 0,
+        qualified: 0,
+        qualificationRate: 0,
+        evaluated: 0,
+      };
+      map.set(funnelId, b);
+    }
+    b.sessions += 1;
+    if (s.startedQuiz) b.startedQuiz += 1;
+    if (s.completedQuiz) b.completedQuiz += 1;
+    if (s.hasLead) b.leads += 1;
+    if (s.qualified !== null) b.evaluated += 1;
+    if (s.qualified === true) b.qualified += 1;
+  }
+  return Array.from(map.values())
+    .map(({ evaluated, ...b }) => ({
+      ...b,
+      qualificationRate: evaluated > 0 ? b.qualified / evaluated : 0,
+    }))
+    .sort((a, b) => b.sessions - a.sessions);
+}
+
+export type UtmBucket = {
+  source: string;
+  medium: string;
+  campaign: string;
+  sessions: number;
+  leads: number;
+  qualified: number;
+  qualificationRate: number;
+};
+
+function utmKeyForSession(s: SessionDetail): { source: string; medium: string; campaign: string } {
+  const source = (s.attribution?.resolvedSource || s.utm.source || "").toLowerCase() || sessionSourceShortLabel(s).toLowerCase() || "—";
+  const medium = (s.attribution?.resolvedMedium || s.utm.medium || "").toLowerCase() || "—";
+  const campaign = (s.utm.campaign || s.campaignName || "").toLowerCase() || "—";
+  return { source, medium, campaign };
+}
+
+export function groupSessionsByUtm(sessions: SessionDetail[]): UtmBucket[] {
+  const map = new Map<string, UtmBucket & { evaluated: number }>();
+  for (const s of sessions) {
+    const { source, medium, campaign } = utmKeyForSession(s);
+    const key = `${source}||${medium}||${campaign}`;
+    let b = map.get(key);
+    if (!b) {
+      b = { source, medium, campaign, sessions: 0, leads: 0, qualified: 0, qualificationRate: 0, evaluated: 0 };
+      map.set(key, b);
+    }
+    b.sessions += 1;
+    if (s.hasLead) b.leads += 1;
+    if (s.qualified !== null) b.evaluated += 1;
+    if (s.qualified === true) b.qualified += 1;
+  }
+  return Array.from(map.values())
+    .map(({ evaluated, ...b }) => ({
+      ...b,
+      qualificationRate: evaluated > 0 ? b.qualified / evaluated : 0,
+    }))
+    .sort((a, b) => b.sessions - a.sessions);
+}
+
+export type DeploymentVersionBucket = {
+  deploymentLabel: string;
+  deploymentId: string | null;
+  sessions: number;
+  startedQuiz: number;
+  completedQuiz: number;
+  qualified: number;
+  formSubmitted: number;
+  /** startedQuiz / sessions */
+  landingConversionRate: number;
+  /** formSubmitted / qualified (solo cualificados ven form) */
+  formConversionRate: number;
+  /** qualified / (qualified + disqualified) */
+  qualificationRate: number;
+};
+
+/**
+ * Agrupa sesiones por versión de deployment (visitDeploymentLabel).
+ * Útil para comparar rendimiento de diferentes versiones de landing publicadas.
+ */
+export function groupSessionsByDeploymentVersion(sessions: SessionDetail[]): DeploymentVersionBucket[] {
+  const map = new Map<string, DeploymentVersionBucket & { disqualified: number }>();
+
+  for (const s of sessions) {
+    const label = s.visitDeploymentLabel || "(sin versión)";
+    let b = map.get(label);
+    if (!b) {
+      b = {
+        deploymentLabel: label,
+        deploymentId: s.visitDeploymentId,
+        sessions: 0,
+        startedQuiz: 0,
+        completedQuiz: 0,
+        qualified: 0,
+        formSubmitted: 0,
+        landingConversionRate: 0,
+        formConversionRate: 0,
+        qualificationRate: 0,
+        disqualified: 0,
+      };
+      map.set(label, b);
+    }
+    b.sessions += 1;
+    if (s.startedQuiz) b.startedQuiz += 1;
+    if (s.completedQuiz) b.completedQuiz += 1;
+    if (s.qualified === true) {
+      b.qualified += 1;
+      if (s.hasLead) b.formSubmitted += 1;
+    }
+    if (s.qualified === false) b.disqualified += 1;
+  }
+
+  return Array.from(map.values())
+    .map(({ disqualified, ...b }) => {
+      const evaluated = b.qualified + disqualified;
+      return {
+        ...b,
+        landingConversionRate: b.sessions > 0 ? b.startedQuiz / b.sessions : 0,
+        formConversionRate: b.qualified > 0 ? b.formSubmitted / b.qualified : 0,
+        qualificationRate: evaluated > 0 ? b.qualified / evaluated : 0,
+      };
+    })
+    .sort((a, b) => b.sessions - a.sessions);
+}
+
+export type FunnelStageKey =
+  | "sessions"
+  | "startedQuiz"
+  | "completedQuiz"
+  | "qualified"
+  | "disqualified"
+  | "formSubmitted";
+
+export type FunnelStage = {
+  key: FunnelStageKey;
+  label: string;
+  count: number;
+  /** Proporción sobre la primera etapa (sessions). */
+  shareOfTop: number;
+  /** Proporción sobre la etapa anterior (continuación). */
+  shareOfPrev: number;
+  /** Métrica de conversión destacada (p. ej. "% Conv. Landing"). */
+  conversionLabel?: string;
+  conversionRate?: number;
+};
+
+/**
+ * Embudo de conversión según el flujo:
+ * 1. Sesiones (landing views)
+ * 2. Quiz Empezado → % Conversión Landing
+ * 3. Quiz Terminado (evaluados) → se divide en:
+ *    - Cualificados
+ *    - Descualificados
+ * 4. Form enviado (solo cualificados ven el form) → % Conversión Form
+ */
+export function computeFunnelStages(sessions: SessionDetail[]): FunnelStage[] {
+  const totalSessions = sessions.length;
+  const startedQuiz = sessions.filter((s) => s.startedQuiz).length;
+  const completedQuiz = sessions.filter((s) => s.completedQuiz).length;
+  const qualified = sessions.filter((s) => s.qualified === true).length;
+  const disqualified = sessions.filter((s) => s.qualified === false).length;
+  const formSubmittedByQualified = sessions.filter((s) => s.qualified === true && s.hasLead).length;
+
+  const landingConversion = totalSessions > 0 ? startedQuiz / totalSessions : 0;
+  const formConversion = qualified > 0 ? formSubmittedByQualified / qualified : 0;
+
+  const raw: Array<{
+    key: FunnelStageKey;
+    label: string;
+    count: number;
+    conversionLabel?: string;
+    conversionRate?: number;
+  }> = [
+    { key: "sessions", label: "Sesiones (Landing)", count: totalSessions },
+    {
+      key: "startedQuiz",
+      label: "Quiz Empezado",
+      count: startedQuiz,
+      conversionLabel: "Conv. Landing",
+      conversionRate: landingConversion,
+    },
+    { key: "completedQuiz", label: "Quiz Terminado", count: completedQuiz },
+    { key: "qualified", label: "Cualificados", count: qualified },
+    { key: "disqualified", label: "Descualificados", count: disqualified },
+    {
+      key: "formSubmitted",
+      label: "Form Enviado",
+      count: formSubmittedByQualified,
+      conversionLabel: "Conv. Form",
+      conversionRate: formConversion,
+    },
+  ];
+
+  const top = totalSessions || 1;
+  return raw.map((s, idx) => {
+    const prev = idx === 0 ? top : raw[idx - 1].count;
+    return {
+      ...s,
+      shareOfTop: totalSessions > 0 ? s.count / top : 0,
+      shareOfPrev: idx === 0 ? 1 : prev > 0 ? s.count / prev : 0,
+    };
+  });
+}
+
+export type AnalyticsSummary = {
+  sessions: number;
+  startedQuiz: number;
+  completedQuiz: number;
+  qualified: number;
+  disqualified: number;
+  /** Leads de cualificados (solo ellos ven el form). */
+  formSubmittedByQualified: number;
+  /** Total de leads (incluyendo descualificados si los hubiera). */
+  totalLeads: number;
+  /** startedQuiz / sessions — % conversión de la landing. */
+  landingConversionRate: number;
+  /** formSubmittedByQualified / qualified — % conversión del form. */
+  formConversionRate: number;
+  /** qualified / (qualified + disqualified) — % cualificación. */
+  qualificationRate: number;
+  /** completedQuiz / startedQuiz — % que terminan el quiz. */
+  quizCompletionRate: number;
+  /** Leads (form cualificado) / sesiones — conversión global del embudo. */
+  overallFunnelConversionRate: number;
+  countries: number;
+};
+
+export function computeAnalyticsSummary(sessions: SessionDetail[]): AnalyticsSummary {
+  let startedQuiz = 0;
+  let completedQuiz = 0;
+  let qualified = 0;
+  let disqualified = 0;
+  let formSubmittedByQualified = 0;
+  let totalLeads = 0;
+  const countrySet = new Set<string>();
+
+  for (const s of sessions) {
+    if (s.startedQuiz) startedQuiz += 1;
+    if (s.completedQuiz) completedQuiz += 1;
+    if (s.qualified === true) qualified += 1;
+    if (s.qualified === false) disqualified += 1;
+    if (s.hasLead) {
+      totalLeads += 1;
+      if (s.qualified === true) formSubmittedByQualified += 1;
+    }
+    const c = (s.geo?.country || "").trim();
+    if (c) countrySet.add(c);
+  }
+
+  const totalSessions = sessions.length;
+  const evaluated = qualified + disqualified;
+
+  return {
+    sessions: totalSessions,
+    startedQuiz,
+    completedQuiz,
+    qualified,
+    disqualified,
+    formSubmittedByQualified,
+    totalLeads,
+    landingConversionRate: totalSessions > 0 ? startedQuiz / totalSessions : 0,
+    formConversionRate: qualified > 0 ? formSubmittedByQualified / qualified : 0,
+    qualificationRate: evaluated > 0 ? qualified / evaluated : 0,
+    quizCompletionRate: startedQuiz > 0 ? completedQuiz / startedQuiz : 0,
+    overallFunnelConversionRate:
+      totalSessions > 0 ? formSubmittedByQualified / totalSessions : 0,
+    countries: countrySet.size,
+  };
+}
+
+// ---- Revenue Analytics ----
+
+export type LeadDealRow = {
+  id: string;
+  lead_id: string | null;
+  funnel_id: string;
+  workspace_id: string;
+  campaign_id: string | null;
+  branch_id: string | null;
+  deployment_id: string | null;
+  external_provider: string;
+  external_deal_id: string;
+  external_stage_name: string | null;
+  status: string;
+  amount: number | null;
+  currency: string | null;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevenueSummary = {
+  totalRevenue: number;
+  revenueCurrency: string;
+  wonDeals: number;
+  lostDeals: number;
+  openDeals: number;
+  bookedAppointments: number;
+  showAppointments: number;
+  noShowAppointments: number;
+  /** booked → show conversion */
+  showRate: number;
+  /** leads → won conversion */
+  leadToWonRate: number;
+  /** booked → won conversion */
+  bookedToWonRate: number;
+  /** Revenue per lead (totalRevenue / totalLeads) */
+  revenuePerLead: number;
+  /** Revenue per session */
+  revenuePerSession: number;
+  /** Average deal size for won deals */
+  averageDealSize: number;
+};
+
+export function computeRevenueSummary(
+  deals: LeadDealRow[],
+  totalLeads: number,
+  totalSessions: number
+): RevenueSummary {
+  let totalRevenue = 0;
+  let wonDeals = 0;
+  let lostDeals = 0;
+  let openDeals = 0;
+  let bookedAppointments = 0;
+  let showAppointments = 0;
+  let noShowAppointments = 0;
+  let revenueCurrency = "EUR";
+
+  for (const deal of deals) {
+    switch (deal.status) {
+      case "won":
+        wonDeals += 1;
+        if (deal.amount && deal.amount > 0) {
+          totalRevenue += deal.amount;
+          if (deal.currency) revenueCurrency = deal.currency;
+        }
+        break;
+      case "lost":
+        lostDeals += 1;
+        break;
+      case "open":
+        openDeals += 1;
+        break;
+      case "booked":
+        bookedAppointments += 1;
+        break;
+      case "show":
+        showAppointments += 1;
+        break;
+      case "no_show":
+        noShowAppointments += 1;
+        break;
+    }
+  }
+
+  const totalBooked = bookedAppointments + showAppointments + noShowAppointments;
+
+  return {
+    totalRevenue,
+    revenueCurrency,
+    wonDeals,
+    lostDeals,
+    openDeals,
+    bookedAppointments,
+    showAppointments,
+    noShowAppointments,
+    showRate: totalBooked > 0 ? showAppointments / totalBooked : 0,
+    leadToWonRate: totalLeads > 0 ? wonDeals / totalLeads : 0,
+    bookedToWonRate: totalBooked > 0 ? wonDeals / totalBooked : 0,
+    revenuePerLead: totalLeads > 0 ? totalRevenue / totalLeads : 0,
+    revenuePerSession: totalSessions > 0 ? totalRevenue / totalSessions : 0,
+    averageDealSize: wonDeals > 0 ? totalRevenue / wonDeals : 0,
+  };
+}
+
+export type RevenueByAttribution = {
+  key: string;
+  label: string;
+  revenue: number;
+  deals: number;
+  leads: number;
+  conversionRate: number;
+};
+
+export function computeRevenueByBranch(
+  deals: LeadDealRow[],
+  branches: { id: string; name: string; slug: string }[]
+): RevenueByAttribution[] {
+  const byBranch = new Map<string, { revenue: number; deals: number; leadIds: Set<string> }>();
+
+  for (const deal of deals) {
+    const branchId = deal.branch_id || "unknown";
+    if (!byBranch.has(branchId)) {
+      byBranch.set(branchId, { revenue: 0, deals: 0, leadIds: new Set() });
+    }
+    const entry = byBranch.get(branchId)!;
+    if (deal.status === "won") {
+      entry.deals += 1;
+      entry.revenue += deal.amount || 0;
+    }
+    if (deal.lead_id) {
+      entry.leadIds.add(deal.lead_id);
+    }
+  }
+
+  return Array.from(byBranch.entries()).map(([branchId, data]) => {
+    const branch = branches.find((b) => b.id === branchId);
+    return {
+      key: branchId,
+      label: branch?.name || branch?.slug || "Desconocido",
+      revenue: data.revenue,
+      deals: data.deals,
+      leads: data.leadIds.size,
+      conversionRate: data.leadIds.size > 0 ? data.deals / data.leadIds.size : 0,
+    };
+  }).sort((a, b) => b.revenue - a.revenue);
+}
+
+export function computeRevenueBySource(deals: LeadDealRow[]): RevenueByAttribution[] {
+  const bySource = new Map<string, { revenue: number; deals: number; leadIds: Set<string> }>();
+
+  for (const deal of deals) {
+    const source = "direct";
+    if (!bySource.has(source)) {
+      bySource.set(source, { revenue: 0, deals: 0, leadIds: new Set() });
+    }
+    const entry = bySource.get(source)!;
+    if (deal.status === "won") {
+      entry.deals += 1;
+      entry.revenue += deal.amount || 0;
+    }
+    if (deal.lead_id) {
+      entry.leadIds.add(deal.lead_id);
+    }
+  }
+
+  return Array.from(bySource.entries()).map(([source, data]) => ({
+    key: source,
+    label: source,
+    revenue: data.revenue,
+    deals: data.deals,
+    leads: data.leadIds.size,
+    conversionRate: data.leadIds.size > 0 ? data.deals / data.leadIds.size : 0,
+  })).sort((a, b) => b.revenue - a.revenue);
 }

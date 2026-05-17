@@ -7,7 +7,7 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
-/** Área bajo el TopNav: con asistente abierto, separador visible al color del menú (zinc-900). */
+/** Área bajo el TopNav: con asistente abierto, separador visible al color del cromado (chrome). */
 function AppWorkspace({ children }: { children: React.ReactNode }) {
   const { open: assistantOpen } = useAppAssistant();
 
@@ -15,7 +15,7 @@ function AppWorkspace({ children }: { children: React.ReactNode }) {
     <div
       className={cn(
         // Mismo tono que el TopNav: así el rounded-t del main se ve en las dos esquinas (abierto o cerrado).
-        "flex min-h-0 flex-1 overflow-hidden bg-zinc-900",
+        "flex min-h-0 flex-1 overflow-hidden bg-chrome",
         assistantOpen && "gap-2"
       )}
     >
@@ -36,7 +36,7 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
 
   return (
     <AppAssistantProvider>
-      <div className="flex min-h-screen min-h-0 h-dvh flex-col bg-zinc-900">
+      <div className="flex min-h-screen min-h-0 h-dvh flex-col bg-chrome">
         <TopNav />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AppWorkspace>{children}</AppWorkspace>

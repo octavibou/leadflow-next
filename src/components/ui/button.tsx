@@ -60,8 +60,8 @@ function getPlasticStyle(variant: NonNullable<ButtonProps["variant"]>): PlasticS
         "linear-gradient(to bottom, color-mix(in oklab, var(--primary), white 22%) 0%, var(--primary) 55%, color-mix(in oklab, var(--primary), white 30%) 100%)",
       boxShadow:
         "0 2px 8px 0 color-mix(in oklab, var(--primary), transparent 65%), 0 1.5px 0 0 rgba(255,255,255,0.25) inset, 0 -2px 8px 0 color-mix(in oklab, var(--primary), transparent 55%) inset",
-      textClass: "text-white",
-      hoverTextClass: "group-hover:text-white",
+      textClass: "text-primary-foreground",
+      hoverTextClass: "group-hover:text-primary-foreground",
       shine: "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%, transparent 100%)",
     }
   }

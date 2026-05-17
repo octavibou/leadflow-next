@@ -205,10 +205,10 @@ function ConversionLayoutView({
         };
       default:
         return {
-          wrap: "border-blue-100 bg-gradient-to-b from-blue-50/50 to-white shadow-sm",
-          iconBg: "bg-blue-100 text-blue-700",
-          value: "text-blue-700",
-          foot: "border-blue-100 bg-blue-50/90 text-blue-950",
+          wrap: "border-primary/20 bg-gradient-to-b from-primary/10 to-white shadow-sm",
+          iconBg: "bg-primary/15 text-brand-dark",
+          value: "text-brand-dark",
+          foot: "border-primary/20 bg-primary/10 text-brand-dark",
         };
     }
   };
@@ -254,13 +254,13 @@ function ConversionLayoutView({
           {r.calloutText ? (
             <aside
               className={cn(
-                "shrink-0 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-4 md:max-w-sm",
-                "shadow-[0_2px_12px_rgba(37,99,235,0.08)]",
+                "shrink-0 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-4 md:max-w-sm",
+                "shadow-[0_2px_12px_color-mix(in_oklab,var(--brand-lime),transparent_88%)]",
               )}
             >
               <div className="flex gap-3">
                 <ConversionCalloutEmoji emoji={conversionCalloutEmoji(r)} />
-                <p className="text-sm font-medium leading-snug text-blue-950">{interpolate(r.calloutText, ctx)}</p>
+                <p className="text-sm font-medium leading-snug text-brand-dark">{interpolate(r.calloutText, ctx)}</p>
               </div>
             </aside>
           ) : null}

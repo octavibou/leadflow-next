@@ -11,6 +11,7 @@ import { LandingQuizVariantsGrid } from "@/components/editor/landing/LandingQuiz
 import { LandingTeamVariantsGrid } from "@/components/editor/landing/LandingTeamVariantsGrid";
 import { LandingTestimonialsVariantsGrid } from "@/components/editor/landing/LandingTestimonialsVariantsGrid";
 import { LandingTrustVariantsGrid } from "@/components/editor/landing/LandingTrustVariantsGrid";
+import { LandingPluginsFlyoutContent } from "@/components/editor/landing/LandingPluginsFlyoutContent";
 import { useLandingBuilder } from "@/components/editor/landing/LandingBuilderContext";
 
 /**
@@ -41,7 +42,9 @@ function ConstructorFlyoutOverlay() {
                     ? "Plantillas Testimonios"
                     : constructorFlyout === "trust"
                       ? "Plantillas Confianza"
-                      : "";
+                      : constructorFlyout === "plugins"
+                        ? "Plugins de conversión"
+                        : "";
 
   return (
     <div
@@ -62,6 +65,7 @@ function ConstructorFlyoutOverlay() {
           {constructorFlyout === "team" && <LandingTeamVariantsGrid />}
           {constructorFlyout === "testimonials" && <LandingTestimonialsVariantsGrid />}
           {constructorFlyout === "trust" && <LandingTrustVariantsGrid />}
+          {constructorFlyout === "plugins" && <LandingPluginsFlyoutContent />}
         </div>
       </ScrollArea>
     </div>

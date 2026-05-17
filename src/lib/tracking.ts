@@ -1,4 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  extractBranchDeploymentColumns,
+  normalizeVisitMetadataForStorage,
+} from "@/lib/visitAttribution";
 
 const FUNNEL_SESSION_STORAGE_KEY = "leadflow_funnel_session_id";
 
@@ -62,8 +66,121 @@ export function isLeadflowPreviewMode(): boolean {
   return false;
 }
 
+/**
+ * True si esta vista debe tratarse como preview sin métricas: `lf_preview` en la URL
+ * o flag ya sincronizado en almacenamiento. Usar para permitir ver borradores en /f/…
+ * cuando el cliente tiene permiso (p. ej. propietario autenticado vía RLS).
+ */
+export function isLfPreviewRequestActive(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = new URLSearchParams(window.location.search).get("lf_preview");
+    if (raw !== null) {
+      const v = raw.trim().toLowerCase();
+      if (v === "0" || v === "false" || v === "off") return false;
+      if (v === "clear" || v === "clearpersist") return false;
+      if (v === "" || v === "1" || v === "true" || v === "yes" || v === "persist") return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return isLeadflowPreviewMode();
+}
+
 /** First-touch atribución por funnel + sesión interna (no cambia URLs públicas). */
 const FIRST_TOUCH_PREFIX = "leadflow_ft_v1_";
+
+/** Contexto de atribución por visita (tab); se congela salvo cambio de deployment activo vs guardado. */
+const FUNNEL_VISIT_CTX_PREFIX = "leadflow_ctx_v1_";
+
+export type FunnelVisitEntrySurface = "landing" | "quiz_only";
+
+export type FunnelVisitContextV1 = {
+  deployment_id: string;
+  deployment_version: number;
+  branch_id: string;
+  branch_slug: string;
+  entry_surface: FunnelVisitEntrySurface;
+  captured_at: string;
+  /** Si la URL usaba campaña publicada (`?c=`). */
+  campaign_id?: string | null;
+};
+
+function funnelVisitStorageKey(funnelId: string): string {
+  return `${FUNNEL_VISIT_CTX_PREFIX}${funnelId}`;
+}
+
+function readVisitCtxJson(funnelId: string): FunnelVisitContextV1 | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(funnelVisitStorageKey(funnelId));
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<FunnelVisitContextV1>;
+    if (!p || typeof p !== "object") return null;
+    if (typeof p.deployment_id !== "string" || typeof p.branch_id !== "string") return null;
+    return p as FunnelVisitContextV1;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tras resolver deployment activo de la rama: guarda atribución en sessionStorage.
+ * - Si ya hay contexto y el `deployment_id` sigue siendo el activo, no reescribe (navegación SPA).
+ * - Si hay contexto pero el activo cambió (p. ej. push + recarga), actualiza al deployment actual.
+ */
+export function trySyncFunnelVisitContextSession(
+  funnelId: string,
+  next: Omit<FunnelVisitContextV1, "captured_at"> & { captured_at?: string },
+): void {
+  if (typeof window === "undefined") return;
+  const activeId = next.deployment_id;
+  const existing = readVisitCtxJson(funnelId);
+  if (
+    existing &&
+    existing.deployment_id === activeId &&
+    existing.entry_surface === next.entry_surface
+  ) {
+    return;
+  }
+
+  const payload: FunnelVisitContextV1 = {
+    deployment_id: next.deployment_id,
+    deployment_version: next.deployment_version,
+    branch_id: next.branch_id,
+    branch_slug: next.branch_slug,
+    entry_surface: next.entry_surface,
+    captured_at: next.captured_at ?? new Date().toISOString(),
+    campaign_id: next.campaign_id ?? null,
+  };
+  try {
+    sessionStorage.setItem(funnelVisitStorageKey(funnelId), JSON.stringify(payload));
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/** Lee el contexto congelado de la visita (si existe). */
+export function getFunnelVisitContext(funnelId: string): FunnelVisitContextV1 | null {
+  return readVisitCtxJson(funnelId);
+}
+
+/** Fusiona metadata de eventos/leads con atributos de versión/rama de la visita. */
+export function mergeFunnelVisitMetadata(
+  funnelId: string,
+  metadata: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const ctx = readVisitCtxJson(funnelId);
+  if (!ctx) return normalizeVisitMetadataForStorage({ ...metadata });
+  const fromCtx: Record<string, unknown> = {
+    deployment_id: ctx.deployment_id,
+    deployment_version: ctx.deployment_version,
+    branch_id: ctx.branch_id,
+    branch_slug: ctx.branch_slug,
+    entry_surface: ctx.entry_surface,
+  };
+  return normalizeVisitMetadataForStorage({ ...metadata, ...fromCtx });
+}
 
 export function getOrCreateFunnelSessionId(): string {
   if (typeof window === "undefined") {
@@ -194,6 +311,10 @@ export function trackEvent(
     return;
   }
 
+  const mergedMetaRaw =
+    typeof window !== "undefined" ? mergeFunnelVisitMetadata(funnelId, metadata) : { ...metadata };
+  const mergedMeta = normalizeVisitMetadataForStorage(mergedMetaRaw);
+
   if (typeof window !== "undefined") {
     fetch("/api/track", {
       method: "POST",
@@ -204,7 +325,7 @@ export function trackEvent(
         funnelId,
         campaignId,
         eventType,
-        metadata,
+        metadata: mergedMeta,
       }),
     }).catch(() => {});
     return;
@@ -216,7 +337,7 @@ export function trackEvent(
       funnel_id: funnelId,
       campaign_id: campaignId,
       event_type: eventType,
-      metadata: metadata as any,
+      metadata: mergedMeta as any,
     })
     .then(() => {});
 }
@@ -228,24 +349,33 @@ export async function saveLead(
   answers: Record<string, string>,
   result: string | null,
   metadata: Record<string, any> = {}
-) {
+): Promise<string | null> {
   if (typeof window !== "undefined" && isLeadflowPreviewMode()) {
-    return;
+    return null;
   }
 
-  const { error } = await supabase
+  const mergedMetaRaw =
+    typeof window !== "undefined" ? mergeFunnelVisitMetadata(funnelId, metadata) : { ...metadata };
+  const mergedMeta = normalizeVisitMetadataForStorage(mergedMetaRaw);
+  const { branch_id: branchIdCol, deployment_id: deploymentIdCol } = extractBranchDeploymentColumns(mergedMeta);
+
+  const { data, error } = await supabase
     .from("leads")
     .insert({
       funnel_id: funnelId,
       campaign_id: campaignId,
       answers: answers as any,
       result,
-      metadata: metadata as any,
-    });
+      metadata: mergedMeta as any,
+      ...(branchIdCol ? { branch_id: branchIdCol } : {}),
+      ...(deploymentIdCol ? { deployment_id: deploymentIdCol } : {}),
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("[v0] Error saving lead:", error);
-    return;
+    return null;
   }
 
   if (typeof window !== "undefined") {
@@ -254,6 +384,8 @@ export async function saveLead(
       keepalive: true,
     }).catch(() => {});
   }
+
+  return data?.id ?? null;
 }
 
 // ---- External tracking scripts ----
@@ -416,4 +548,76 @@ export function getMetaCookies(): { fbp?: string; fbc?: string } {
     ...(fbp ? { fbp } : {}),
     ...(fbc ? { fbc } : {}),
   };
+}
+
+/**
+ * Server-side Meta CAPI call for offline conversions (e.g., closed deals from CRM).
+ * Does not depend on browser APIs.
+ */
+export async function fireMetaCapiServerSide(
+  funnelId: string,
+  eventName: string,
+  userData: {
+    external_id?: string;
+    email?: string;
+    phone?: string;
+    first_name?: string;
+    last_name?: string;
+    fbclid?: string;
+  },
+  customData: {
+    value?: number;
+    currency?: string;
+    content_name?: string;
+    [key: string]: unknown;
+  },
+  eventId: string
+): Promise<boolean> {
+  const projectId = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!projectId || !serviceKey) {
+    console.error("[fireMetaCapiServerSide] Missing env vars");
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/meta-capi`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          funnelId,
+          fbclid: userData.fbclid,
+          events: [
+            {
+              event_name: eventName,
+              event_time: Math.floor(Date.now() / 1000),
+              action_source: "system_generated",
+              event_id: eventId,
+              user_data: {
+                ...(userData.external_id ? { external_id: userData.external_id } : {}),
+                ...(userData.email ? { em: userData.email } : {}),
+                ...(userData.phone ? { ph: userData.phone } : {}),
+                ...(userData.first_name ? { fn: userData.first_name } : {}),
+                ...(userData.last_name ? { ln: userData.last_name } : {}),
+              },
+              custom_data:
+                Object.keys(customData).length > 0 ? customData : undefined,
+            },
+          ],
+        }),
+      }
+    );
+
+    return response.ok;
+  } catch (err) {
+    console.error("[fireMetaCapiServerSide] Error:", err);
+    return false;
+  }
 }

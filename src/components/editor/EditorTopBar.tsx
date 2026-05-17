@@ -2,21 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { House, Gear, FloppyDisk, Eye, Lightning, ArrowsClockwise, Pulse, Rocket, Layout } from "@phosphor-icons/react";
+import { House, Gear, FloppyDisk, Eye, Lightning, PaperPlaneTilt, Rocket, Layout } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PlasticButton } from "@/components/ui/plastic-button";
 import { Input } from "@/components/ui/input";
 import type { Funnel } from "@/types/funnel";
 import type { EditorTab } from "@/views/FunnelEditor";
 import { useFunnelStore } from "@/store/funnelStore";
-import { cn } from "@/lib/utils";
 import { appendLfPreviewQueryParam } from "@/lib/tracking";
 
 const editorTabs = [
   { id: "landing" as const, label: "Landing" },
   { id: "funnel" as const, label: "Quiz" },
-  { id: "webhook" as const, label: "Webhook" },
-  { id: "tracking" as const, label: "Tracking" },
+  { id: "webhook" as const, label: "Send" },
   { id: "publish" as const, label: "Publish" },
 ];
 
@@ -24,8 +23,7 @@ const getTabIcon = (tabId: string) => {
   switch (tabId) {
     case "landing": return Layout;
     case "funnel": return Lightning;
-    case "webhook": return ArrowsClockwise;
-    case "tracking": return Pulse;
+    case "webhook": return PaperPlaneTilt;
     case "publish": return Rocket;
     default: return null;
   }
@@ -39,7 +37,7 @@ interface EditorTopBarProps {
   onTabChange: (tab: EditorTab) => void;
 }
 
-export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, onTabChange }: EditorTopBarProps) {
+export function EditorTopBar({ funnel, onOpenSettings, activeTab, onTabChange }: EditorTopBarProps) {
   const router = useRouter();
   const updateFunnel = useFunnelStore((s) => s.updateFunnel);
   const saveFunnel = useFunnelStore((s) => s.saveFunnel);
@@ -68,15 +66,20 @@ export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, on
   };
 
   return (
-    <div className="h-14 border-b bg-background flex items-center px-4 shrink-0">
+    <header className="flex h-14 shrink-0 items-center gap-6 bg-chrome px-4 text-chrome-fg">
       {/* Left: Home + Name */}
-      <div className="flex items-center gap-3 min-w-0">
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push("/dashboard")}>
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
+          onClick={() => router.push("/dashboard")}
+        >
           <House className="h-4 w-4" weight="bold" />
         </Button>
         {editing ? (
           <Input
-            className="h-8 w-48"
+            className="h-8 w-48 border-chrome-border bg-chrome-hover text-sm text-chrome-fg placeholder:text-chrome-fg-muted"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
@@ -85,7 +88,7 @@ export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, on
           />
         ) : (
           <span
-            className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors truncate max-w-[180px]"
+            className="max-w-[180px] cursor-pointer truncate text-sm font-semibold text-chrome-fg transition-colors hover:text-white"
             onClick={() => setEditing(true)}
           >
             {funnel.name}
@@ -93,25 +96,32 @@ export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, on
         )}
       </div>
 
-      {/* Center: Tabs */}
-      <nav className="flex-1 flex items-center justify-center gap-1">
+      {/* Center: Tabs (mismo criterio visual que TopNav) */}
+      <nav className="flex flex-1 items-center justify-center gap-1.5">
         {editorTabs.map((tab) => {
           const Icon = getTabIcon(tab.id);
           const isActive = activeTab === tab.id;
+          if (isActive && Icon) {
+            return (
+              <PlasticButton
+                key={tab.id}
+                variant="brand-lime"
+                onClick={() => handleTabClick(tab.id)}
+                className="h-8 px-3"
+              >
+                <Icon className="h-3.5 w-3.5" weight="fill" />
+                {tab.label}
+              </PlasticButton>
+            );
+          }
           return (
             <Button
               key={tab.id}
               variant="ghost"
-              size="sm"
               onClick={() => handleTabClick(tab.id)}
-              className={cn(
-                "gap-2 rounded-lg px-4",
-                isActive
-                  ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              className="h-8 gap-2 px-3 text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
             >
-              {Icon && <Icon className="h-4 w-4" weight={isActive ? "fill" : "bold"} />}
+              {Icon && <Icon className="h-3.5 w-3.5" weight="bold" />}
               {tab.label}
             </Button>
           );
@@ -119,25 +129,38 @@ export function EditorTopBar({ funnel, onOpenSettings, campaignId, activeTab, on
       </nav>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Preview */}
-        <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview">
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-lg text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
+          onClick={handlePreview}
+          title="Vista previa sin métricas (lf_preview)"
+        >
           <Eye className="h-4 w-4" weight="bold" />
         </Button>
 
-        {/* Settings */}
-        <Button variant="ghost" size="icon" onClick={onOpenSettings}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-lg text-chrome-fg-muted hover:bg-chrome-hover hover:text-white"
+          onClick={onOpenSettings}
+        >
           <Gear className="h-4 w-4" weight="bold" />
         </Button>
 
-        {/* Save */}
-        <Button onClick={handleSave} className="relative">
-          <FloppyDisk className="h-4 w-4 mr-2" weight="bold" /> Guardar
+        <span className="relative inline-flex">
+          <PlasticButton variant="brand-lime" onClick={handleSave} className="h-8 px-3">
+            <FloppyDisk className="mr-2 h-4 w-4" weight="bold" /> Guardar
+          </PlasticButton>
           {hasUnsavedChanges && (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-background" />
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 z-30 h-2.5 w-2.5 rounded-full border-2 border-chrome bg-destructive"
+              aria-hidden
+            />
           )}
-        </Button>
+        </span>
       </div>
-    </div>
+    </header>
   );
 }

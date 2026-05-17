@@ -109,7 +109,7 @@ function PreviewSplitImageCta() {
         </div>
         <span className="text-[6px] text-amber-500">★★★★★</span>
       </div>
-      <div className="w-[34%] shrink-0 self-stretch rounded-md bg-gradient-to-b from-sky-100/70 to-muted-foreground/25 dark:from-sky-950/40" />
+      <div className="w-[34%] shrink-0 self-stretch rounded-md bg-gradient-to-b from-primary/15 to-muted-foreground/25 dark:from-chrome-panel/40" />
     </div>
   );
 }

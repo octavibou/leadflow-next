@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { GhlFieldsReference } from "@/components/routing/GhlFieldsReference";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useUiSessionState } from "@/hooks/useUiSessionState";
 import { useFunnelStore } from "@/store/funnelStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import type { Funnel } from "@/types/funnel";
@@ -35,11 +36,14 @@ export interface WorkspaceRouteConfig {
   clients: RouteClient[];
 }
 
+const ROUTING_EXPANDED_DEFAULT = { expandedClient: null as string | null };
+
 const LeadRouting = () => {
   const { funnels, fetchFunnels } = useFunnelStore();
   const { currentWorkspaceId } = useWorkspaceStore();
   const [routeConfig, setRouteConfig] = useState<WorkspaceRouteConfig>({ distributionStrategy: "all", clients: [] });
-  const [expandedClient, setExpandedClient] = useState<string | null>(null);
+  const [routingPanel, setRoutingPanel] = useUiSessionState("routing-panels", ROUTING_EXPANDED_DEFAULT);
+  const expandedClient = routingPanel.expandedClient;
   const [_saving, setSaving] = useState(false);
   const [configRowId, setConfigRowId] = useState<string | null>(null);
 
@@ -169,7 +173,7 @@ const LeadRouting = () => {
       qualifyingAnswers: {},
     };
     saveConfig({ ...routeConfig, clients: [...routeConfig.clients, newClient] });
-    setExpandedClient(newClient.id);
+    setRoutingPanel((u) => ({ ...u, expandedClient: newClient.id }));
   };
 
   const updateClient = (clientId: string, updates: Partial<RouteClient>) => {
@@ -317,7 +321,7 @@ const LeadRouting = () => {
             <Collapsible
               key={client.id}
               open={isExpanded}
-              onOpenChange={(open) => setExpandedClient(open ? client.id : null)}
+              onOpenChange={(open) => setRoutingPanel((u) => ({ ...u, expandedClient: open ? client.id : null }))}
             >
               <Card>
                 <CollapsibleTrigger asChild>

@@ -9,6 +9,7 @@ export type ConstructorFlyoutKind =
   | "team"
   | "testimonials"
   | "trust"
+  | "plugins"
   | null;
 
 /** Identificadores de bloques/secciones del constructor de landing (UI). */

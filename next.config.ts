@@ -23,7 +23,8 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: https:",
       "font-src 'self' data: https:",
       "connect-src 'self' https: wss:",
-      "frame-src https://www.youtube.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net",
+      // Same-origin iframes (p. ej. previews en el editor /f/… dentro de la app).
+      "frame-src 'self' https://www.youtube.com https://player.vimeo.com https://www.loom.com https://fast.wistia.net",
       "base-uri 'self'",
       // We intentionally do NOT set frame-ancestors here because funnels may be embedded.
     ].join("; ");

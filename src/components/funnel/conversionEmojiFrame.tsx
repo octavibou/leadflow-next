@@ -11,7 +11,7 @@ export function ConversionHeaderEmojiBadge({ emoji, className }: { emoji: string
   return (
     <span
       className={cn(
-        "flex h-12 w-12 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-blue-50 ring-2 ring-blue-100",
+        "flex h-12 w-12 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-primary/10 ring-2 ring-primary/20",
         className,
       )}
       aria-hidden

@@ -1,3 +1,7 @@
+import type { FunnelPluginsBundle } from "@/types/funnelPlugins";
+
+export type { FunnelPluginsBundle, FunnelPluginId } from "@/types/funnelPlugins";
+
 export type FunnelType = "blank" | "appointment" | "strategy_call" | "vsl" | "lead_magnet" | "recruiting" | "ai_secretary";
 
 export type StepType = "intro" | "question" | "contact" | "results" | "booking" | "vsl" | "delivery" | "thankyou";
@@ -51,6 +55,8 @@ export interface FunnelSettings {
   questionTextAlign?: "left" | "center" | "right";
   /** Si es false, la vista pública empieza en la primera pregunta y oculta el paso intro. undefined = true (compatibilidad). */
   useLanding?: boolean;
+  /** Plugins de conversión (embeds globales landing/quiz/contacto). */
+  plugins?: FunnelPluginsBundle;
 }
 
 export interface QuestionOption {

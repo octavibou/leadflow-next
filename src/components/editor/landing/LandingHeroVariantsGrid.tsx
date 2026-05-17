@@ -93,7 +93,7 @@ function PreviewCorporate() {
 
 function PreviewPromoTint() {
   return (
-    <div className="flex w-full flex-col gap-1 rounded-md bg-sky-100/80 px-2 py-1.5 dark:bg-sky-950/40">
+    <div className="flex w-full flex-col gap-1 rounded-md bg-primary/12 px-2 py-1.5 dark:bg-chrome-panel/40">
       <div className="h-1.5 w-[80%] self-center rounded-sm bg-foreground/90" />
       <div className="h-1 w-full rounded-sm bg-foreground/40" />
       <div className="mx-auto h-2 w-[50%] rounded-sm bg-primary" />

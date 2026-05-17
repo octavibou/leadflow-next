@@ -10,8 +10,8 @@ export const funnelPublicFooterInnerClass =
   "mx-auto flex w-full max-w-[760px] justify-center px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-10 md:pt-5 md:pb-[max(1.25rem,env(safe-area-inset-bottom))]";
 
 /**
- * Área tipo /f dentro del preview del editor: un solo scroll vertical; el pie va al final del contenido
- * (no pegado al borde inferior del viewport), igual que en la vista pública.
+ * Área tipo /f dentro del preview del editor: un solo scroll vertical; el pie (términos + Leadflow)
+ * va al final del contenido al hacer scroll, no como barra fija del viewport.
  */
 export function FunnelIntroScrollShell({
   children,

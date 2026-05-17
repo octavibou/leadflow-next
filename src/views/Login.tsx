@@ -37,9 +37,17 @@ export default function Login({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const emailTrimmed = email.trim();
+    if (!supabase) {
+      toast.error("La autenticación no está configurada en este entorno.");
+      return;
+    }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed,
+        password,
+      });
       if (error) {
         toast.error(error.message);
       } else {

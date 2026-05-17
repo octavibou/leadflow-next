@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Plus, DotsThree, Copy, Trash, Pencil, Megaphone, MagnifyingGlass, SquaresFour, List, Lock, ArrowRight, Rocket, Link, CaretDown, SquaresFour as SquaresFourIcon, Star, NotePencil, LinkSimple, Power, Archive, Export, CaretUpDown } from "@phosphor-icons/react";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { PlasticButton } from "@/components/ui/plastic-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter, CardAction } from "@/components/ui/card";
@@ -21,6 +20,10 @@ import { exportFunnelToHtml } from "@/lib/exportHtml";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionIdFromRow } from "@/lib/sessionAnalytics";
 import { cn } from "@/lib/utils";
+import { DashboardSkeleton } from "@/views/DashboardSkeleton";
+
+type FunnelFilter = "all" | "favorites" | "drafts" | "live" | "offline" | "archived" | "shared";
+type DateRange = "today" | "7d" | "month" | "year" | "all";
 
 const TemplatePicker = dynamic(
   () => import("@/components/TemplatePicker").then((m) => m.TemplatePicker),
@@ -95,16 +98,58 @@ function HealthRing({
   );
 }
 
+function clampDashboardDateRange(v: string | null): DateRange {
+  const allowed: DateRange[] = ["today", "7d", "month", "year", "all"];
+  return (allowed as string[]).includes(v || "") ? (v as DateRange) : "7d";
+}
+
+function clampDashboardFunnelFilter(v: string | null): FunnelFilter {
+  const allowed: FunnelFilter[] = ["all", "favorites", "drafts", "live", "offline", "archived", "shared"];
+  return (allowed as string[]).includes(v || "") ? (v as FunnelFilter) : "all";
+}
+
+function parseDashboardSearchParams(sp: URLSearchParams) {
+  return {
+    searchQuery: (sp.get("q") || "").trim(),
+    viewMode: sp.get("view") === "list" ? ("list" as const) : ("grid" as const),
+    dateRange: clampDashboardDateRange(sp.get("range")),
+    funnelFilter: clampDashboardFunnelFilter(sp.get("filter")),
+  };
+}
+
 const Dashboard = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { funnels, loading, fetchFunnels, deleteFunnel, duplicateFunnel, saveFunnel, unpublishFunnel } = useFunnelStore();
   const { currentWorkspaceId } = useWorkspaceStore();
   const { canCreateFunnel, usage, limits, loading: limitsLoading } = usePlanLimits();
   const [showPicker, setShowPicker] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [dateRange, setDateRange] = useState<DateRange>("7d");
-  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("all");
-  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState(() => parseDashboardSearchParams(searchParams).searchQuery);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => parseDashboardSearchParams(searchParams).viewMode);
+  const [dateRange, setDateRange] = useState<DateRange>(() => parseDashboardSearchParams(searchParams).dateRange);
+  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>(() => parseDashboardSearchParams(searchParams).funnelFilter);
+
+  useEffect(() => {
+    const n = parseDashboardSearchParams(searchParams);
+    setSearchQuery(n.searchQuery);
+    setViewMode(n.viewMode);
+    setDateRange(n.dateRange);
+    setFunnelFilter(n.funnelFilter);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const q = new URLSearchParams();
+      if (searchQuery.trim()) q.set("q", searchQuery.trim());
+      if (viewMode !== "grid") q.set("view", viewMode);
+      if (dateRange !== "7d") q.set("range", dateRange);
+      if (funnelFilter !== "all") q.set("filter", funnelFilter);
+      const qs = q.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [searchQuery, viewMode, dateRange, funnelFilter, pathname, router]);
 
   const handleNewFunnel = () => {
     if (!canCreateFunnel) {
@@ -317,9 +362,28 @@ const Dashboard = () => {
     URL.revokeObjectURL(url);
   };
 
+  const hasNoFunnels = funnels.length === 0;
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <PendingInvitations />
+      {loading ? (
+        <DashboardSkeleton />
+      ) : hasNoFunnels ? (
+        <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
+          <div className="rounded-2xl bg-accent/50 p-6 mb-6">
+            <Plus className="h-12 w-12 text-brand-dark" weight="bold" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Crea tu primer funnel</h2>
+          <p className="text-muted-foreground mb-6 text-center max-w-md">
+            Construye funnels de quiz de alta conversion y compartelos con un link unico.
+          </p>
+          <Button size="lg" onClick={handleNewFunnel}>
+            <Plus className="h-4 w-4 mr-2" weight="bold" /> Nuevo funnel
+          </Button>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <DropdownMenu>
@@ -434,13 +498,13 @@ const Dashboard = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Resumen</CardTitle>
             <CardDescription className="text-xs">
-              Sesiones, progreso del quiz y calidad del tráfico ({DATE_RANGE_LABELS[dateRange]}).
+              Visitas, progreso del quiz y calidad del tráfico ({DATE_RANGE_LABELS[dateRange]}).
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border bg-background p-3">
-                <div className="text-[11px] text-muted-foreground">Sesiones</div>
+                <div className="text-[11px] text-muted-foreground">Visitas</div>
                 <div className="mt-1 text-2xl font-semibold tabular-nums">{health.sessions.toLocaleString()}</div>
               </div>
               <div className="rounded-xl border bg-background p-3">
@@ -468,14 +532,14 @@ const Dashboard = () => {
             <HealthRing
               label="Landing Conversion"
               valuePct={pct(health.firstAnswered, health.sessions)}
-              detail={`${health.firstAnswered.toLocaleString()} / ${health.sessions.toLocaleString()} sesiones`}
+              detail={`${health.firstAnswered.toLocaleString()} / ${health.sessions.toLocaleString()} visitas`}
               colorClass="stroke-emerald-500"
             />
             <HealthRing
               label="Completion Rate"
               valuePct={pct(health.completed, health.sessions)}
               detail={`${health.completed.toLocaleString()} / ${health.sessions.toLocaleString()} iniciadas`}
-              colorClass="stroke-blue-500"
+              colorClass="stroke-primary"
             />
             <HealthRing
               label="Traffic Quality"
@@ -487,37 +551,12 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <Skeleton className="aspect-[16/10] w-full rounded-t-lg" />
-              <CardContent className="pt-6 space-y-4">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-10 w-full rounded-md" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : filteredFunnels.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
-          <div className="rounded-2xl bg-accent/50 p-6 mb-6">
-            <Plus className="h-12 w-12 text-primary" weight="bold" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">
-            {searchQuery ? "Sin resultados" : "Crea tu primer funnel"}
-          </h2>
-          <p className="text-muted-foreground mb-6 text-center max-w-md">
-            {searchQuery
-              ? "No se encontraron funnels con ese nombre."
-              : "Construye funnels de quiz de alta conversion y compartelos con un link unico."}
+      {filteredFunnels.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+          <h2 className="text-xl font-semibold mb-2">Sin resultados</h2>
+          <p className="text-muted-foreground text-center max-w-md">
+            No se encontraron funnels con esos filtros.
           </p>
-          {!searchQuery && (
-            <Button size="lg" onClick={() => setShowPicker(true)}>
-              <Plus className="h-4 w-4 mr-2" weight="bold" /> New Funnel
-            </Button>
-          )}
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -558,6 +597,8 @@ const Dashboard = () => {
           ))}
         </div>
       )}
+        </>
+      )}
 
       <TemplatePicker open={showPicker} onClose={() => setShowPicker(false)} />
     </div>
@@ -576,7 +617,7 @@ interface FunnelActionProps {
   onTogglePublish: () => void;
 }
 
-type FunnelFilter = "all" | "favorites" | "drafts" | "live" | "offline" | "archived" | "shared";
+type ChartPoint = { day: string; leads: number };
 
 const FUNNEL_FILTER_OPTIONS: { value: FunnelFilter; label: string; icon: any }[] = [
   { value: "all",       label: "Todos los Funnels", icon: SquaresFourIcon },
@@ -588,8 +629,6 @@ const FUNNEL_FILTER_OPTIONS: { value: FunnelFilter; label: string; icon: any }[]
   { value: "shared",    label: "Compartidos",         icon: Export },
 ];
 
-type DateRange = "today" | "7d" | "month" | "year" | "all";
-type ChartPoint = { day: string; leads: number };
 type FunnelMetrics = {
   leadsTotal: number;
   impressions: number;
@@ -794,7 +833,7 @@ function FunnelListItem({ funnel, onEdit, onCampaigns, onDuplicate, onExport, on
       onClick={onEdit}
     >
       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <span className="text-sm font-bold text-primary">{funnel.name.charAt(0).toUpperCase()}</span>
+        <span className="text-sm font-bold text-brand-dark">{funnel.name.charAt(0).toUpperCase()}</span>
       </div>
       <div className="min-w-0 flex-1">
         <h3 className="font-medium truncate">{funnel.name}</h3>

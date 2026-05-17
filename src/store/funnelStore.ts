@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Funnel, FunnelType, FunnelStep } from "@/types/funnel";
 import { DEFAULT_SETTINGS } from "@/types/funnel";
 import { createTemplateSteps } from "@/lib/templates";
+import { publishBootstrapMain } from "@/lib/publish/publishApi";
 
 interface FunnelStore {
   funnels: Funnel[];
@@ -49,9 +50,19 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
   currentWorkspaceId: null,
 
   fetchFunnels: async (workspaceId?: string) => {
+    if (!supabase) {
+      set({ loading: false, loaded: true });
+      return;
+    }
+    const nextWorkspaceId = workspaceId || null;
     // Re-fetch if workspace changed
-    if (get().loaded && get().currentWorkspaceId === (workspaceId || null)) return;
-    set({ loading: true, currentWorkspaceId: workspaceId || null });
+    if (get().loaded && get().currentWorkspaceId === nextWorkspaceId && !get().loading) return;
+    const workspaceChanged = get().currentWorkspaceId !== nextWorkspaceId;
+    set({
+      loading: true,
+      currentWorkspaceId: nextWorkspaceId,
+      ...(workspaceChanged ? { funnels: [] } : {}),
+    });
 
     let query = supabase
       .from("funnels")
@@ -63,10 +74,15 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
     }
 
     const { data, error } = await query;
-    if (!error && data) {
-      set({ funnels: data.map(dbToFunnel), loaded: true });
+    if (get().currentWorkspaceId !== nextWorkspaceId) return;
+    if (error) {
+      console.error("[funnelStore] fetchFunnels:", error);
     }
-    set({ loading: false });
+    if (!error && data) {
+      set({ funnels: data.map(dbToFunnel), loaded: true, loading: false });
+    } else {
+      set({ funnels: [], loaded: true, loading: false });
+    }
   },
 
   createFunnel: async (name, type, workspaceId, options) => {
@@ -103,6 +119,9 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
     if (error || !data) return null;
     const funnel = dbToFunnel(data);
     set((s) => ({ funnels: [funnel, ...s.funnels] }));
+    void publishBootstrapMain(funnel.id).catch(() => {
+      /* ramas publish por defecto: no bloquear creación */
+    });
     return funnel;
   },
 
@@ -172,6 +191,7 @@ export const useFunnelStore = create<FunnelStore>()((set, get) => ({
     if (error || !data) return null;
     const funnel = dbToFunnel(data);
     set((s) => ({ funnels: [funnel, ...s.funnels] }));
+    void publishBootstrapMain(funnel.id).catch(() => {});
     return funnel;
   },
 

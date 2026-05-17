@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  extractBranchDeploymentColumns,
+  normalizeVisitMetadataForStorage,
+} from "@/lib/visitAttribution";
 
 function pickCountryFromHeaders(headers: Headers): string | null {
   const candidates = [
@@ -52,7 +56,12 @@ export async function POST(req: Request) {
     const funnelId = String(body.funnelId || "").trim();
     const eventType = String(body.eventType || "").trim();
     const campaignId = body.campaignId ? String(body.campaignId) : null;
-    const metadata = (body.metadata && typeof body.metadata === "object" ? body.metadata : {}) as Record<string, unknown>;
+    const metadataRaw = (body.metadata && typeof body.metadata === "object" ? body.metadata : {}) as Record<
+      string,
+      unknown
+    >;
+    const metadata = normalizeVisitMetadataForStorage(metadataRaw);
+    const { branch_id: branchIdCol, deployment_id: deploymentIdCol } = extractBranchDeploymentColumns(metadata);
 
     if (!funnelId || !eventType) {
       return NextResponse.json({ ok: false, error: "Missing funnelId or eventType" }, { status: 400 });
@@ -72,6 +81,8 @@ export async function POST(req: Request) {
       campaign_id: campaignId,
       event_type: eventType,
       metadata: metadata as any,
+      ...(branchIdCol ? { branch_id: branchIdCol } : {}),
+      ...(deploymentIdCol ? { deployment_id: deploymentIdCol } : {}),
     });
 
     if (error) {

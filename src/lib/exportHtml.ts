@@ -39,6 +39,10 @@ function buildOptionLabelMap(steps: FunnelStep[]): Record<string, string> {
   return map;
 }
 
+/**
+ * HTML estático autónomo del funnel (sin React).
+ * `settings.plugins` no se aplica aquí: los plugins de conversión solo funcionan en la URL pública y en el editor.
+ */
 export function exportFunnelToHtml(funnel: Funnel): string {
   const { settings, steps } = funnel;
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
@@ -77,6 +81,9 @@ export function exportFunnelToHtml(funnel: Funnel): string {
     return Math.min(99, Math.max(80, n));
   })();
   const CONTACT_PROG_JS_SHOW = contactStepEntity ? contactStepEntity.contactShowNearCompleteProgress !== false : false;
+  const CONTACT_HAS_APELLIDO = !!(contactStepEntity?.contactFields || []).some((f) =>
+    f.label.toLowerCase().includes("apellido"),
+  );
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -136,7 +143,7 @@ h2{font-size:1.5rem;font-weight:700;line-height:1.3;margin-bottom:8px!important}
 .delivery-card{background:#f9fafb;border:2px solid #e5e7eb;border-radius:16px;padding:32px!important;text-align:center}
 .delivery-card h2{margin-bottom:8px!important}
 .delivery-card p{color:#666;margin-bottom:24px!important}
-.contact-card{max-width:420px;margin:0 auto!important;padding:24px 22px 28px!important;border:1px solid #f3f4f6;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+.contact-wrap{max-width:420px;margin:0 auto!important;width:100%}
 .contact-badge{display:flex;justify-content:center;margin-bottom:16px!important}
 .contact-badge span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:.74rem;font-weight:700;border-radius:999px;background:#ecfdf5;color:#065f46}
 .contact-head{text-align:center;font-size:1.35rem;font-weight:800;line-height:1.2;color:#111;margin:0!important}
@@ -170,6 +177,7 @@ var TOTAL_Q=${totalQuestionSteps};
 var CONTACT_STEP=${contactStepOrder};
 var CONTACT_PROG_PCT=${CONTACT_PROG_JS_PCT};
 var CONTACT_PROG_SHOW=${CONTACT_PROG_JS_SHOW};
+var CONTACT_HAS_APELLIDO=${JSON.stringify(CONTACT_HAS_APELLIDO)};
 var QUALIFIED_ROUTE=${resultsStep?.resultsConfig?.qualifiedRoute ?? 0};
 var DISQUALIFIED_ROUTE=${resultsStep?.resultsConfig?.disqualifiedRoute ?? 0};
 var CONTACT_CONSENT_REQUIRED=${JSON.stringify(contactConsentRequired)};
@@ -229,12 +237,34 @@ function submitF(e){
    var ln=document.getElementById('fln');
    var em=document.getElementById('fe');
    var ph=document.getElementById('fph');
-   var firstName=nm?nm.value.trim():'';
-   var lastName=ln?ln.value.trim():'';
+   var rawFirst=nm?nm.value.trim():'';
+   var rawLast=ln&&ln.value!=null?ln.value.trim():'';
    var email=em?em.value.trim():'';
    var phone=ph?ph.value.trim():'';
    if(CONTACT_CONSENT_REQUIRED&&!cons){alert(CONSENT_ALERT);return}
    if(email&&!email.includes('@')){alert(EMAIL_ALERT);return}
+   function splitFL(full){
+     var t=(full||'').trim();
+     if(!t)return{firstName:'',lastName:''};
+     var p=t.split(/\\s+/).filter(Boolean);
+     if(p.length<2)return{firstName:t,lastName:''};
+     return{firstName:p.slice(0,-1).join(' '),lastName:p[p.length-1]};
+   }
+   var fullNameRaw=CONTACT_HAS_APELLIDO?(rawFirst+' '+rawLast).trim():rawFirst;
+   var firstName='',lastName='';
+   if(CONTACT_HAS_APELLIDO){
+     firstName=rawFirst;
+     lastName=rawLast;
+     if(!lastName){
+       var sp=splitFL(rawFirst);
+       firstName=sp.firstName;
+       lastName=sp.lastName;
+     }
+   }else{
+     var s=splitFL(rawFirst);
+     firstName=s.firstName;
+     lastName=s.lastName;
+   }
    var isQ=checkQ();
    if(WEBHOOK_URL){
       var namedAnswers={};for(var k in fd){var qLabel=Q_LABELS[k];if(qLabel){var optKey=k+'_'+fd[k];namedAnswers[qLabel]=OPT_LABELS[optKey]||fd[k]}};
@@ -244,7 +274,7 @@ function submitF(e){
       summaryLines.push('Calificado: '+(isQ?'Sí':'No'),'','📝 Respuestas:');
       for(var k2 in fd){var ql=Q_LABELS[k2];if(ql){var ok=k2+'_'+fd[k2];summaryLines.push('• '+ql+': '+(OPT_LABELS[ok]||fd[k2]))}}
       var summary=summaryLines.join('\n');
-      fetch(WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firstName:firstName,lastName:lastName,email:email,phone:phone,qualified:isQ,answers:namedAnswers,summary:summary,timestamp:new Date().toISOString()})}).catch(function(){});
+      fetch(WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firstName:firstName,lastName:lastName,fullName:fullNameRaw,first_name:firstName,last_name:lastName,full_name:fullNameRaw,email:email,phone:phone,qualified:isQ,answers:namedAnswers,summary:summary,timestamp:new Date().toISOString()})}).catch(function(){});
     }
   var qEl=document.getElementById('resultQ');
   var dEl=document.getElementById('resultD');
@@ -315,7 +345,7 @@ ${optsHtml}
           : "";
       return `<div class="step" id="s${step.order}"><div class="inner">
 ${backBtn}
-<div class="contact-card">
+<div class="contact-wrap">
 <div class="contact-badge"><span>✓ ${escHtml(cv.badgeLabel)}</span></div>
 <h2 class="contact-head">${escHtml(cv.headline)}</h2>
 <p class="contact-sub">${escHtml(cv.subheadline)}</p>${trustBlk}

@@ -16,12 +16,29 @@ import {
   isLandingTrustTemplateId,
 } from "@/components/editor/landing/landingBuilderTypes";
 
-/** Contenedor del icono de vista previa (estilo captura: caja clara con borde). */
-function PreviewIconBox({ className, children }: { className?: string; children: React.ReactNode }) {
+/** Miniaturas dentro del chip cromado: evitar `bg-primary` (en claro coincide con `brand-dark` y no se ve). */
+const CHROME_ICON_ACCENT = "bg-brand-lime";
+const CHROME_ICON_MUTED = "bg-white/25";
+const CHROME_ICON_SOFT = "bg-white/15";
+const CHROME_ICON_FAINT = "bg-white/12";
+
+/** Contenedor del icono de vista previa: claro o cromado (verde oscuro de marca en el constructor). */
+function PreviewIconBox({
+  className,
+  surface = "light",
+  children,
+}: {
+  className?: string;
+  surface?: "light" | "chrome";
+  children: React.ReactNode;
+}) {
   return (
     <div
       className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/90 bg-background shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.08)]",
+        surface === "chrome"
+          ? "border border-white/15 bg-brand-dark"
+          : "border border-border/90 bg-background",
         className,
       )}
     >
@@ -32,8 +49,13 @@ function PreviewIconBox({ className, children }: { className?: string; children:
 
 function BasicBlocksIcon() {
   return (
-    <PreviewIconBox>
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded bg-primary text-[12px] font-bold leading-none text-primary-foreground">
+    <PreviewIconBox surface="chrome">
+      <span
+        className={cn(
+          "flex h-[26px] w-[26px] items-center justify-center rounded text-[12px] font-bold leading-none text-brand-dark",
+          CHROME_ICON_ACCENT,
+        )}
+      >
         T
       </span>
     </PreviewIconBox>
@@ -42,10 +64,10 @@ function BasicBlocksIcon() {
 
 function HeroSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] flex-col justify-start gap-1 p-1">
-        <div className="h-1.5 w-full rounded-sm bg-primary" />
-        <div className="h-2 w-full rounded-sm bg-primary/15" />
+        <div className={cn("h-1.5 w-full rounded-sm", CHROME_ICON_ACCENT)} />
+        <div className={cn("h-2 w-full rounded-sm", CHROME_ICON_SOFT)} />
       </div>
     </PreviewIconBox>
   );
@@ -53,12 +75,12 @@ function HeroSectionIcon() {
 
 function ProductSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] gap-0.5 p-1">
-        <div className="h-full w-2 rounded-sm bg-primary" />
+        <div className={cn("h-full w-2 rounded-sm", CHROME_ICON_ACCENT)} />
         <div className="flex flex-1 flex-col gap-0.5">
-          <div className="h-1.5 w-full rounded-sm bg-primary/20" />
-          <div className="flex-1 rounded-sm bg-primary/10" />
+          <div className={cn("h-1.5 w-full rounded-sm", CHROME_ICON_MUTED)} />
+          <div className={cn("flex-1 rounded-sm", CHROME_ICON_FAINT)} />
         </div>
       </div>
     </PreviewIconBox>
@@ -67,9 +89,9 @@ function ProductSectionIcon() {
 
 function CtaSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] items-center justify-center p-1">
-        <div className="h-2 w-[90%] rounded-sm bg-primary" />
+        <div className={cn("h-2 w-[90%] rounded-sm", CHROME_ICON_ACCENT)} />
       </div>
     </PreviewIconBox>
   );
@@ -77,11 +99,11 @@ function CtaSectionIcon() {
 
 function AboutSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] flex-col gap-0.5 p-1">
-        <div className="h-1.5 w-full rounded-sm bg-primary" />
-        <div className="h-2 w-full rounded-sm bg-primary/25" />
-        <div className="h-2 w-full rounded-sm bg-primary/10" />
+        <div className={cn("h-1.5 w-full rounded-sm", CHROME_ICON_ACCENT)} />
+        <div className={cn("h-2 w-full rounded-sm", CHROME_ICON_MUTED)} />
+        <div className={cn("h-2 w-full rounded-sm", CHROME_ICON_FAINT)} />
       </div>
     </PreviewIconBox>
   );
@@ -89,10 +111,10 @@ function AboutSectionIcon() {
 
 function QuizSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] justify-center gap-1 p-1">
-        <div className="h-full w-[38%] rounded-sm bg-primary/90" />
-        <div className="h-full w-[38%] rounded-sm bg-primary/90" />
+        <div className={cn("h-full w-[38%] rounded-sm", CHROME_ICON_ACCENT)} />
+        <div className={cn("h-full w-[38%] rounded-sm", CHROME_ICON_ACCENT)} />
       </div>
     </PreviewIconBox>
   );
@@ -100,10 +122,10 @@ function QuizSectionIcon() {
 
 function TeamSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="grid h-[26px] w-[26px] grid-cols-2 gap-0.5 p-1">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-sm bg-primary/80" />
+          <div key={i} className={cn("rounded-sm", CHROME_ICON_MUTED)} />
         ))}
       </div>
     </PreviewIconBox>
@@ -112,10 +134,10 @@ function TeamSectionIcon() {
 
 function TestimonialsSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="flex h-[26px] w-[26px] flex-col justify-end gap-1 p-1">
-        <div className="h-2 flex-1 rounded-sm bg-primary/12" />
-        <div className="h-1.5 w-full rounded-sm bg-primary" />
+        <div className={cn("h-2 flex-1 rounded-sm", CHROME_ICON_FAINT)} />
+        <div className={cn("h-1.5 w-full rounded-sm", CHROME_ICON_ACCENT)} />
       </div>
     </PreviewIconBox>
   );
@@ -123,10 +145,22 @@ function TestimonialsSectionIcon() {
 
 function TrustSectionIcon() {
   return (
-    <PreviewIconBox>
+    <PreviewIconBox surface="chrome">
       <div className="relative h-[26px] w-[26px] p-1">
-        <div className="absolute left-1 top-1 h-2 w-2 rounded-sm bg-primary" />
-        <div className="h-full w-full rounded-sm border border-dashed border-primary/35" />
+        <div className={cn("absolute left-1 top-1 h-2 w-2 rounded-sm", CHROME_ICON_ACCENT)} />
+        <div className="h-full w-full rounded-sm border border-dashed border-white/40" />
+      </div>
+    </PreviewIconBox>
+  );
+}
+
+function PluginsMenuIcon() {
+  return (
+    <PreviewIconBox surface="chrome">
+      <div className="flex h-[26px] w-[26px] items-end justify-center gap-0.5 p-1">
+        <div className={cn("h-3 w-1.5 rounded-sm", CHROME_ICON_ACCENT)} />
+        <div className="h-2 w-1.5 rounded-sm bg-white/45" />
+        <div className="h-4 w-1.5 rounded-sm bg-white/70" />
       </div>
     </PreviewIconBox>
   );
@@ -165,6 +199,8 @@ export function LandingAddSectionPanel() {
   const trustRowActive =
     constructorFlyout === "trust" || (isLandingTrustTemplateId(activeComponent) && sheetOpen);
 
+  const pluginsRowActive = constructorFlyout === "plugins";
+
   return (
     <div className="flex flex-col">
       <h3 className="mb-1 text-base font-semibold tracking-tight">Añadir sección</h3>
@@ -181,6 +217,22 @@ export function LandingAddSectionPanel() {
       >
         <BasicBlocksIcon />
         <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Bloques básicos</span>
+        <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground/45" weight="bold" />
+      </button>
+
+      <Separator className="my-4" />
+
+      <button
+        type="button"
+        onMouseEnter={() => setConstructorFlyout("plugins")}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg py-2.5 pl-2 pr-2 text-left transition-colors hover:bg-muted/70",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          pluginsRowActive && "bg-primary/10",
+        )}
+      >
+        <PluginsMenuIcon />
+        <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Plugins</span>
         <CaretRight className="h-4 w-4 shrink-0 text-muted-foreground/45" weight="bold" />
       </button>
 

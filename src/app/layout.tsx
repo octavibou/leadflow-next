@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { PlatformAnalytics } from "@/components/analytics/PlatformAnalytics";
 
 export const metadata: Metadata = {
   title: "Leadflow",
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning className="bg-background text-foreground antialiased">
         <Providers>{children}</Providers>
+        <PlatformAnalytics />
       </body>
     </html>
   );
