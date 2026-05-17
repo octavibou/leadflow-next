@@ -73,8 +73,14 @@ export function GhlSyncPanel({
         });
         fetchSyncStatus();
       } else {
+        const errMsg = String(data.errors?.[0] || data.error || "Error desconocido");
+        const needsReconnect =
+          errMsg.includes("not authorized for this scope") ||
+          errMsg.includes("401");
         toast.error("Error en sincronización", {
-          description: data.errors?.[0] || data.error || "Error desconocido",
+          description: needsReconnect
+            ? "Faltan permisos para campos personalizados. En GoHighLevel Marketplace activa los scopes locations/customFields.readonly y locations/customFields.write, luego desconecta y vuelve a conectar GoHighLevel aquí."
+            : errMsg,
         });
       }
     } catch (err) {

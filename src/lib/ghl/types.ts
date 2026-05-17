@@ -139,4 +139,6 @@ export const GHL_SCOPES = [
   'contacts.readonly',
   'contacts.write',
   'locations.readonly',
+  'locations/customFields.readonly',
+  'locations/customFields.write',
 ].join(' ');
