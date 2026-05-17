@@ -56,20 +56,22 @@ export async function exchangeGhlAuthorizationCode(code: string): Promise<GhlTok
   console.log("[GHL OAuth] Token URL:", GHL_OAUTH_TOKEN_URL);
   console.log("[GHL OAuth] Exchanging code, redirect_uri:", redirectUri);
 
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: redirectUri,
+    user_type: "Location",
+  });
+
   const response = await fetch(GHL_OAUTH_TOKEN_URL, {
     method: "POST",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-      user_type: "Location",
-    }),
+    body,
   });
 
   const rawText = await response.text();
