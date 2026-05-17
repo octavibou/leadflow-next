@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseUserIdFromRoute, createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 import { GHL_OAUTH_BASE_URL, GHL_SCOPES } from "@/lib/ghl/types";
-
-function getAppBaseUrl(req: Request): string {
-  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
-
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  if (host) return `${proto}://${host}`;
-
-  return "https://os.leadflow.es";
-}
+import { getAppBaseUrl } from "@/lib/ghl/oauth";
 
 function redirectWithError(req: Request, message: string, status = 302) {
   const url = new URL("/dashboard", getAppBaseUrl(req));

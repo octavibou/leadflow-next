@@ -55,7 +55,9 @@ export async function middleware(request: NextRequest) {
   const isOnboarding = pathname.startsWith("/onboarding/");
   const isUnsubscribe = pathname === "/unsubscribe";
   /** Callback OAuth de GHL: debe ejecutarse aunque la sesión haya caducado durante el flujo externo. */
-  const isGhlOAuthCallback = pathname === "/api/integrations/ghl/callback";
+  const isGhlOAuthCallback =
+    pathname === "/api/integrations/ghl/callback" ||
+    pathname.startsWith("/api/integrations/ghl/callback/");
 
   if (
     !session &&

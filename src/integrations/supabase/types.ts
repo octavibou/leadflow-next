@@ -860,6 +860,117 @@ export type Database = {
           },
         ]
       }
+      ghl_field_mappings: {
+        Row: {
+          id: string
+          workspace_id: string
+          funnel_id: string
+          leadflow_field_slug: string
+          leadflow_field_label: string
+          leadflow_field_type: string
+          ghl_field_id: string | null
+          ghl_field_name: string | null
+          created_in_ghl: boolean
+          sync_status: string
+          last_synced_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          funnel_id: string
+          leadflow_field_slug: string
+          leadflow_field_label: string
+          leadflow_field_type: string
+          ghl_field_id?: string | null
+          ghl_field_name?: string | null
+          created_in_ghl?: boolean
+          sync_status?: string
+          last_synced_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          funnel_id?: string
+          leadflow_field_slug?: string
+          leadflow_field_label?: string
+          leadflow_field_type?: string
+          ghl_field_id?: string | null
+          ghl_field_name?: string | null
+          created_in_ghl?: boolean
+          sync_status?: string
+          last_synced_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_field_mappings_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ghl_field_mappings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_sync_events: {
+        Row: {
+          id: string
+          workspace_id: string
+          funnel_id: string | null
+          event_type: string
+          payload: Json
+          status: string
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          funnel_id?: string | null
+          event_type: string
+          payload?: Json
+          status?: string
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          funnel_id?: string | null
+          event_type?: string
+          payload?: Json
+          status?: string
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_sync_events_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ghl_sync_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_integrations: {
         Row: {
           id: string
