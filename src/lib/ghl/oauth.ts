@@ -53,6 +53,9 @@ export async function exchangeGhlAuthorizationCode(code: string): Promise<GhlTok
     throw new Error("Missing GHL OAuth configuration");
   }
 
+  console.log("[GHL OAuth] Token URL:", GHL_OAUTH_TOKEN_URL);
+  console.log("[GHL OAuth] Exchanging code, redirect_uri:", redirectUri);
+
   const response = await fetch(GHL_OAUTH_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -70,6 +73,7 @@ export async function exchangeGhlAuthorizationCode(code: string): Promise<GhlTok
   });
 
   const rawText = await response.text();
+  console.log("[GHL OAuth] Response status:", response.status);
   if (!response.ok) {
     console.error("[GHL OAuth] Authorization code exchange failed:", response.status, rawText);
     throw new Error(`Token exchange failed: ${response.status}`);
