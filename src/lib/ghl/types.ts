@@ -127,8 +127,13 @@ export interface GhlContact {
   customFields?: Record<string, string>;
 }
 
-export const GHL_OAUTH_BASE_URL = 'https://marketplace.gohighlevel.com';
+/** Authorization UI (choose location, install). */
+export const GHL_OAUTH_AUTHORIZE_URL = 'https://marketplace.gohighlevel.com';
+/** Token exchange & refresh (API host — not marketplace.gohighlevel.com). */
+export const GHL_OAUTH_TOKEN_URL = 'https://services.leadconnectorhq.com/oauth/token';
 export const GHL_API_BASE_URL = 'https://services.leadconnectorhq.com';
+/** @deprecated Use GHL_OAUTH_AUTHORIZE_URL or GHL_OAUTH_TOKEN_URL */
+export const GHL_OAUTH_BASE_URL = GHL_OAUTH_AUTHORIZE_URL;
 
 export const GHL_SCOPES = [
   'contacts.readonly',

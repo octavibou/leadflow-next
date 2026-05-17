@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import type { GhlOAuthConfig, GhlTokenResponse } from "./types";
-import { GHL_OAUTH_BASE_URL } from "./types";
+import type { GhlOAuthConfig } from "./types";
+import { refreshGhlAccessToken } from "./oauth";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,37 +15,6 @@ export interface GhlTokenResult {
   locationId: string;
   needsReconnect: boolean;
   error?: string;
-}
-
-async function refreshTokens(refreshToken: string): Promise<GhlTokenResponse> {
-  const clientId = process.env.GHL_CLIENT_ID;
-  const clientSecret = process.env.GHL_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Missing GHL OAuth configuration");
-  }
-
-  const response = await fetch(`${GHL_OAUTH_BASE_URL}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[GHL Token Refresh] Failed:", errorText);
-    throw new Error(`Token refresh failed: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 export async function getValidGhlToken(
@@ -98,7 +67,7 @@ export async function getValidGhlToken(
   }
 
   try {
-    const tokens = await refreshTokens(config.refresh_token);
+    const tokens = await refreshGhlAccessToken(config.refresh_token);
 
     const newExpiresAt = new Date(
       Date.now() + tokens.expires_in * 1000

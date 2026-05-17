@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseUserIdFromRoute, createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
-import { GHL_OAUTH_BASE_URL, GHL_SCOPES } from "@/lib/ghl/types";
+import { GHL_OAUTH_AUTHORIZE_URL, GHL_SCOPES } from "@/lib/ghl/types";
 import { getAppBaseUrl } from "@/lib/ghl/oauth";
 
 function redirectWithError(req: Request, message: string, status = 302) {
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
       })
     ).toString("base64url");
 
-    const authUrl = new URL(`${GHL_OAUTH_BASE_URL}/oauth/chooselocation`);
+    const authUrl = new URL(`${GHL_OAUTH_AUTHORIZE_URL}/oauth/chooselocation`);
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);

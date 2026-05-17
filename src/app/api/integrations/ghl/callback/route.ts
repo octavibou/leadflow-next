@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { GhlOAuthConfig } from "@/lib/ghl/types";
-import { GHL_OAUTH_BASE_URL } from "@/lib/ghl/types";
-import { getAppBaseUrl, normalizeGhlTokenResponse } from "@/lib/ghl/oauth";
+import { exchangeGhlAuthorizationCode, getAppBaseUrl } from "@/lib/ghl/oauth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -18,41 +17,6 @@ function parseState(state: string): StatePayload | null {
   } catch {
     return null;
   }
-}
-
-async function exchangeCodeForTokens(code: string) {
-  const clientId = process.env.GHL_CLIENT_ID;
-  const clientSecret = process.env.GHL_CLIENT_SECRET;
-  const redirectUri = process.env.GHL_REDIRECT_URI;
-
-  if (!clientId || !clientSecret || !redirectUri) {
-    throw new Error("Missing GHL OAuth configuration");
-  }
-
-  const response = await fetch(`${GHL_OAUTH_BASE_URL}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-    }),
-  });
-
-  const rawText = await response.text();
-  if (!response.ok) {
-    console.error("[GHL Callback] Token exchange failed:", response.status, rawText);
-    throw new Error(`Token exchange failed: ${response.status}`);
-  }
-
-  const raw = JSON.parse(rawText) as Record<string, unknown>;
-  console.log("[GHL Callback] Token exchange raw keys:", Object.keys(raw));
-  return normalizeGhlTokenResponse(raw);
 }
 
 async function fetchLocationInfo(accessToken: string, locationId: string) {
@@ -182,7 +146,7 @@ export async function GET(req: Request) {
 
   try {
     console.log("[GHL Callback] ========== STEP 3: Token exchange ==========");
-    const tokens = await exchangeCodeForTokens(code);
+    const tokens = await exchangeGhlAuthorizationCode(code);
     console.log("[GHL Callback] Token exchange success, locationId:", tokens.locationId);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
