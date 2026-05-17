@@ -884,7 +884,7 @@ const PublicFunnel = () => {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const handleContactSubmit = () => {
+  const handleContactSubmit = async () => {
     const sessionId = sessionIdRef.current || getOrCreateFunnelSessionId();
     const tp = trackingPayloadRef.current;
 
