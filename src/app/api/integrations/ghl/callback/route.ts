@@ -200,21 +200,21 @@ export async function GET(req: Request) {
       configKeys: Object.keys(oauthConfig),
     });
 
-    const { error: upsertError, data: upsertData } = await getSupabaseAdmin()
+    const upsertResult = await getSupabaseAdmin()
       .from("workspace_integrations")
-      .upsert(
-        {
-          workspace_id: statePayload.workspace_id,
-          provider: "ghl",
-          config: oauthConfig,
-          enabled: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "workspace_id,provider" }
-      )
-      .select();
+      .upsert({
+        workspace_id: statePayload.workspace_id,
+        provider: "ghl",
+        config: oauthConfig,
+        enabled: true,
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: "workspace_id,provider",
+        ignoreDuplicates: false 
+      });
 
-    console.log("[GHL Callback] Upsert result - error:", upsertError, "data:", upsertData);
+    const upsertError = upsertResult.error;
+    console.log("[GHL Callback] Upsert result - error:", upsertError, "status:", upsertResult.status);
 
     if (upsertError) {
       console.error("[GHL Callback] FAIL: Supabase upsert error:", JSON.stringify(upsertError, null, 2));
